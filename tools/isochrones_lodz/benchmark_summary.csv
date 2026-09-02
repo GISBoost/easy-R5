@@ -1,0 +1,13 @@
+method,city,variant,origins,hours,elapsed_s,s_per_origin_hour,notes
+otp_plugin_cold,lodz,static,5,1,15.05,3.010,"easyotp:generateisochrones via QGIS Processing, fresh graph build + server start, single departure time (2026-08-21 08:00), same lodz.osm.pbf + lodz_static_gtfs_2026-08-21.zip r5r used"
+otp_plugin_warm_graph,lodz,static,5,1,14.44,2.888,"same call, EXISTING_GRAPH_DIR reused (graph build skipped) -- barely faster, dominant cost is JVM+OTP-server startup per call, not the graph build"
+r5r_ci,szczecin,static,1567,17,1350.5,0.0507,"GitHub Actions ubuntu-latest 4-core runner, 2026-08-26 full batch run"
+r5r_ci,szczecin,rt,1567,17,1352.9,0.0508,"GitHub Actions ubuntu-latest 4-core runner, 2026-08-26 full batch run"
+r5r_ci,krakow,static,1633,17,1820.6,0.0656,"GitHub Actions ubuntu-latest 4-core runner, 2026-08-26 full batch run"
+r5r_ci,krakow,rt,1633,17,1817.3,0.0655,"GitHub Actions ubuntu-latest 4-core runner, 2026-08-26 full batch run"
+r5r_ci,poznan,static,1350,17,1617.2,0.0705,"GitHub Actions ubuntu-latest 4-core runner, 2026-08-26 full batch run"
+r5r_ci,poznan,rt,1350,17,1470.2,0.0641,"GitHub Actions ubuntu-latest 4-core runner, 2026-08-26 full batch run"
+r5r_ci,gdansk,static,1389,17,1685.4,0.0714,"GitHub Actions ubuntu-latest 4-core runner, 2026-08-26 full batch run"
+r5r_ci,gdansk,rt,1389,17,1631.8,0.0691,"GitHub Actions ubuntu-latest 4-core runner, 2026-08-26 full batch run"
+r5r_ci,warszawa,static,668,17,1942.6,0.1711,"GitHub Actions ubuntu-latest 4-core runner, 2026-08-26, 1000m grid (668 origins, not the SES study's 500m/2546) -- per-origin-hour cost is 2.4-3.4x the other cities despite fewer origins, densest transit network of the 6"
+r5r_ci,warszawa,rt,668,17,1916.9,0.1688,"GitHub Actions ubuntu-latest 4-core runner, 2026-08-26, 1000m grid (668 origins, not the SES study's 500m/2546) -- per-origin-hour cost is 2.4-3.4x the other cities despite fewer origins, densest transit network of the 6"

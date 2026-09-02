@@ -1,0 +1,69 @@
+# --- Input data (per CLAUDE.md: data is not versioned) ---
+*.osm.pbf
+*.osm.pbf.mapdb
+*.osm.pbf.mapdb.p
+*.zip
+*.gtfs
+*.gpkg
+*.gpkg-wal
+*.gpkg-shm
+*.csv
+# ...but the study inputs and measurements under tools/ are code-like and ARE versioned
+# (they define a run; without them the pipelines are not reproducible).
+!tools/**/*_hex_origins*.csv
+!tools/**/*_hex_ses.csv
+!tools/isochrones_lodz/benchmark_summary.csv
+
+# --- R5 runtime artifacts ---
+*.jar
+network.dat
+network_settings.json
+*_network_static/
+*_network_rt/
+network_static/
+network_rt/
+build-config.json
+*.log
+
+# --- Downloaded Java runtime (DownloadR5) ---
+jdk/
+jre/
+
+# --- Intermediate and output rasters ---
+*.tif
+*.tiff
+*.vrt
+
+# --- Working / cache directories ---
+work/
+workdir/
+cache/
+tmp/
+# NOTE: no blanket `out/` rule — tools/*/out/ holds published figures and web-map GeoJSON
+# that are deliverables of the studies, not scratch.
+
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+# --- Node (geobuf packing in tools/) ---
+node_modules/
+
+# --- QGIS / IDE ---
+*.qgs~
+*.qgz~
+.idea/
+.vscode/
+*.swp
+
+# --- Crash artifacts ---
+bash.exe.stackdump
+hs_err_pid*.log
+
+# --- Keep: sample/reference geometry that is small and is checked in deliberately ---
+!docs/**/*.geojson
