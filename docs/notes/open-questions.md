@@ -10,16 +10,20 @@ reasoned about as far as it usefully can be.
    `EasyR5Runner.java`, compiled with the downloaded JDK, run as a subprocess. JPype stays as a
    documented reversal path only.
 2. ~~Does `tools/ses_income_lodz/` move?~~ **Yes** — ADR-0003 Accepted: all four folders plus
-   `isochrones-cities.yml`. Not executed yet.
+   `isochrones-cities.yml`. **Executed 2026-09-02**, including ~6 GB of untracked study data and
+   the link updates in `mapy-analizy` and the blog.
+3. ~~Hex grid / population algorithms — copy or cross-link?~~ **No hex-grid algorithm** (it wraps
+   `native:creategrid`; document the recipe instead), but **`PreparePopulationLayer`** (renamed
+   from easy-OTP's `PrepareStudentLayer`) **and `PopulationOverlay` move here** — they are
+   genuinely unique. PRD §4.7–4.9. Two follow-ups this creates: the `openpyxl` exception needs
+   Michał's sign-off in `CLAUDE.md`, and removing them from the published easy-OTP v0.7 is a
+   breaking change that deserves its own release, not a side effect.
 
 ## Blocking — for Michał, not for an agent
 
-3. **Do `GenerateHexGrid` / `PopulationOverlay` / `PrepareStudentLayer` get copied into Easy-R5,
-   or does Easy-R5 tell users to run easy-OTP for those?** Copying means two divergent
-   implementations of identical, engine-independent code. Recommendation: copy `GenerateHexGrid`
-   (too central to make people install a second plugin), cross-link the other two.
-4. **Repository name and QGIS plugin name.** `easy-R5` / `Easy-R5` is assumed throughout. The
-   official QGIS plugin repository will also want a unique plugin name and folder.
+4. **Repository name and QGIS plugin name.** `easy-R5` / `Easy-R5` is assumed throughout, and
+   the GitHub repository now exists under that name. The official QGIS plugin repository will
+   also want a unique plugin name and folder.
 
 ## Answered by the spike (2026-09-02) — see [`spike-r5-probe-2026-09-02.md`](spike-r5-probe-2026-09-02.md)
 

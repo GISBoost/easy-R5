@@ -46,9 +46,11 @@ either. This note is the capability map the roadmap should be built from.
   (`recordTravelTimeHistograms`, or ≤5 percentiles, see primer §3). **Verify before promising
   this.** If it is not reachable, the honest R5 metric is a percentile-based one, and it should be
   named differently rather than pretending to be the same number.
-- **Hex grid, population overlay, student layer, XLSX reports** — engine-independent; port the
-  code from easy-OTP largely unchanged, or (better) keep them in easy-OTP and tell users to run
-  both plugins. Decide once; do not maintain two divergent copies of the same algorithm.
+- **Population overlay and the GUS census-sheet importer** — engine-independent, but unique
+  enough to be worth owning: they move here as `PopulationOverlay` and `PreparePopulationLayer`
+  (decided 2026-09-02). The **hex grid does not**: easy-OTP's `GenerateHexGrid` wraps
+  `native:creategrid`, and re-implementing a stock QGIS algorithm buys nothing — document the
+  recipe instead.
 
 **Where easy-OTP stays the right tool — do not port**
 

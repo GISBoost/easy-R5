@@ -230,6 +230,8 @@ używane przez `TestR5Setup` i przy walidacji daty dla istniejącej sieci.
 | `matrix.py` | scalanie CSV z batchy, wczytanie do struktury wynikowej, budowa warstw/tabel |
 | `accessibility.py` | dostępność skumulowana (step / logistic / exponential) liczona z macierzy |
 | `settings.py` | klucze QSettings **z własnym prefiksem** `easy_r5/…` — nigdy wspólne z easy-OTP |
+| `xlsx_reader.py` | samodzielny skrypt CLI czytający XLSX (M5, §4.8) — **musi** działać jako podproces |
+| `dependencies.py` | wyłącznie bootstrap `openpyxl` dla §4.8, jeśli Michał zatwierdzi ten wyjątek |
 
 Testy jednostkowe (`easy_r5/test/`) muszą działać **poza QGIS-em** dla: `job_spec`,
 `network_cache`, `accessibility`, parsera protokołu i doboru heap-u. Wzorzec: `easy_otp/test/`.
@@ -352,11 +354,59 @@ dotyczy, i dokończyć pozostałe, zamiast przerywać całość.
 **Uzasadnienie:** R5 nie produkuje poligonów; ani r5r, ani r5py, ani Conveyal Analysis nie
 robią tego w Javie. Konturowanie zostaje w QGIS.
 
-### 4.7 `GenerateHexGrid` (Analysis)
+### 4.7 Siatka heksagonalna — **nie robimy własnego algorytmu**
 
-Port z `easy_otp/algorithms/generate_hex_grid.py` bez zmian semantyki (siatka jest
-niezależna od silnika). Uzasadnienie duplikacji: użytkownik nie może być zmuszany do
-instalacji drugiej wtyczki dla siatki, która jest wejściem do wszystkiego.
+Decyzja (2026-09-02, Michał): `GenerateHexGrid` z easy-OTP jest w praktyce opakowaniem na
+`native:creategrid` (+ `native:extractbylocation`), czyli powiela generyczny algorytm QGIS.
+Nie duplikujemy. Dokumentacja pokazuje gotowy przepis — dokładnie ten, którym zbudowano siatki
+w `tools/accessibility_cities/` (`HOWTO_MANUAL.md` krok 4: `native:creategrid` TYPE=4,
+HSPACING/VSPACING=500 m, potem `native:extractbylocation` z całymi heksami) — i tyle.
+Jeśli praktyka pokaże, że użytkownicy się na tym wykładają, wraca to jako osobny ticket.
+
+### 4.8 `PreparePopulationLayer` (Analysis)
+
+Port z `easy_otp/algorithms/prepare_student_layer.py`, **przemianowany** —
+nazwa „student" była zawężeniem: algorytm wczytuje dowolny arkusz GUS NSP 2021 i łączy dane
+z geometrią obwodów spisowych; grupa 20–29 lat była tylko pierwszym zastosowaniem.
+Przenosi się razem z `easy_otp/core/xlsx_reader.py`.
+
+| Parametr | Typ | Uwagi |
+|---|---|---|
+| `XLSX_PATH` | File | arkusz GUS NSP 2021 |
+| `SHEET` | String | województwo; puste = pierwszy arkusz |
+| `GEOMETRY_LAYER` | VectorLayer (poligony) | obwody spisowe |
+| `JOIN_FIELD` | Field | klucz łączenia |
+| `AGE_COLUMNS` | String, lista | które kolumny wiekowe zsumować (dom. wszystkie) |
+| `OUTPUT_LAYER` | VectorDestination | |
+
+**Dwie rzeczy przenieś dosłownie, nie „popraw":**
+
+1. **Odczyt XLSX musi iść w osobnym procesie.** `_elementtree.pyd` konfliktuje z `libxml2`
+   załadowanym przez stos GDAL/Qt QGIS-a; wywołany z wątku `QgsTask` daje fatal exception
+   (access violation w `xmlDictReference`) na Windows. `xlsx_reader.py` jest napisany jako
+   samodzielny skrypt CLI właśnie dlatego. To nie jest nadmiarowa ostrożność.
+2. **`openpyxl`** — patrz niżej.
+
+> **Zmiana twardego ograniczenia, do potwierdzenia przez Michała.** `CLAUDE.md` mówi dziś
+> „ZERO `pip install`" bez wyjątków. Ten algorytm wymaga `openpyxl`, ładowanego tak jak
+> w easy-OTP (`core/dependencies.py`, pobranie wheela przez `urllib` — bez admina, obchodzi
+> brak SSL w pipie QGIS 3.22). **Rekomendacja: przyjąć ten sam, jeden wyjątek**, opisany
+> identycznie jak w easy-OTP i ograniczony wyłącznie do `PreparePopulationLayer` — nie
+> generalizować. Alternatywa (własny czytnik XLSX na `zipfile` + `xml.etree`, ~100 linii,
+> zero zależności) jest wykonalna, bo podproces i tak już istnieje, ale to pisanie parsera
+> tam, gdzie działający wheel jest sprawdzony od v0.2 easy-OTP.
+
+### 4.9 `PopulationOverlay` (Analysis)
+
+Port z `easy_otp/algorithms/population_overlay.py` bez zmian semantyki: interpolacja arealna
+demografii na siatkę. **Zachowaj pole typu Float** — reference model w QGIS zaokrąglał do
+liczb całkowitych i gubił ułamki mieszkańców; easy-OTP naprawił to w v0.2 i ta poprawka
+przenosi się razem z kodem.
+
+> Te dwa algorytmy są **niezależne od silnika** i docelowo mają żyć tutaj, nie w easy-OTP
+> (decyzja Michała). Usunięcie ich z easy-OTP to jednak zmiana łamiąca dla wydanej wtyczki
+> v0.7 — należy ją zrobić **osobno**, jako świadome wydanie z notą deprecacyjną, a nie przy
+> okazji tego PRD. Do tego czasu obie wtyczki je mają.
 
 ## 5. Reguły UX i obsługi błędów (obowiązkowe)
 
@@ -461,11 +511,16 @@ uruchomienie na własnej warstwie punktowej w innym CRS.
 ten sam wzorzec przestrzenny.
 
 ### M5 — izochrony + wydanie 0.1.0
-**Zakres:** `GenerateIsochrones`, `GenerateHexGrid`, style, README, `metadata.txt` (changelog),
-tłumaczenie PL (`.ts`/`.qm`), `KNOWN_ISSUES.md`.
+**Zakres:** `GenerateIsochrones`, `PreparePopulationLayer` + `PopulationOverlay` (§4.8–4.9),
+style, README, `metadata.txt` (changelog), tłumaczenie PL (`.ts`/`.qm`), `KNOWN_ISSUES.md`.
 **Kryteria akceptacji:**
 - Izochrony 15/30/45 min z jednego punktu w Gdańsku wyglądają sensownie i nie mają dziur
   wynikających z rasteryzacji.
+- `PreparePopulationLayer` wczytuje arkusz GUS NSP 2021 **bez wywracania QGIS-a** (odczyt
+  w podprocesie) i daje ten sam wynik co `PrepareStudentLayer` z easy-OTP na tym samym pliku.
+- `PopulationOverlay` zachowuje wartości ułamkowe (pole Float, nie Integer).
+- README pokazuje przepis na siatkę heksagonalną na `native:creategrid` (§4.7) — nie ma
+  własnego algorytmu siatki.
 - Wtyczka przechodzi walidację pakietu QGIS (sekcja 7) i instaluje się z ZIP-a.
 **Weryfikacja przez człowieka:** pełna ścieżka od zera na czystym profilu: pobierz → zbuduj →
 policz → zobacz mapę.
@@ -503,8 +558,8 @@ Na podstawie oficjalnej dokumentacji PyQGIS (Plugins):
 Scenariusze sieciowe (modyfikacje R5); szczegółowe itineraria i `paths`; taryfy i pareto;
 metryka „minut obsługi" z histogramów (v0.2 — mechanizm potwierdzony, ale wymaga własnego
 projektu UI i nazewnictwa, żeby nie udawać metryki easy-OTP); GTFS-RT w jakiejkolwiek
-postaci; `PopulationOverlay` i `PrepareStudentLayer` (zostają w easy-OTP, link krzyżowy);
-`TemporalDensityResult`; wielowątkowość po stronie Javy (batch procesów wystarcza).
+postaci; własny generator siatki heksagonalnej (§4.7); `TemporalDensityResult`;
+wielowątkowość po stronie Javy (batch procesów wystarcza).
 
 ## 10. Materiały dla agenta
 

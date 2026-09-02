@@ -44,9 +44,30 @@ matrix → travel-time raster → `gdal:contour_polygon` per cutoff. Output poly
 - Grid density is the cost knob and it is quadratic. Warn before generating an absurd grid, and
   reuse M3's `ESTIMATE_FIRST` machinery rather than inventing a second estimator.
 
-### `GenerateHexGrid` (PRD §4.7)
-Port from easy-OTP with the same semantics. If you change anything, say why in the commit
-message — the existing studies' grids must stay reproducible.
+### `PreparePopulationLayer` + `PopulationOverlay` (PRD §4.8–4.9)
+Ports of easy-OTP's `prepare_student_layer.py` (**renamed** — it reads any GUS NSP 2021 sheet,
+not just students) and `population_overlay.py`, plus `core/xlsx_reader.py`.
+
+Two things carry over verbatim and are not up for improvement:
+
+- **XLSX is read in a separate process.** `_elementtree.pyd` clashes with the `libxml2` that
+  QGIS's GDAL/Qt stack loads; called from a `QgsTask` worker thread it is a Windows fatal
+  exception (access violation in `xmlDictReference`). That is why `xlsx_reader.py` is a
+  standalone CLI script.
+- **`PopulationOverlay` keeps a Float field.** The QGIS reference model rounded to integers and
+  lost fractional residents; easy-OTP fixed that in v0.2.
+
+`openpyxl`: read the PRD §4.8 note first. It proposes adopting easy-OTP's single bootstrap
+exception (`core/dependencies.py`, urllib wheel download). **If Michał has not confirmed it in
+`CLAUDE.md`, stop and ask** — do not add a pip install against a hard constraint on your own,
+and do not silently write your own XLSX parser instead.
+
+### No hex-grid algorithm (PRD §4.7)
+Deliberate: easy-OTP's `GenerateHexGrid` wraps `native:creategrid`, and duplicating a stock QGIS
+algorithm is not worth a second implementation. Document the recipe in the README instead —
+`native:creategrid` TYPE=4 with HSPACING/VSPACING, then `native:extractbylocation` for whole
+hexes, exactly as `tools/accessibility_cities/HOWTO_MANUAL.md` step 4 describes. Do not build the
+algorithm "for convenience".
 
 ### Styles
 `styles/` QML for: accessibility (graduated), isochrones (categorised by cutoff), travel-time
@@ -71,7 +92,11 @@ matrix OD lines. Load them automatically on the output layers.
 - 15/30/45-minute isochrones from a Gdańsk point look plausible and have no rasterisation holes.
 - A deliberately fragmented case (very early morning, sparse service) either produces sane
   polygons or reports which cutoff failed — never a bare GDAL traceback.
-- `GenerateHexGrid` reproduces a grid matching the existing `gdansk_hex_origins.csv` layout.
+- `PreparePopulationLayer` reads a GUS NSP 2021 sheet without crashing QGIS, and matches
+  easy-OTP's output on the same file.
+- `PopulationOverlay` output has fractional values, not rounded integers.
+- The README's hex-grid recipe reproduces `gdansk_hex_origins.csv`'s layout using stock QGIS
+  algorithms only.
 - Plugin ZIP installs on a clean QGIS profile and every algorithm appears in the toolbox.
 - Polish UI actually switches with QGIS's locale.
 

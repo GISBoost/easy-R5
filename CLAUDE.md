@@ -37,8 +37,11 @@ Accepted** — od niego zależy cała warstwa `core/`.
 - QGIS minimum **3.22 LTR**. Tylko **PyQGIS** + biblioteki z dystrybucji QGIS.
 - **ZERO `pip install`** w `easy_r5/`. Pobieranie binariów przy setupie (JDK, jar R5)
   jest dozwolone — tak samo jak `DownloadJre` w easy-OTP. Instalowanie pakietów
-  Pythona do interpretera QGIS-a — nie. Jedyny dopuszczalny wyjątek to plan B z
-  ADR-0001 (JPype), i tylko jeśli ADR-0001 zostanie zmieniony świadomą decyzją.
+  Pythona do interpretera QGIS-a — nie. Dopuszczalne wyjątki, oba wąskie:
+  1. `openpyxl` — **wyłącznie** dla `PreparePopulationLayer` (PRD §4.8), ładowany
+     dokładnie tak jak w easy-OTP (`core/dependencies.py`, wheel przez `urllib`).
+     **Wymaga potwierdzenia Michała, zanim agent to zaimplementuje.** Nie generalizuj.
+  2. plan B z ADR-0001 (JPype) — tylko jeśli ADR-0001 zostanie zmieniony świadomą decyzją.
 - **ZERO R, ZERO GRASS** w kodzie wtyczki. (Reguła dotyczy `easy_r5/`; `tools/` jest
   z niej wyłączone — patrz niżej.)
 - **R5 i Java: dokładnie wersje z ADR-0002** (dziś: `r5-v7.6-all.jar`, Temurin 21).
@@ -61,8 +64,13 @@ Wtyczka = provider Processing, sekcje jak w easy-OTP, **bez sekcji `Realtime/`**
 Setup/       — DownloadR5 (JDK 21 + jar R5), DownloadTransitData, BuildNetwork
 Diagnostics/ — TestR5Setup
 Analysis/    — RunTravelTimeMatrix (flagowy), RunAccessibility, GenerateIsochrones,
-               GenerateHexGrid, CompareScenarios, (później) RunScenarioAnalysis
+               PreparePopulationLayer, PopulationOverlay, CompareScenarios,
+               (później) RunScenarioAnalysis
 ```
+
+**Bez własnego generatora siatki heksagonalnej** — easy-OTP-owy `GenerateHexGrid` to
+opakowanie na `native:creategrid`; nie powielamy generycznego algorytmu QGIS, tylko
+opisujemy przepis w README (PRD §4.7).
 
 Logika w `core/`: `r5_runner` (uruchamianie procesu Javy, progress, anulowanie),
 `job_spec` (JSON in), `results_reader` (CSV/JSON out), `network_cache`, `settings`,

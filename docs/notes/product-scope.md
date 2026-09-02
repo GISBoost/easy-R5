@@ -60,8 +60,10 @@ Grouped the way easy-OTP groups its provider. `Setup/` and `Analysis/` only — 
 - `RunAccessibility` — opportunities + cutoffs + decay (step / logistic / exponential) →
   accessibility per origin. This is what every migrated `tools/` script computes.
 - `GenerateIsochrones` — travel-time grid → contoured polygons in QGIS.
-- `GenerateHexGrid` — port from easy-OTP (or reuse easy-OTP's; decide once).
-- `PopulationOverlay`, `PrepareStudentLayer` — same question.
+- `PreparePopulationLayer` (renamed from easy-OTP's `PrepareStudentLayer` — it reads any GUS
+  NSP 2021 sheet, students were just the first use) and `PopulationOverlay` — engine-independent
+  but genuinely unique, so they live here. **No hex-grid algorithm**: easy-OTP's wraps
+  `native:creategrid`, and a stock QGIS algorithm is not worth a second implementation.
 - `CompareScenarios` — two runs → delta layer. Cheap to build once the matrix exists, and the
   thing planners actually ask for.
 - *(later)* `RunScenarioAnalysis` — R5 network modifications (a new line, a closed street). The
