@@ -54,7 +54,24 @@ venv/
 # --- Node (geobuf packing in tools/) ---
 node_modules/
 
+# --- isochrones_lodz intermediates (network build caches are covered above; these are
+# the ogr2ogr exports and the staged per-origin data/ waiting to be copied into
+# mapy-analizy/izochrony-transport/data/) ---
+tools/isochrones_lodz/*_isochrones_ogr.geojson
+tools/isochrones_lodz/*_isochrones_simplified.geojson
+tools/isochrones_lodz/data/
+
+# --- r5r's rJavaEnv-managed JDK (~250 MB runtime, reinstallable via rJavaEnv) ---
+tools/**/rjavaenv/
+
+# --- large rendered figures that were never versioned in easy-OTP either
+# (the published ones under out/atlas/ and out/webmap/ ARE tracked) ---
+tools/accessibility_cities/out/*.png
+
 # --- QGIS / IDE ---
+# local project files point at absolute paths on one machine
+*.qgz
+*.qgs
 *.qgs~
 *.qgz~
 .idea/
