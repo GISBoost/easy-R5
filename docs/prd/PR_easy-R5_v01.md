@@ -368,7 +368,7 @@ Jeśli praktyka pokaże, że użytkownicy się na tym wykładają, wraca to jako
 Port z `easy_otp/algorithms/prepare_student_layer.py`, **przemianowany** —
 nazwa „student" była zawężeniem: algorytm wczytuje dowolny arkusz GUS NSP 2021 i łączy dane
 z geometrią obwodów spisowych; grupa 20–29 lat była tylko pierwszym zastosowaniem.
-Przenosi się razem z `easy_otp/core/xlsx_reader.py`.
+Kopiowany razem z `easy_otp/core/xlsx_reader.py`.
 
 | Parametr | Typ | Uwagi |
 |---|---|---|
@@ -401,12 +401,15 @@ Przenosi się razem z `easy_otp/core/xlsx_reader.py`.
 Port z `easy_otp/algorithms/population_overlay.py` bez zmian semantyki: interpolacja arealna
 demografii na siatkę. **Zachowaj pole typu Float** — reference model w QGIS zaokrąglał do
 liczb całkowitych i gubił ułamki mieszkańców; easy-OTP naprawił to w v0.2 i ta poprawka
-przenosi się razem z kodem.
+jest częścią kopiowanego kodu.
 
-> Te dwa algorytmy są **niezależne od silnika** i docelowo mają żyć tutaj, nie w easy-OTP
-> (decyzja Michała). Usunięcie ich z easy-OTP to jednak zmiana łamiąca dla wydanej wtyczki
-> v0.7 — należy ją zrobić **osobno**, jako świadome wydanie z notą deprecacyjną, a nie przy
-> okazji tego PRD. Do tego czasu obie wtyczki je mają.
+> **To są kopie, nie przeniesienie.** easy-OTP zachowuje `PrepareStudentLayer`
+> i `PopulationOverlay` bez zmian — z easy-OTP nic nie zabieramy (decyzja Michała,
+> 2026-09-02). Obie wtyczki mają własną, niezależną implementację i mogą się rozejść;
+> **nie próbuj ich współdzielić** (import między wtyczkami, wspólny pakiet, symlink) —
+> zależność między wtyczkami w repozytorium QGIS jest gorsza niż duplikat.
+> Jeśli poprawiasz tu błąd, który istnieje też w easy-OTP, zgłoś to w raporcie zamiast
+> sięgać do drugiego repo.
 
 ## 5. Reguły UX i obsługi błędów (obowiązkowe)
 

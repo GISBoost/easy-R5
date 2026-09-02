@@ -47,10 +47,12 @@ either. This note is the capability map the roadmap should be built from.
   this.** If it is not reachable, the honest R5 metric is a percentile-based one, and it should be
   named differently rather than pretending to be the same number.
 - **Population overlay and the GUS census-sheet importer** — engine-independent, but unique
-  enough to be worth owning: they move here as `PopulationOverlay` and `PreparePopulationLayer`
-  (decided 2026-09-02). The **hex grid does not**: easy-OTP's `GenerateHexGrid` wraps
-  `native:creategrid`, and re-implementing a stock QGIS algorithm buys nothing — document the
-  recipe instead.
+  enough to be worth owning: **copied** here as `PopulationOverlay` and
+  `PreparePopulationLayer` (decided 2026-09-02). easy-OTP keeps its own copies — nothing is
+  taken out of it — so the two will drift, and that is accepted: a cross-plugin dependency in
+  the QGIS repository would be worse than a duplicate. The **hex grid is not copied**:
+  easy-OTP's `GenerateHexGrid` wraps `native:creategrid`, and re-implementing a stock QGIS
+  algorithm buys nothing — document the recipe instead.
 
 **Where easy-OTP stays the right tool — do not port**
 

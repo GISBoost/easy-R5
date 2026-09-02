@@ -48,6 +48,12 @@ Accepted** — od niego zależy cała warstwa `core/`.
   Java uruchamiana pełną ścieżką do binarki, nie przez wersję systemową.
 - **Nie dziel ustawień z easy-OTP.** Osobne klucze QSettings — user może mieć
   zainstalowane obie wtyczki, jedna z Javą 8, druga z 21.
+- **Z easy-OTP nic nie zabieramy — tylko kopiujemy.** Algorytm potrzebny tu i tam
+  istnieje w obu repo jako osobna implementacja. Żadnych importów między wtyczkami,
+  wspólnych pakietów ani symlinków: zależność między wtyczkami w repozytorium QGIS
+  jest gorsza niż duplikat. Kopie mogą się rozejść i to jest akceptowane.
+  (Wyjątek historyczny: r5r-owe `tools/` **przeniesiono** w całości 2026-09-02,
+  ADR-0003 — to była jednorazowa, zatwierdzona operacja, nie precedens.)
 - Licencja: **GPLv3 lub nowsza** (`GPL-3.0-or-later`). R5 jest MIT — kompatybilne.
   Ewentualne repo towarzyszące (gdyby runner urósł do własnego jara) — MIT, jak
   `easy-GTFS-RT`.

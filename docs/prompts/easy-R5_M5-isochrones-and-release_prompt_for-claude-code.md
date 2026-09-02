@@ -45,8 +45,10 @@ matrix → travel-time raster → `gdal:contour_polygon` per cutoff. Output poly
   reuse M3's `ESTIMATE_FIRST` machinery rather than inventing a second estimator.
 
 ### `PreparePopulationLayer` + `PopulationOverlay` (PRD §4.8–4.9)
-Ports of easy-OTP's `prepare_student_layer.py` (**renamed** — it reads any GUS NSP 2021 sheet,
-not just students) and `population_overlay.py`, plus `core/xlsx_reader.py`.
+**Copies** of easy-OTP's `prepare_student_layer.py` (**renamed** — it reads any GUS NSP 2021
+sheet, not just students) and `population_overlay.py`, plus `core/xlsx_reader.py`.
+easy-OTP keeps its own — nothing is removed from that repo, and the two copies are allowed to
+drift. Do not import across plugins or invent a shared package.
 
 Two things carry over verbatim and are not up for improvement:
 

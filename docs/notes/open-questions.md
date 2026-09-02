@@ -14,10 +14,10 @@ reasoned about as far as it usefully can be.
    the link updates in `mapy-analizy` and the blog.
 3. ~~Hex grid / population algorithms — copy or cross-link?~~ **No hex-grid algorithm** (it wraps
    `native:creategrid`; document the recipe instead), but **`PreparePopulationLayer`** (renamed
-   from easy-OTP's `PrepareStudentLayer`) **and `PopulationOverlay` move here** — they are
-   genuinely unique. PRD §4.7–4.9. Two follow-ups this creates: the `openpyxl` exception needs
-   Michał's sign-off in `CLAUDE.md`, and removing them from the published easy-OTP v0.7 is a
-   breaking change that deserves its own release, not a side effect.
+   from easy-OTP's `PrepareStudentLayer`) **and `PopulationOverlay` are copied here** — they are
+   genuinely unique. **Copied, not moved** — easy-OTP keeps its own; nothing is taken out of
+   easy-OTP. PRD §4.7–4.9. One follow-up: the `openpyxl` exception needs Michał's sign-off in
+   `CLAUDE.md` before the M5 agent implements it.
 
 ## Blocking — for Michał, not for an agent
 

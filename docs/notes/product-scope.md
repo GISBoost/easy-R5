@@ -62,8 +62,9 @@ Grouped the way easy-OTP groups its provider. `Setup/` and `Analysis/` only — 
 - `GenerateIsochrones` — travel-time grid → contoured polygons in QGIS.
 - `PreparePopulationLayer` (renamed from easy-OTP's `PrepareStudentLayer` — it reads any GUS
   NSP 2021 sheet, students were just the first use) and `PopulationOverlay` — engine-independent
-  but genuinely unique, so they live here. **No hex-grid algorithm**: easy-OTP's wraps
-  `native:creategrid`, and a stock QGIS algorithm is not worth a second implementation.
+  but genuinely unique, so Easy-R5 gets its own copies while easy-OTP keeps its own.
+  **No hex-grid algorithm**: easy-OTP's wraps `native:creategrid`, and a stock QGIS algorithm is
+  not worth a second implementation.
 - `CompareScenarios` — two runs → delta layer. Cheap to build once the matrix exists, and the
   thing planners actually ask for.
 - *(later)* `RunScenarioAnalysis` — R5 network modifications (a new line, a closed street). The
