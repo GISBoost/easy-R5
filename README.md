@@ -5,9 +5,11 @@ A QGIS processing plugin for transit accessibility analysis on the
 cumulative-opportunity accessibility and isochrones over a departure-time window, computed inside
 QGIS with no R, no conda and no Docker.
 
-> **Status: pre-alpha.** There is no plugin code yet — this repository currently holds the design
-> notes, the architecture decisions and the R5 research tooling the plugin is being built from.
-> Start at [`CLAUDE.md`](CLAUDE.md) and [`docs/adr/0001-r5-binding.md`](docs/adr/0001-r5-binding.md).
+> **Status: 0.1.0, experimental.** All eight algorithms work; the travel-time matrix and
+> accessibility are verified end-to-end (accessibility reproduces r5r's Gdańsk output
+> *exactly* — [`docs/notes/validation-gdansk.md`](docs/notes/validation-gdansk.md)). The flag
+> stays `experimental` until a clean-install run of the full pipeline is signed off. See
+> [`KNOWN_ISSUES.md`](KNOWN_ISSUES.md).
 
 Sibling project: [**easy-OTP**](https://github.com/GISBoost/easy-OTP), the same idea on
 OpenTripPlanner 1.5.
@@ -23,35 +25,70 @@ P50/P85 feeds work in both.
 
 ---
 
-## What it will do
+## What it does
 
-- **Travel-time matrix** — N origins × M destinations, with percentiles across a departure window.
-- **Accessibility** — cumulative opportunities within cutoffs, with step / logistic / exponential
-  decay.
-- **Isochrones** — contoured in QGIS from an R5 travel-time grid.
-- **Scenario comparison** — two runs, one delta layer.
-- **Setup that is actually one click** — the plugin downloads the pinned Temurin JDK and R5 jar;
-  nothing else to install.
+Processing toolbox → **Easy-R5**:
 
-See [`docs/notes/product-scope.md`](docs/notes/product-scope.md) for the full sketch and
-[`docs/notes/r5-vs-otp.md`](docs/notes/r5-vs-otp.md) for what is deliberately *not* here.
+| Group | Algorithm | Does |
+|---|---|---|
+| Setup | **Download R5 engine and Java 21** | fetches Temurin 21 + `r5-v7.6-all.jar` (SHA-256 pinned), compiles the runner. No admin rights. |
+| Setup | **Build R5 network** | one `.osm.pbf` + a folder of GTFS `.zip` → cached `network.dat` + a `network.json` summary with a per-date active-trip count. |
+| Diagnostics | **Test R5 setup** | checks the JDK, jar and runner independently. |
+| Analysis | **Run travel time matrix** | N origins × M destinations, percentiles over a departure window, batched processes, sampled time estimate, hard dead-date gate + post-run walk-only detector. Long CSV out. |
+| Analysis | **Run accessibility** | opportunities reachable per origin / cutoff / percentile (STEP / LOGISTIC / EXPONENTIAL decay), summed in Python from the matrix. Long CSV + an ORIGINS copy with `acc_<opp>_p<pct>_c<cutoff>` fields. |
+| Analysis | **Generate isochrones** | travel-time polygons per cutoff from one or more points (grid → matrix → contour, in QGIS). |
+| Analysis | **Prepare population layer** | joins a GUS NSP 2021 sheet to census-tract geometry. |
+| Analysis | **Population overlay** | area-weighted population onto a hex grid (fractional, not rounded). |
+
+Isochrones are contoured **in QGIS** — R5 does not produce polygons. There is no hex-grid
+algorithm: use stock `native:creategrid` (recipe below).
+
+See [`docs/notes/product-scope.md`](docs/notes/product-scope.md) and
+[`docs/notes/r5-vs-otp.md`](docs/notes/r5-vs-otp.md) for what is deliberately *not* here
+(scenarios, itineraries, GTFS-RT, the service-minutes metric — all v0.2+).
+
+## Quick start
+
+1. **Install** — download the plugin ZIP, then *Plugins → Manage and Install → Install from ZIP*.
+2. **Download the engine** — run *Setup → Download R5 engine and Java 21*, pick a target folder
+   in your user profile. One-time, ~200 MB.
+3. **Build a network** — *Setup → Build R5 network*: point it at an `.osm.pbf` and a folder
+   holding your GTFS `.zip`(s). Cached by content hash + R5 version, so re-runs are instant.
+4. **Analyse** — *Run travel time matrix* or *Run accessibility*: the network from step 3, an
+   origins point layer, a destinations point layer, a `DATE` the feed actually serves, a
+   departure time and window. Output layers are styled automatically.
+
+The Gdańsk reference data is in [`tools/accessibility_cities/gdansk/`](tools/accessibility_cities/gdansk/).
+
+## Hex grid — use stock QGIS
+
+Easy-R5 ships no hex-grid algorithm. To reproduce `gdansk_hex_origins.csv`'s layout:
+
+1. **Processing → `native:creategrid`** — `TYPE = Hexagon`, `HSPACING = VSPACING = 500`
+   (metres), `GRID EXTENT` = your study area, `GRID CRS` = a metric CRS (e.g. EPSG:2180).
+2. **`native:extractbylocation`** — keep only hexes that *are within* / *intersect* the
+   study-area boundary.
+3. **`native:centroids`** — the origin points; add an `id` field with the Field Calculator
+   (`@row_number` or a stable code) and export `id,lon,lat` after reprojecting to EPSG:4326.
+
+(See `tools/accessibility_cities/HOWTO_MANUAL.md` step 4.)
 
 ## Repository layout
 
 | Path | What it is |
 |---|---|
-| `easy_r5/` | the QGIS plugin *(not created yet)* |
-| `easy_r5/java/` | the one Java source file that drives R5 *(not created yet)* |
+| `easy_r5/` | the QGIS plugin |
+| `easy_r5/java/EasyR5Runner.java` | the one Java source file that drives R5 (`build`, `matrix`) |
 | [`CONTEXT.md`](CONTEXT.md) | glossary — the words this project uses |
 | [`docs/adr/`](docs/adr/) | architecture decisions |
 | [`docs/notes/`](docs/notes/) | engine primer, binding comparison, scope, migration plan, open questions |
 | [`tools/`](tools/README.md) | standalone R5 research tooling — accessibility and isochrone studies for 7 Polish cities, migrated from easy-OTP ([ADR-0003](docs/adr/0003-migrate-r5-tools.md)). Gdańsk is the plugin's reference dataset. |
 
-## Requirements (planned)
+## Requirements
 
 | Requirement | Version | How to get it |
 |---|---|---|
-| QGIS | 3.22 LTR or newer | qgis.org — the plugin uses the bundled Python and GDAL |
+| QGIS | 3.22 LTR or newer (developed on 3.40) | qgis.org — the plugin uses the bundled Python and GDAL |
 | Java | **21** (Temurin) | the plugin downloads it |
 | R5 | **pinned** — see [ADR-0002](docs/adr/0002-pinned-versions.md) | the plugin downloads it |
 | OSM extract | any `.osm.pbf` covering the study area | the plugin can download it |
