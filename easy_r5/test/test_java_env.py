@@ -167,3 +167,14 @@ def test_build_command_source():
     cmd = build_java_command(_env("source"), "-Xmx4096m", "/tmp/job.json")
     assert cmd[3] == str(java_env.Path("/e/r5.jar"))
     assert cmd[4].endswith(".java")
+
+
+def test_build_command_extra_jvm_args():
+    cmd = build_java_command(
+        _env("compiled"), "-Xmx4096m", "/tmp/job.json",
+        extra_jvm_args=["-Djava.io.tmpdir=/tmp/x"],
+    )
+    assert cmd[1] == "-Xmx4096m"
+    assert cmd[2] == "-Djava.io.tmpdir=/tmp/x"
+    assert cmd[3] == "-cp"
+    assert cmd[5] == "EasyR5Runner"

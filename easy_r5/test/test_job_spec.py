@@ -6,6 +6,7 @@ import pytest
 
 from easy_r5.core.job_spec import (
     JobSpecError,
+    build_build_job,
     build_info_job,
     parse_percentiles,
     validate_percentiles,
@@ -71,6 +72,31 @@ def test_build_info_job():
 def test_build_info_job_empty_raises():
     with pytest.raises(JobSpecError):
         build_info_job("  ")
+
+
+def test_build_build_job():
+    job = build_build_job(
+        "C:/d/city.osm.pbf", ["C:/d/a.zip", "C:/d/b.zip"],
+        "C:/c/k/network.dat", "C:/c/k/network.json",
+    )
+    assert job == {
+        "command": "build",
+        "osm": "C:/d/city.osm.pbf",
+        "gtfs": ["C:/d/a.zip", "C:/d/b.zip"],
+        "out_network": "C:/c/k/network.dat",
+        "out_summary": "C:/c/k/network.json",
+    }
+
+
+@pytest.mark.parametrize("args", [
+    ("", ["a.zip"], "n.dat", "n.json"),
+    ("o.pbf", [], "n.dat", "n.json"),
+    ("o.pbf", ["a.zip"], "", "n.json"),
+    ("o.pbf", ["a.zip"], "n.dat", ""),
+])
+def test_build_build_job_missing_raises(args):
+    with pytest.raises(JobSpecError):
+        build_build_job(*args)
 
 
 def test_write_job_roundtrip(tmp_path):
