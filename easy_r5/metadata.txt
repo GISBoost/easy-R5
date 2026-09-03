@@ -11,7 +11,7 @@ about=Runs the Conveyal R5 routing engine (v7.6, MIT) as a child process to
     BuildNetwork (cached network.dat + network.json with per-date active trip
     counts). Diagnostics: TestR5Setup. Travel-time matrices, accessibility and
     isochrones arrive in later milestones.
-version=0.0.2
+version=0.0.3
 author=Michal Kaczorowski
 email=michal.kaczorowsx@gmail.com
 repository=https://github.com/GISBoost/easy-R5
@@ -24,7 +24,16 @@ tags=accessibility,r5,conveyal,transit,gtfs,travel time,isochrone,public transpo
 experimental=True
 deprecated=False
 hasProcessingProvider=yes
-changelog=0.0.2
+changelog=0.0.3
+    * M3 — travel-time matrix (the flagship algorithm).
+    * feat(analysis): RunTravelTimeMatrix — one-to-many / many-to-many travel
+      times over a departure window; percentiles, batched processes, sampled
+      time estimate, hard dead-date gate + post-run walk-only detector.
+    * feat(java): EasyR5Runner command "matrix" — ports the verified
+      Probe.java RegionalTask / FreeFormPointSet recipe.
+    * feat(core): points (layer -> id,lon,lat CSV, EPSG:4326, stable ids),
+      matrix (batch merge, systematic sample, nearest served days).
+    0.0.2
     * M2 — network building + GTFS service-day validation.
     * feat(setup): BuildNetwork — build a cached network.dat from an OSM extract
       and a folder of GTFS feeds; cache keyed by input hash + R5 version;
