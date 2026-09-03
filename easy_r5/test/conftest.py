@@ -25,3 +25,6 @@ if "qgis" not in sys.modules:
 if "osgeo" not in sys.modules:
     sys.modules["osgeo"] = MagicMock()
     sys.modules["osgeo.gdal"] = MagicMock()
+
+if "processing" not in sys.modules:
+    sys.modules["processing"] = MagicMock()

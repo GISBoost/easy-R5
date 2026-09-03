@@ -159,14 +159,21 @@ def test_build_command_compiled():
     cmd = build_java_command(_env("compiled"), "-Xmx4096m", "/tmp/job.json")
     assert cmd[0] == str(java_env.Path("/jdk/bin/java"))
     assert cmd[1] == "-Xmx4096m"
-    assert cmd[3].count(os.pathsep) == 1
-    assert cmd[4] == "EasyR5Runner"
+    assert cmd[2] == "-XX:+ExitOnOutOfMemoryError"
+    assert "-cp" in cmd
+    assert "EasyR5Runner" in cmd
 
 
 def test_build_command_source():
     cmd = build_java_command(_env("source"), "-Xmx4096m", "/tmp/job.json")
-    assert cmd[3] == str(java_env.Path("/e/r5.jar"))
-    assert cmd[4].endswith(".java")
+    assert str(java_env.Path("/e/r5.jar")) in cmd
+    assert cmd[-2].endswith(".java")
+
+
+def test_build_command_exit_on_oom_always_present():
+    for mode in ("compiled", "source"):
+        cmd = build_java_command(_env(mode), "-Xmx4096m", "/tmp/job.json")
+        assert "-XX:+ExitOnOutOfMemoryError" in cmd
 
 
 def test_build_command_extra_jvm_args():
@@ -175,6 +182,7 @@ def test_build_command_extra_jvm_args():
         extra_jvm_args=["-Djava.io.tmpdir=/tmp/x"],
     )
     assert cmd[1] == "-Xmx4096m"
-    assert cmd[2] == "-Djava.io.tmpdir=/tmp/x"
-    assert cmd[3] == "-cp"
-    assert cmd[5] == "EasyR5Runner"
+    assert cmd[2] == "-XX:+ExitOnOutOfMemoryError"
+    assert cmd[3] == "-Djava.io.tmpdir=/tmp/x"
+    assert cmd[4] == "-cp"
+    assert "EasyR5Runner" in cmd

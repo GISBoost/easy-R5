@@ -249,6 +249,24 @@ class MatrixBase:
             raise QgsProcessingException(_tr("A date is required for a transit run."))
         if not date:
             date = datetime.date.today().isoformat()
+        try:
+            datetime.datetime.strptime(date, "%Y-%m-%d")
+        except ValueError:
+            raise QgsProcessingException(
+                _tr("DATE must be yyyy-MM-dd (e.g. 2026-08-24); got '{}'.").format(date)
+            )
+        try:
+            datetime.datetime.strptime(departure_time, "%H:%M")
+        except ValueError:
+            raise QgsProcessingException(
+                _tr("DEPARTURE_TIME must be HH:mm (e.g. 07:00); got '{}'.").format(departure_time)
+            )
+
+        if is_transit and not service_days:
+            feedback.pushWarning(
+                _tr("Cannot verify the date against the feed — network.json has no "
+                    "service_days. Rebuild the network so the dead-date guard can run.")
+            )
         if is_transit and service_days and int(service_days.get(date, 0)) == 0:
             if not allow_no_service:
                 nearest = matrix.nearest_served_days(service_days, date, 3)
@@ -325,7 +343,10 @@ class MatrixBase:
 
         if estimate_first and len(origin_ids) > 15:
             multi.setCurrentStep(0)
-            self._estimate(tmp, origins_csv, origin_ids, job_common, env, heap_mb, multi)
+            try:
+                self._estimate(tmp, origins_csv, origin_ids, job_common, env, heap_mb, multi)
+            except runner.RunnerCancelled:
+                raise QgsProcessingException(_tr("Cancelled by user."))
         if multi.isCanceled():
             raise QgsProcessingException(_tr("Cancelled by user."))
 
@@ -386,7 +407,10 @@ class MatrixBase:
             "run_date": date,
             "departure_time": departure_time,
             "time_window": time_window,
-            "percentiles": ",".join(str(p) for p in percentiles),
+            # PRD §5.2 names this output field "percentile" (singular); the value
+            # is the whole requested list so two maps that differ only by it are
+            # still tellable apart.
+            "percentile": ",".join(str(p) for p in percentiles),
             "modes": MODE_OPTIONS[mode],
         }
         return {
@@ -423,16 +447,26 @@ class MatrixBase:
         feedback.pushInfo(_tr("Timing {n} sample origins…").format(n=len(idx)))
         t0 = time.monotonic()
         try:
-            runner.run_job(cmd, feedback, cwd=tmp, stderr_log=tmp / "stderr_est.log",
-                           r5_version=pins.R5_VERSION)
+            result = runner.run_job(cmd, feedback, cwd=tmp, stderr_log=tmp / "stderr_est.log",
+                                    r5_version=pins.R5_VERSION)
         except runner.RunnerError as exc:
             feedback.pushWarning(_tr("Estimate run failed ({}). Continuing.").format(exc))
             return
-        per_origin = (time.monotonic() - t0) / max(1, len(idx))
-        full_min = per_origin * len(origin_ids) / 60
+        wall = time.monotonic() - t0
+        # The runner reports routing time separately from the one-off setup cost
+        # (JVM boot + ~100 MB network deserialize + point-set link). Extrapolate
+        # from routing time only — the setup cost is paid once, not per origin.
+        try:
+            routing = float(result.results.get("routing_seconds", 0.0))
+        except (TypeError, ValueError):
+            routing = 0.0
+        per_origin = (routing or wall) / max(1, len(idx))
+        setup_min = max(0.0, wall - routing) / 60 if routing else 0.0
+        full_min = per_origin * len(origin_ids) / 60 + setup_min
         feedback.pushInfo(
-            _tr("~{s:.2f} s/origin on this network -> ~{m:.1f} min for {n} origins.").format(
-                s=per_origin, m=full_min, n=len(origin_ids)
+            _tr("~{s:.2f} s/origin on this network -> ~{m:.1f} min for {n} origins "
+                "(+{u:.1f} min one-off setup).").format(
+                s=per_origin, m=full_min, n=len(origin_ids), u=setup_min
             )
         )
         if full_min > _SLOW_RUN_MINUTES:

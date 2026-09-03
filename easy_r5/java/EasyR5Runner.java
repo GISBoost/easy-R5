@@ -183,6 +183,7 @@ public class EasyR5Runner {
      * </ul>
      */
     private static void doMatrix(JsonNode job) throws Exception {
+        long setupStartNanos = System.nanoTime();
         String networkPath = job.path("network").asText("").trim();
         String originsPath = job.path("origins").asText("").trim();
         String destsPath = job.path("destinations").asText("").trim();
@@ -249,6 +250,12 @@ public class EasyR5Runner {
         int done = 0;
         long lastProgress = 0;
 
+        // Fixed cost (JVM boot + network deserialize + point-set link) so the
+        // Python time estimate can subtract it before extrapolating per-origin.
+        Emit.result("setup_seconds",
+                String.format("%.3f", (System.nanoTime() - setupStartNanos) / 1e9));
+        long routingStartNanos = System.nanoTime();
+
         try (BufferedWriter w = Files.newBufferedWriter(Path.of(outCsv), StandardCharsets.UTF_8)) {
             StringBuilder header = new StringBuilder("from_id,to_id");
             for (int p : percentiles) {
@@ -309,6 +316,8 @@ public class EasyR5Runner {
             }
         }
 
+        Emit.result("routing_seconds",
+                String.format("%.3f", (System.nanoTime() - routingStartNanos) / 1e9));
         Emit.result("transit_used_pairs", Long.toString(transitUsedPairs));
         Emit.result("origins_done", Integer.toString(total));
         Emit.done(outCsv, rowsWritten);

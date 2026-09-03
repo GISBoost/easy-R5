@@ -314,7 +314,13 @@ def run_job(cmd, feedback, *, cwd, stderr_log, r5_version=pins.R5_VERSION):
         )
     if rc != 0:
         tail = _log_tail(stderr_log)
-        if "OutOfMemoryError" in tail:
+        oom_markers = (
+            "OutOfMemoryError",
+            "Terminating due to java.lang.OutOfMemoryError",
+            "Could not reserve enough space",
+            "Too small maximum heap",
+        )
+        if any(m in tail for m in oom_markers):
             raise RunnerError("OUT_OF_MEMORY", map_message("OUT_OF_MEMORY", tail, r5_version))
         raise RunnerError(
             "",

@@ -259,8 +259,14 @@ def build_java_command(env, xmx, job_json_path, extra_jvm_args=()):
     """Assemble the java command line for one runner invocation.
 
     ``extra_jvm_args`` (e.g. ``["-Djava.io.tmpdir=..."]``) go right after -Xmx.
+
+    ``-XX:+ExitOnOutOfMemoryError`` is always on: R5 routes on a ForkJoinPool, so
+    an OOM thrown in a worker thread may never reach the runner's ``catch`` and
+    the process would hang until the user cancels. This turns it into a
+    deterministic non-zero exit (and the JVM prints a line the stderr scan
+    catches).
     """
-    jvm = [xmx, *extra_jvm_args]
+    jvm = [xmx, "-XX:+ExitOnOutOfMemoryError", *extra_jvm_args]
     if env.runner_mode == "compiled":
         cp = "{}{}{}".format(env.jar_path, os.pathsep, env.runner_class_dir)
         return [str(env.jdk_path), *jvm, "-cp", cp, pins.RUNNER_MAIN_CLASS, str(job_json_path)]

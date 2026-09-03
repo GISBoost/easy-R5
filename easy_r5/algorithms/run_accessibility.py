@@ -37,7 +37,7 @@ from ..core.styling import apply_style
 from ._matrix_base import MatrixBase
 
 _META_FIELDS = ("r5_version", "network_hash", "run_date", "departure_time",
-                "time_window", "percentiles", "modes", "decay")
+                "time_window", "percentile", "modes", "decay")
 
 
 class RunAccessibility(MatrixBase, QgsProcessingAlgorithm):
@@ -128,6 +128,16 @@ class RunAccessibility(MatrixBase, QgsProcessingAlgorithm):
         if not opp_fields:
             raise QgsProcessingException(self.tr("Select at least one opportunity field."))
 
+        # A cutoff above MAX_TRIP_DURATION would silently truncate the matrix and
+        # under-count the larger cutoffs — bump the trip budget to cover them.
+        if max(cutoffs) > max_trip:
+            feedback.pushWarning(self.tr(
+                "MAX_TRIP_DURATION ({t} min) is below the largest cutoff ({c} min) — "
+                "raising it to {c} so accessibility is not under-counted."
+            ).format(t=max_trip, c=max(cutoffs)))
+            parameters = {**parameters, self.MAX_TRIP_DURATION: max(cutoffs)}
+            max_trip = max(cutoffs)
+
         # Lossless walk cap: max(cutoffs) for STEP; the tapered functions have
         # weight beyond the cutoff, so they need the full trip budget.
         walk_fallback = max(cutoffs) if decay == accessibility.STEP else max_trip
@@ -189,13 +199,21 @@ class RunAccessibility(MatrixBase, QgsProcessingAlgorithm):
         if sink is None:
             raise QgsProcessingException(self.tr("Could not create the output layer."))
 
+        # Match features to results by the id value when ORIGIN_ID_FIELD is set,
+        # not by iteration position — some providers don't guarantee a stable
+        # feature order between two getFeatures() calls. With no id field the id
+        # is a zero-padded running index (same rule as points.stable_ids).
+        id_field = self.parameterAsString(parameters, self.ORIGIN_ID_FIELD, context)
+        fidx = origins_src.fields().lookupField(id_field) if id_field else -1
+        width = max(1, len(str(len(res["origin_ids"]) - 1))) if res["origin_ids"] else 1
+
         meta_values = [meta.get(k) for k in _META_FIELDS]
         kept = 0
         for feat in origins_src.getFeatures():
             geom = feat.geometry()
             if geom.isNull() or geom.isEmpty():
                 continue
-            oid = res["origin_ids"][kept]
+            oid = str(feat.attribute(fidx)) if fidx >= 0 else "{:0{w}d}".format(kept, w=width)
             kept += 1
             per_origin = pivot.get(oid, {})
             out = QgsFeature(out_fields)

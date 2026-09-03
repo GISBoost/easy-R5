@@ -12,7 +12,6 @@ import hashlib
 import importlib
 import json
 import os
-import subprocess  # nosec B404 — pip fallback only, all args literal / from PyPI
 import sys
 import tempfile
 import urllib.request
@@ -32,32 +31,6 @@ def ensure_openpyxl() -> bool:
         return True
     except ImportError:
         return False
-
-
-def _get_python_executable() -> str:
-    """The real interpreter, not the QGIS launcher (``qgis-bin.exe`` on Windows)."""
-    exe = sys.executable
-    if "python" in os.path.basename(exe).lower():
-        return exe
-    for name in ("python.exe", "python3.exe"):
-        candidate = os.path.join(sys.exec_prefix, name)
-        if os.path.isfile(candidate):
-            return candidate
-    for name in ("python3", "python"):
-        candidate = os.path.join(sys.exec_prefix, "bin", name)
-        if os.path.isfile(candidate):
-            return candidate
-    return exe
-
-
-def _add_user_site_to_path() -> None:
-    try:
-        import site
-        user_site = site.getusersitepackages()
-        if user_site and user_site not in sys.path:
-            sys.path.insert(0, user_site)
-    except (AttributeError, TypeError):
-        pass
 
 
 def _safe_zipextract(zf: zipfile.ZipFile, dest_path: str) -> None:
@@ -132,7 +105,14 @@ def _fetch_and_extract_wheel(pkg: str, version: str, target_dir: str) -> None:
             pass
 
 
-def _install_openpyxl_via_urllib() -> "tuple[bool, str]":
+def install_openpyxl() -> "tuple[bool, str]":
+    """Make openpyxl importable by fetching its pure-python wheel over ``urllib``.
+
+    CLAUDE.md forbids ``pip`` in the plugin and forbids installing into the QGIS
+    interpreter. The only mechanism allowed is a SHA-256-verified wheel dropped
+    into the user site (or ``easy_r5/_vendor/`` when that is read-only). If that
+    fails, we tell the user to install it themselves — we never shell out to pip.
+    """
     try:
         target = _writable_target_dir()
         for pkg, ver in [("et_xmlfile", _ET_XMLFILE_VERSION), ("openpyxl", _OPENPYXL_VERSION)]:
@@ -144,35 +124,11 @@ def _install_openpyxl_via_urllib() -> "tuple[bool, str]":
             return True, "openpyxl installed via urllib into {}".format(target)
         return False, "Wheel extracted but openpyxl still not importable — restart QGIS."
     except Exception as exc:  # noqa: BLE001
-        return False, "In-process urllib wheel install failed: {}".format(exc)
-
-
-def install_openpyxl() -> "tuple[bool, str]":
-    """Try to make openpyxl importable: urllib wheel, then ``pip --user``, then ``pip``."""
-    ok, msg = _install_openpyxl_via_urllib()
-    if ok:
-        return True, msg
-
-    python_exe = _get_python_executable()
-    base_cmd = [python_exe, "-m", "pip", "install", "openpyxl"]
-    for extra in (["--user"], []):
-        try:
-            result = subprocess.run(  # nosec B603
-                base_cmd + extra, capture_output=True, text=True, timeout=120,
-            )
-        except subprocess.TimeoutExpired:
-            return False, "pip timed out after 120 s."
-        except OSError as exc:
-            return False, "Could not launch pip: {}".format(exc)
-        if result.returncode == 0:
-            _add_user_site_to_path()
-            importlib.invalidate_caches()
-            if ensure_openpyxl():
-                return True, "openpyxl installed via pip."
-    stderr = (result.stderr or "").strip()[-500:]
-    return (
-        False,
-        "Could not install openpyxl automatically:\n\n{}\n\n"
-        "Install manually from the OSGeo4W Shell:\n\n    python -m pip install openpyxl\n\n"
-        "Then restart QGIS.".format(stderr),
-    )
+        return (
+            False,
+            "Could not fetch openpyxl automatically ({}).\n\n"
+            "Install it yourself from the OSGeo4W Shell:\n\n"
+            "    python -m pip install openpyxl\n\n"
+            "Then restart QGIS. Only PreparePopulationLayer / PopulationOverlay "
+            "need it — the rest of Easy-R5 works without it.".format(exc),
+        )

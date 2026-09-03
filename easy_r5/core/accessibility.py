@@ -31,12 +31,13 @@ def decay_weight(decay, travel_time, cutoff):
 
     - ``STEP``: 1 *below* the cutoff, 0 at or above it. R5's ``StepDecayFunction``
       is a strict ``travelTime < cutoff`` (verified from bytecode); matching that
-      exactly is what makes the r5r diff land at >99% identical rows for the
-      15/30-min cutoffs (``docs/notes/validation-gdansk.md``).
-    - ``EXPONENTIAL``: ``0.5 ** (t / cutoff)`` — half weight exactly at the cutoff
-      (R5 ExponentialDecayFunction, ``logOneHalf``).
-    - ``LOGISTIC``: rolloff centred on the cutoff, matching R5's logistic CDF form
-      with a 10-minute standard deviation. Unvalidated.
+      exactly is what reproduces r5r's Gdańsk output row for row — all 27 780
+      rows, every cutoff (``docs/notes/validation-gdansk.md``).
+    - ``EXPONENTIAL``: ``0.5 ** (t / cutoff)`` — half weight at the cutoff. The
+      shape matches R5's ExponentialDecayFunction but has **not** been checked
+      against the jar; do not assume an exact r5r match.
+    - ``LOGISTIC``: rolloff centred on the cutoff, 10-minute standard deviation.
+      Same caveat — **not** validated against R5's LogisticDecayFunction.
     """
     if travel_time is None:
         return 0.0
@@ -68,8 +69,10 @@ def compute_accessibility(matrix_csv, opportunities, origin_ids, cutoffs, decay=
     no reachable destination contributes 0 (never NULL, never missing).
 
     Yields dicts ``{id, opportunity, percentile, cutoff, accessibility}``.
-    STEP sums are rounded to int (they are integer by construction and this keeps
-    the r5r diff exact); the weighted functions keep 4 decimals.
+    A STEP sum that is already whole (integer opportunity counts — the r5r case)
+    is emitted as an int so the diff stays byte-exact; a fractional STEP sum
+    (e.g. residents from PopulationOverlay) keeps 4 decimals rather than being
+    silently truncated. The weighted functions always keep 4 decimals.
     """
     opp_names = sorted({name for d in opportunities.values() for name in d})
     cutoffs = sorted(int(c) for c in cutoffs)
@@ -111,12 +114,16 @@ def compute_accessibility(matrix_csv, opportunities, origin_ids, cutoffs, decay=
             for _, pct in pct_cols:
                 for c in cutoffs:
                     v = acc[(o, opp, pct, c)]
+                    if decay == STEP and abs(v - round(v)) < 1e-6:
+                        out_v = int(round(v))
+                    else:
+                        out_v = round(v, 4)
                     yield {
                         "id": o,
                         "opportunity": opp,
                         "percentile": pct,
                         "cutoff": c,
-                        "accessibility": int(round(v)) if decay == STEP else round(v, 4),
+                        "accessibility": out_v,
                     }
 
 

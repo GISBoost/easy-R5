@@ -16,7 +16,9 @@ class EasyR5Plugin:
         self.provider = None
         self._translator = None
 
-        locale = QSettings().value("locale/userLocale", "en_US")[:2]
+        # value() can return None (key present but unset when "Override system
+        # locale" is off) — [:2] on None would crash the whole plugin load.
+        locale = (QSettings().value("locale/userLocale") or "en_US")[:2]
         qm = os.path.join(os.path.dirname(__file__), "i18n", f"easy_r5_{locale}.qm")
         if os.path.exists(qm):
             self._translator = QTranslator()

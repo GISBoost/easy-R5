@@ -147,6 +147,50 @@ lrelease easy_r5/i18n/easy_r5_pl.ts             # -> .qm
 The translate script used this session lives in the scratchpad
 (`.../scratchpad/m3/translate_full.py`), not in the repo.
 
+### Milestone-reviewer response (2026-09-03, later the same day)
+
+The `milestone-reviewer` agent was run against M3, M4, M5. M3/M4 passed with
+notes; M5 failed on one hard-constraint breach. Fixes applied (tests + flake8
+green, `EasyR5Runner.java` still compiles against the 7.6 jar, one file):
+
+- **M5 blocker — `pip` in the plugin.** `core/dependencies.install_openpyxl`
+  had a `subprocess … pip install --user` fallback carried over from easy-OTP.
+  Removed (with `import subprocess` and the dead interpreter-locator helpers);
+  the only path now is the SHA-256-verified urllib wheel into the user site or
+  `easy_r5/_vendor/`, then a "install it yourself" message.
+- **OOM robustness (M3).** `-XX:+ExitOnOutOfMemoryError` is now always in the
+  JVM args (`java_env.build_java_command`) so an OOM in an R5 ForkJoinPool
+  worker can't hang the process; `runner.run_job` matches more JVM OOM markers.
+- **Estimate methodology (M3/M5).** The runner now emits `RESULT setup_seconds`
+  / `RESULT routing_seconds`; `_estimate` extrapolates from routing time only
+  and reports the one-off setup cost separately, instead of dividing the whole
+  probe wall-clock (JVM boot + 100 MB deserialize + link) by 15.
+- **Gate hardening (M3).** `DATE` / `DEPARTURE_TIME` format-validated in Python
+  before the JVM; a transit run against a network with no `service_days` now
+  warns instead of silently skipping the dead-date gate; `RunnerCancelled`
+  during the estimate is a clean cancel.
+- **Method field name (M4/M5).** Output-layer metadata field renamed
+  `percentiles` → `percentile` (PRD §5.2 / §4.5 / §4.6). `GenerateIsochrones`
+  now requires exactly one percentile, carries `time_window`, and stamps the
+  real single percentile value.
+- **M4.** `RunAccessibility` raises `MAX_TRIP_DURATION` to `max(CUTOFFS)` when a
+  cutoff would otherwise truncate the matrix; the feature↔result join is by id
+  value (not iteration position) when `ORIGIN_ID_FIELD` is set; a fractional
+  STEP sum (residents from `PopulationOverlay`) keeps decimals instead of being
+  truncated to int.
+- **Small.** `QSettings().value("locale/userLocale")` guarded against `None`;
+  `easy_r5_pl.ts` gained `language="pl"`; `metadata.txt` `about=` updated to the
+  real v0.1 algorithm list; large one-origin isochrone grids warn about runtime.
+- **Tests.** `test_dependencies.py` (zip-slip guard), `test_isochrones.py`
+  (`utm_epsg` moved to `core/matrix.py`), extra `test_accessibility.py` cases
+  (unknown decay, exponential zero-cutoff, fractional STEP, `read_opportunities`).
+  132 pytest green.
+
+Still open from the reviews (not blockers, deferred): the walk-only companion
+computation doubles routing time on transit matrices (§5.8 cost, documented);
+`warnUnlinked` reports the global count in every batch log; per-origin `iso_t`
+memory layers are only freed at algorithm end.
+
 ### Known issues (both have a GitHub issue — CLAUDE.md policy)
 
 - **#1** — Polish translation is fully populated but machine-translated; needs a

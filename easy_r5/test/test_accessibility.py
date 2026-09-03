@@ -9,6 +9,7 @@ from easy_r5.core.accessibility import (
     STEP,
     compute_accessibility,
     decay_weight,
+    read_opportunities,
 )
 
 
@@ -79,3 +80,33 @@ def test_multiple_percentile_columns(tmp_path):
     got = {r["percentile"]: r["accessibility"]
            for r in compute_accessibility(m, opps, ["o1"], [30], STEP)}
     assert got == {25: 1, 75: 0}
+
+
+def test_unknown_decay_raises():
+    with pytest.raises(ValueError):
+        decay_weight("GAUSSIAN", 10, 30)
+
+
+def test_exponential_zero_cutoff_is_zero():
+    assert decay_weight(EXPONENTIAL, 10, 0) == 0.0
+
+
+def test_weighted_decay_keeps_four_decimals(tmp_path):
+    m = _matrix(tmp_path, ["o1,d1,30"])
+    opps = {"d1": {"jobs": 10}}
+    out = list(compute_accessibility(m, opps, ["o1"], [30], EXPONENTIAL))
+    assert out[0]["accessibility"] == pytest.approx(5.0, abs=1e-4)  # 10 * 0.5
+
+
+def test_fractional_step_sum_is_not_truncated(tmp_path):
+    m = _matrix(tmp_path, ["o1,d1,10", "o1,d2,10"])
+    opps = {"d1": {"pop": 100.4}, "d2": {"pop": 100.4}}
+    out = list(compute_accessibility(m, opps, ["o1"], [30], STEP))
+    assert out[0]["accessibility"] == pytest.approx(200.8)
+
+
+def test_read_opportunities_blank_and_missing(tmp_path):
+    p = tmp_path / "dests.csv"
+    p.write_text("id,lon,lat,jobs\nd1,0,0,\nd2,0,0,7\n", encoding="utf-8")
+    got = read_opportunities(p, ["jobs", "absent"])
+    assert got == {"d1": {"jobs": 0.0}, "d2": {"jobs": 7.0}}

@@ -45,6 +45,8 @@ from qgis.core import (
     QgsWkbTypes,
 )
 
+from ..core import job_spec
+from ..core.matrix import utm_epsg
 from ..core.styling import apply_style
 from ._matrix_base import MatrixBase
 
@@ -127,6 +129,18 @@ class GenerateIsochrones(MatrixBase, QgsProcessingAlgorithm):
         if not cutoffs or cutoffs[0] < 1:
             raise QgsProcessingException(self.tr("Give at least one positive cutoff."))
 
+        # One contour = one travel-time surface = one percentile. A list would
+        # produce polygons mislabelled with every requested percentile at once.
+        try:
+            pcts = job_spec.parse_percentiles(
+                self.parameterAsString(parameters, self.PERCENTILES, context))
+        except job_spec.JobSpecError as exc:
+            raise QgsProcessingException(str(exc))
+        if len(pcts) != 1:
+            raise QgsProcessingException(self.tr(
+                "Isochrones need exactly one percentile (got {}). Run the tool once "
+                "per percentile.").format(len(pcts)))
+
         origins_src = self.parameterAsSource(parameters, self.ORIGINS, context)
         if origins_src is None:
             raise QgsProcessingException(self.tr("Origin points are required."))
@@ -155,12 +169,14 @@ class GenerateIsochrones(MatrixBase, QgsProcessingAlgorithm):
             if sink is None:
                 raise QgsProcessingException(self.tr("Could not create the output layer."))
 
-            times = self._times_by_origin(matrix_csv, res["percentiles"][0])
+            percentile = res["percentiles"][0]
+            times = self._times_by_origin(matrix_csv, percentile)
             to_out = QgsCoordinateTransform(metric, origins_crs, context.transformContext())
             grid_xy = {f["gid"]: f.geometry().asPoint() for f in grid_layer.getFeatures()}
 
-            meta_values = [meta.get(k) for k in ("departure_time", "percentiles", "r5_version",
-                                                 "network_hash", "run_date", "modes")]
+            meta_values = [meta.get("departure_time"), meta.get("time_window"), percentile,
+                           meta.get("r5_version"), meta.get("network_hash"),
+                           meta.get("run_date"), meta.get("modes")]
             written = 0
             for origin_id in res["origin_ids"]:
                 per = times.get(origin_id, {})
@@ -191,8 +207,7 @@ class GenerateIsochrones(MatrixBase, QgsProcessingAlgorithm):
             ext = QgsCoordinateTransform(c, wgs84, context.transformContext()) \
                 .transformBoundingBox(ext)
         lon, lat = ext.center().x(), ext.center().y()
-        zone = min(60, max(1, int((lon + 180) / 6) + 1))
-        epsg = (32600 if lat >= 0 else 32700) + zone
+        epsg = utm_epsg(lon, lat)
         metric = QgsCoordinateReferenceSystem("EPSG:{}".format(epsg))
         if not metric.isValid():
             raise QgsProcessingException(
@@ -216,6 +231,12 @@ class GenerateIsochrones(MatrixBase, QgsProcessingAlgorithm):
         feedback.pushInfo(
             self.tr("Destination grid: up to ~{:,.0f} points at {} m (clipped to origin reach).")
             .format(n, spacing))
+        # ESTIMATE_FIRST samples origins, and isochrones have one — so it never
+        # fires here. The cost is in the grid instead; warn if it is large.
+        if n > 100_000:
+            feedback.pushWarning(self.tr(
+                "~{:,.0f} grid cells is a heavy one-origin run. If it is too slow, "
+                "raise GRID_SPACING or use fewer / closer origins.").format(n))
 
         grid = processing.run("native:creategrid", {
             "TYPE": 0, "EXTENT": ext, "HSPACING": spacing, "VSPACING": spacing,
@@ -350,7 +371,8 @@ class GenerateIsochrones(MatrixBase, QgsProcessingAlgorithm):
         f.append(QgsField("origin_id", QVariant.String))
         f.append(QgsField("cutoff_min", QVariant.Int))
         f.append(QgsField("departure_time", QVariant.String))
-        f.append(QgsField("percentile", QVariant.String))
+        f.append(QgsField("time_window", QVariant.String))
+        f.append(QgsField("percentile", QVariant.Int))
         f.append(QgsField("r5_version", QVariant.String))
         f.append(QgsField("network_hash", QVariant.String))
         f.append(QgsField("run_date", QVariant.String))

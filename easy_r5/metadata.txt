@@ -3,14 +3,16 @@ name=Easy-R5
 qgisMinimumVersion=3.22
 description=Transit accessibility analysis with the Conveyal R5 routing engine.
 about=Runs the Conveyal R5 routing engine (v7.6, MIT) as a child process to
-    compute one-to-many and many-to-many travel-time matrices and
-    cumulative-opportunity accessibility over a departure-time window, returning
-    styled QGIS layers. R5 and a Temurin 21 JDK are downloaded on first setup —
-    no pip, no R, no Docker, no administrator rights.
+    compute one-to-many and many-to-many travel-time matrices,
+    cumulative-opportunity accessibility and travel-time isochrones over a
+    departure-time window, returning styled QGIS layers. R5 and a Temurin 21 JDK
+    are downloaded on first setup — no pip, no R, no Docker, no administrator
+    rights.
     Setup: DownloadR5 (Temurin 21 JDK + r5-v7.6-all.jar, SHA-256 verified),
     BuildNetwork (cached network.dat + network.json with per-date active trip
-    counts). Diagnostics: TestR5Setup. Travel-time matrices, accessibility and
-    isochrones arrive in later milestones.
+    counts). Diagnostics: TestR5Setup. Analysis: RunTravelTimeMatrix,
+    RunAccessibility, GenerateIsochrones, PreparePopulationLayer,
+    PopulationOverlay.
 version=0.1.0
 author=Michal Kaczorowski
 email=michal.kaczorowsx@gmail.com
@@ -27,6 +29,14 @@ hasProcessingProvider=yes
 hasTranslations=yes
 changelog=0.1.0
     * M5 — isochrones, population layers, release.
+    * fix(deps): drop the pip fallback from the openpyxl bootstrap — urllib
+      wheel + _vendor/ only, never shell out to pip (CLAUDE.md).
+    * fix(java): -XX:+ExitOnOutOfMemoryError so an R5 worker-thread OOM cannot
+      hang the process; runner reports setup vs routing time for a sane estimate.
+    * fix(analysis): validate DATE/DEPARTURE_TIME before the JVM; RunAccessibility
+      lifts MAX_TRIP_DURATION to cover a larger cutoff and joins results by id;
+      GenerateIsochrones takes exactly one percentile; output field percentiles
+      -> percentile (PRD 5.2).
     * feat(analysis): GenerateIsochrones — travel-time polygons per cutoff from
       N points (grid -> one-origin matrix -> contour in QGIS; R5 does not
       contour). Styled output, per-cutoff error isolation.

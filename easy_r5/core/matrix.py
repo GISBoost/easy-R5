@@ -15,6 +15,17 @@ import csv
 import datetime
 
 
+def utm_epsg(lon, lat):
+    """EPSG code of the UTM zone containing ``(lon, lat)`` (WGS84 degrees).
+
+    GenerateIsochrones needs a metre-based working CRS. Pure so the
+    zone/hemisphere arithmetic (a classic off-by-one) is unit-tested without
+    QGIS. Zone is clamped to 1..60 for a point exactly on the antimeridian.
+    """
+    zone = min(60, max(1, int((lon + 180) / 6) + 1))
+    return (32600 if lat >= 0 else 32700) + zone
+
+
 def systematic_sample_indices(n, k=15):
     """Return up to ``k`` row indices spread evenly across ``range(n)``.
 
@@ -138,7 +149,7 @@ _META_FIELDS = (
     "run_date",
     "departure_time",
     "time_window",
-    "percentiles",
+    "percentile",
     "modes",
 )
 
