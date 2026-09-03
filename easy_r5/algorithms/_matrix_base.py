@@ -75,7 +75,7 @@ class MatrixBase:
         param.setFlags(param.flags() | QgsProcessingParameterDefinition.FlagAdvanced)
         self.addParameter(param)
 
-    def _add_matrix_params(self, percentile_help):
+    def _add_matrix_params(self, percentile_help, with_destinations=True):
         self.addParameter(
             QgsProcessingParameterFile(
                 self.NETWORK, self.tr("R5 network (network.dat)"),
@@ -91,15 +91,17 @@ class MatrixBase:
         )
         oid.setFlags(oid.flags() | QgsProcessingParameterDefinition.FlagOptional)
         self.addParameter(oid)
-        self.addParameter(
-            QgsProcessingParameterFeatureSource(self.DESTINATIONS, self.tr("Destination points"))
-        )
-        did = QgsProcessingParameterField(
-            self.DEST_ID_FIELD, self.tr("Destination id field (blank = feature id)"),
-            parentLayerParameterName=self.DESTINATIONS, optional=True,
-        )
-        did.setFlags(did.flags() | QgsProcessingParameterDefinition.FlagOptional)
-        self.addParameter(did)
+        if with_destinations:
+            self.addParameter(
+                QgsProcessingParameterFeatureSource(
+                    self.DESTINATIONS, self.tr("Destination points"))
+            )
+            did = QgsProcessingParameterField(
+                self.DEST_ID_FIELD, self.tr("Destination id field (blank = feature id)"),
+                parentLayerParameterName=self.DESTINATIONS, optional=True,
+            )
+            did.setFlags(did.flags() | QgsProcessingParameterDefinition.FlagOptional)
+            self.addParameter(did)
 
         dt = QgsProcessingParameterString(
             self.DATE, self.tr("Date (yyyy-MM-dd; required for transit)"), optional=True
@@ -184,7 +186,8 @@ class MatrixBase:
     # --- the run --------------------------------------------------------
 
     def _run_matrix(self, parameters, context, feedback, *, tmp, matrix_csv,
-                    walk_fallback, include_unreachable=False, dest_extra_fields=None):
+                    walk_fallback, include_unreachable=False, dest_extra_fields=None,
+                    dests_source=None, dest_id_field=""):
         """Export points, run the batched matrix, merge to ``matrix_csv``.
 
         ``walk_fallback`` is the value MAX_WALK_TIME takes when left blank
@@ -199,7 +202,9 @@ class MatrixBase:
         service_days = summary.get("service_days") or {}
 
         origins_src = self.parameterAsSource(parameters, self.ORIGINS, context)
-        dests_src = self.parameterAsSource(parameters, self.DESTINATIONS, context)
+        dests_src = dests_source
+        if dests_src is None:
+            dests_src = self.parameterAsSource(parameters, self.DESTINATIONS, context)
         if origins_src is None or dests_src is None:
             raise QgsProcessingException(self.tr("Origin and destination layers are required."))
 
@@ -215,7 +220,8 @@ class MatrixBase:
         estimate_first = self.parameterAsBool(parameters, self.ESTIMATE_FIRST, context)
         allow_no_service = self.parameterAsBool(parameters, self.ALLOW_NO_SERVICE, context)
         origin_id_field = self.parameterAsString(parameters, self.ORIGIN_ID_FIELD, context)
-        dest_id_field = self.parameterAsString(parameters, self.DEST_ID_FIELD, context)
+        if dests_source is None:
+            dest_id_field = self.parameterAsString(parameters, self.DEST_ID_FIELD, context)
 
         try:
             percentiles = job_spec.parse_percentiles(
