@@ -17,11 +17,11 @@ OpenTripPlanner 1.5.
 | | easy-OTP | Easy-R5 |
 |---|---|---|
 | Engine | OpenTripPlanner 1.5 (Java 8) | Conveyal R5 (Java 21) |
-| Best at | per-minute travel-time surfaces, detailed itineraries, **live GTFS-RT** | one-to-many / many-to-many travel times over a **departure-time window**, cumulative accessibility, scenarios |
+| Best at | per-minute travel-time surfaces, detailed itineraries, **live GTFS-RT** | one-to-many / many-to-many travel times over a **departure-time window**, cumulative accessibility |
 | Realtime | yes — records GTFS-RT and reconstructs realized feeds | no — R5 cannot read GTFS-RT; it consumes the realized static feeds easy-OTP produces |
 
-The two are designed to share data: the same OSM extracts, GTFS feeds, hex grids and realized
-P50/P85 feeds work in both.
+The two are designed to share data: the same OSM extracts, GTFS feeds and hex grids work in
+both.
 
 ---
 
@@ -36,7 +36,7 @@ Processing toolbox → **Easy-R5**:
 | Diagnostics | **Test R5 setup** | checks the JDK, jar and runner independently. |
 | Analysis | **Run travel time matrix** | N origins × M destinations, percentiles over a departure window, batched processes, sampled time estimate, hard dead-date gate + post-run walk-only detector. Long CSV out. |
 | Analysis | **Run accessibility** | opportunities reachable per origin / cutoff / percentile (STEP / LOGISTIC / EXPONENTIAL decay), summed in Python from the matrix. Long CSV + an ORIGINS copy with `acc_<opp>_p<pct>_c<cutoff>` fields. |
-| Analysis | **Generate isochrones** | travel-time polygons per cutoff from one or more points (grid → matrix → contour, in QGIS). |
+| Analysis | **Generate isochrones** | cumulative travel-time polygons, one per (origin, cutoff): a destination grid → one-origin matrix → union of the reachable cells, contoured in QGIS. Unreachable pockets stay as holes. |
 | Analysis | **Prepare population layer** | joins a GUS NSP 2021 sheet to census-tract geometry. |
 | Analysis | **Population overlay** | area-weighted population onto a hex grid (fractional, not rounded). |
 
@@ -49,16 +49,25 @@ See [`docs/notes/product-scope.md`](docs/notes/product-scope.md) and
 
 ## Quick start
 
-1. **Install** — download the plugin ZIP, then *Plugins → Manage and Install → Install from ZIP*.
+1. **Install** — Easy-R5 is not yet in the QGIS plugin repository. Either copy the
+   `easy_r5/` folder into your QGIS profile's `python/plugins/`, or build a ZIP from a
+   checkout (`py -c "import zipfile,os; z=zipfile.ZipFile('easy_r5.zip','w',zipfile.ZIP_DEFLATED); [z.write(os.path.join(d,f), os.path.join(d,f)) for d,_,fs in os.walk('easy_r5') for f in fs if '__pycache__' not in d and not f.endswith(('.pyc','.pyo'))]; z.close()"`)
+   and use *Plugins → Manage and Install → Install from ZIP*. Then enable it.
 2. **Download the engine** — run *Setup → Download R5 engine and Java 21*, pick a target folder
-   in your user profile. One-time, ~200 MB.
-3. **Build a network** — *Setup → Build R5 network*: point it at an `.osm.pbf` and a folder
-   holding your GTFS `.zip`(s). Cached by content hash + R5 version, so re-runs are instant.
-4. **Analyse** — *Run travel time matrix* or *Run accessibility*: the network from step 3, an
-   origins point layer, a destinations point layer, a `DATE` the feed actually serves, a
-   departure time and window. Output layers are styled automatically.
+   in your user profile. One-time, ~200 MB (Temurin 21 JDK + the R5 jar).
+3. **Get data** — you supply the OSM extract (`.osm.pbf` from [Geofabrik](https://download.geofabrik.de/)
+   or [BBBike](https://extract.bbbike.org/)) and the GTFS feed(s) (`.zip`) for your study area.
+4. **Build a network** — *Setup → Build R5 network*: the `.osm.pbf` and a folder holding your
+   GTFS `.zip`(s). Cached by content hash + R5 version, so re-runs are instant.
+5. **Analyse** — *Run travel time matrix* or *Run accessibility*: the network from step 4, an
+   origins point layer, a destinations point layer, a `DATE` the feed actually serves (the run
+   is blocked otherwise), a departure time and window. Output layers are styled automatically.
 
-The Gdańsk reference data is in [`tools/accessibility_cities/gdansk/`](tools/accessibility_cities/gdansk/).
+The Gdańsk reference data — 1389 origins, 956 destinations, the r5r ground-truth output — is in
+[`tools/accessibility_cities/gdansk/`](tools/accessibility_cities/gdansk/); the exact-match
+comparison is in [`docs/notes/validation-gdansk.md`](docs/notes/validation-gdansk.md).
+
+![Isochrones from Gdańsk Główny — 15 / 30 / 45 min, 07:00, transit + walk](docs/img/isochrones-gdansk.png)
 
 ## Hex grid — use stock QGIS
 
@@ -89,10 +98,10 @@ Easy-R5 ships no hex-grid algorithm. To reproduce `gdansk_hex_origins.csv`'s lay
 | Requirement | Version | How to get it |
 |---|---|---|
 | QGIS | 3.22 LTR or newer (developed on 3.40) | qgis.org — the plugin uses the bundled Python and GDAL |
-| Java | **21** (Temurin) | the plugin downloads it |
-| R5 | **pinned** — see [ADR-0002](docs/adr/0002-pinned-versions.md) | the plugin downloads it |
-| OSM extract | any `.osm.pbf` covering the study area | the plugin can download it |
-| GTFS feed(s) | any valid feed | the plugin can download it |
+| Java | **21** (Temurin) | *Download R5 engine and Java 21* fetches it |
+| R5 | **pinned** `r5-v7.6-all.jar` — see [ADR-0002](docs/adr/0002-pinned-versions.md) | same algorithm, SHA-256 verified |
+| OSM extract | any `.osm.pbf` covering the study area | you supply it (Geofabrik, BBBike) |
+| GTFS feed(s) | any valid feed | you supply it (the operator, transitfeeds, MobilityData) |
 
 ## Licence
 
