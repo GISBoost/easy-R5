@@ -24,6 +24,7 @@ _KEY = {
     "runner_mode": _PREFIX + "runner_mode",
     "runner_source_path": _PREFIX + "runner_source_path",
     "target_folder": _PREFIX + "target_folder",
+    "cache_folder": _PREFIX + "cache_folder",
     "java_heap_gb": _PREFIX + "java_heap_gb",
 }
 

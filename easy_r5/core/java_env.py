@@ -255,12 +255,16 @@ def resolve_env(settings_snapshot):
     return ResolvedEnv(jdk, jar, mode, class_dir, source_path)
 
 
-def build_java_command(env, xmx, job_json_path):
-    """Assemble the java command line for one runner invocation."""
+def build_java_command(env, xmx, job_json_path, extra_jvm_args=()):
+    """Assemble the java command line for one runner invocation.
+
+    ``extra_jvm_args`` (e.g. ``["-Djava.io.tmpdir=..."]``) go right after -Xmx.
+    """
+    jvm = [xmx, *extra_jvm_args]
     if env.runner_mode == "compiled":
         cp = "{}{}{}".format(env.jar_path, os.pathsep, env.runner_class_dir)
-        return [str(env.jdk_path), xmx, "-cp", cp, pins.RUNNER_MAIN_CLASS, str(job_json_path)]
+        return [str(env.jdk_path), *jvm, "-cp", cp, pins.RUNNER_MAIN_CLASS, str(job_json_path)]
     return [
-        str(env.jdk_path), xmx, "-cp", str(env.jar_path),
+        str(env.jdk_path), *jvm, "-cp", str(env.jar_path),
         str(env.runner_source_path), str(job_json_path),
     ]

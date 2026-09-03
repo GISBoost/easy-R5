@@ -73,6 +73,27 @@ def build_info_job(network_path):
     return {"command": "info", "network": network_path}
 
 
+def build_build_job(osm_path, gtfs_paths, out_network, out_summary):
+    """Build the ``build`` job: build a network.dat + structural network.json."""
+    osm_path = str(osm_path or "").strip()
+    gtfs = [str(p).strip() for p in gtfs_paths if str(p).strip()]
+    out_network = str(out_network or "").strip()
+    out_summary = str(out_summary or "").strip()
+    if not osm_path:
+        raise JobSpecError("No OSM .pbf given for the 'build' command.")
+    if not gtfs:
+        raise JobSpecError("No GTFS feeds given for the 'build' command.")
+    if not out_network or not out_summary:
+        raise JobSpecError("'build' needs both out_network and out_summary paths.")
+    return {
+        "command": "build",
+        "osm": osm_path,
+        "gtfs": gtfs,
+        "out_network": out_network,
+        "out_summary": out_summary,
+    }
+
+
 def write_job(job, tmp_dir):
     """Serialise ``job`` to a uniquely named JSON file in ``tmp_dir``.
 
