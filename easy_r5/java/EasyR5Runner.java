@@ -1,8 +1,13 @@
+import com.conveyal.gtfs.GTFSFeed;
+import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.SoftwareVersion;
 import com.conveyal.r5.kryo.KryoNetworkSerializer;
+import com.conveyal.r5.transit.DuplicateFeedException;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.locationtech.jts.geom.Envelope;
 
 import java.io.FileDescriptor;
@@ -12,7 +17,11 @@ import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
+import java.util.stream.Stream;
 
 /**
  * Easy-R5 engine runner. One file, one compilation unit (Java 21 single-file
@@ -63,6 +72,9 @@ public class EasyR5Runner {
             switch (command) {
                 case "info":
                     doInfo(job);
+                    break;
+                case "build":
+                    doBuild(job);
                     break;
                 default:
                     Emit.error("BAD_JOB_SPEC", "Unknown command '" + command + "'.");
@@ -122,18 +134,107 @@ public class EasyR5Runner {
         Emit.done(networkPath, 0);
     }
 
+    // --- command: build ---------------------------------------------------
+
+    private static void doBuild(JsonNode job) throws Exception {
+        String osmPath = job.path("osm").asText("").trim();
+        List<String> gtfs = new ArrayList<>();
+        for (JsonNode g : job.path("gtfs")) {
+            String s = g.asText("").trim();
+            if (!s.isEmpty()) {
+                gtfs.add(s);
+            }
+        }
+        String outNet = job.path("out_network").asText("").trim();
+        String outSum = job.path("out_summary").asText("").trim();
+        if (osmPath.isEmpty() || gtfs.isEmpty() || outNet.isEmpty() || outSum.isEmpty()) {
+            Emit.error("BAD_JOB_SPEC", "'build' needs osm, gtfs[], out_network, out_summary.");
+            return;
+        }
+        if (!new File(osmPath).isFile()) {
+            Emit.error("IO_ERROR", "OSM file not found: " + osmPath);
+            return;
+        }
+        for (String g : gtfs) {
+            if (!new File(g).isFile()) {
+                Emit.error("IO_ERROR", "GTFS file not found: " + g);
+                return;
+            }
+        }
+
+        Emit.info("Building network: " + osmPath + " + " + gtfs.size() + " GTFS feed(s)");
+        Emit.progress(0, 4);
+
+        File cacheDir = new File(outNet).getAbsoluteFile().getParentFile();
+        if (cacheDir != null) {
+            cacheDir.mkdirs();
+        }
+
+        // Keep the MapDB sidecar in our cache dir, not next to the source OSM —
+        // the tools/ folders already carry r5r's .osm.pbf.mapdb from an older
+        // osmlib and OSM.openOrCreateFile would reuse a stale one.
+        OSM osm = OSM.openOrCreateFile(new File(cacheDir, "osm.mapdb"), osmPath);
+        Emit.info("OSM loaded: " + osm.ways.size() + " ways, " + osm.nodes.size() + " nodes");
+        Emit.progress(1, 4);
+
+        Stream<GTFSFeed> feeds = gtfs.stream().map(GTFSFeed::readOnlyTempFileFromGtfs);
+
+        TransportNetwork network;
+        try {
+            network = TransportNetwork.build(null, osm, feeds, true);
+        } catch (DuplicateFeedException e) {
+            Emit.error("IO_ERROR",
+                    "Two GTFS feeds share the same feed_id — put each network variant in its "
+                    + "own folder. Detail: " + e.getMessage());
+            return;
+        }
+        Emit.info("Network built: " + network.transitLayer.getStopCount() + " stops, "
+                + network.transitLayer.tripPatterns.size() + " trip patterns");
+        Emit.progress(2, 4);
+
+        KryoNetworkSerializer.write(network, new File(outNet));
+        Emit.progress(3, 4);
+
+        ObjectNode j = MAPPER.createObjectNode();
+        j.put("r5_version", r5Version());
+        j.put("network_format_version", KryoNetworkSerializer.NETWORK_FORMAT_VERSION);
+        j.put("built_at", LocalDateTime.now().withNano(0).toString());
+        j.put("timezone", String.valueOf(network.getTimeZone()));
+        ArrayNode feedsArr = j.putArray("feeds");
+        for (String f : network.transitLayer.feedChecksums.keySet()) {
+            feedsArr.add(f);
+        }
+        j.put("stops", network.transitLayer.getStopCount());
+        j.put("trip_patterns", network.transitLayer.tripPatterns.size());
+        j.put("routes", network.transitLayer.routes.size());
+        j.put("street_vertices", network.streetLayer.getVertexCount());
+        Envelope e = network.getEnvelope();
+        ObjectNode b = j.putObject("bounds");
+        if (e != null && !e.isNull()) {
+            b.put("min_lon", e.getMinX());
+            b.put("min_lat", e.getMinY());
+            b.put("max_lon", e.getMaxX());
+            b.put("max_lat", e.getMaxY());
+        }
+        MAPPER.writerWithDefaultPrettyPrinter().writeValue(new File(outSum), j);
+        Emit.progress(4, 4);
+
+        Emit.done(outNet, network.transitLayer.tripPatterns.size());
+    }
+
     // --- helpers -----------------------------------------------------------
 
     private static String r5Version() {
+        String v = "7.6";
         try {
-            SoftwareVersion v = SoftwareVersion.instance;
-            if (v != null && v.version != null && !v.version.isBlank()) {
-                return v.version;
+            SoftwareVersion sv = SoftwareVersion.instance;
+            if (sv != null && sv.version != null && !sv.version.isBlank()) {
+                v = sv.version;
             }
         } catch (Throwable ignored) {
             // fall through to the pinned value
         }
-        return "v7.6";
+        return v.startsWith("v") ? v.substring(1) : v;  // "v7.6" -> "7.6", matches pins.R5_VERSION
     }
 
     /** min_lon,min_lat,max_lon,max_lat with 6 decimals, or "" if unavailable. */
