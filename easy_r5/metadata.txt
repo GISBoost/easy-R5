@@ -1,6 +1,7 @@
 [general]
 name=Easy-R5
 qgisMinimumVersion=3.22
+qgisMaximumVersion=3.99
 description=Transit accessibility analysis with the Conveyal R5 routing engine.
 about=Runs the Conveyal R5 routing engine (v7.6, MIT) as a child process to
     compute one-to-many and many-to-many travel-time matrices,

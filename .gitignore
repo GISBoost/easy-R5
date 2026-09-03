@@ -90,3 +90,7 @@ hs_err_pid*.log
 # --- Keep: the built plugin ZIP for the QGIS repository upload (small, is the deliverable) ---
 !builds/
 !builds/*.zip
+
+# --- Claude Code: local settings stay out; shared subagent definitions are versioned ---
+.claude/*
+!.claude/agents/
