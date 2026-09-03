@@ -4,6 +4,7 @@ from qgis.core import QgsProcessingProvider
 
 from .algorithms.build_network import BuildNetwork
 from .algorithms.download_r5 import DownloadR5
+from .algorithms.download_realized_gtfs import DownloadRealizedGtfs
 from .algorithms.generate_isochrones import GenerateIsochrones
 from .algorithms.population_overlay import PopulationOverlay
 from .algorithms.prepare_population_layer import PreparePopulationLayer
@@ -24,6 +25,7 @@ class EasyR5Provider(QgsProcessingProvider):
 
     def loadAlgorithms(self) -> None:  # noqa: N802 — Qt API name
         self.addAlgorithm(DownloadR5())
+        self.addAlgorithm(DownloadRealizedGtfs())
         self.addAlgorithm(BuildNetwork())
         self.addAlgorithm(TestR5Setup())
         self.addAlgorithm(RunTravelTimeMatrix())

@@ -1,6 +1,8 @@
 SOURCES = easy_r5_plugin.py \
           provider.py \
+          gui/download_recordings_dialog.py \
           algorithms/download_r5.py \
+          algorithms/download_realized_gtfs.py \
           algorithms/build_network.py \
           algorithms/test_r5_setup.py \
           algorithms/_matrix_base.py \

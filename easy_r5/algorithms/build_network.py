@@ -88,6 +88,8 @@ class BuildNetwork(QgsProcessingAlgorithm):
                 self.GTFS_FOLDER,
                 self.tr("Folder of GTFS feeds (every .zip inside is used)"),
                 behavior=QgsProcessingParameterFile.Folder,
+                # 'Download transit recordings…' saves its last output here
+                defaultValue=settings.get("last_gtfs_folder", "") or None,
             )
         )
         cache = QgsProcessingParameterFile(

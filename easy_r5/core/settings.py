@@ -26,6 +26,9 @@ _KEY = {
     "target_folder": _PREFIX + "target_folder",
     "cache_folder": _PREFIX + "cache_folder",
     "java_heap_gb": _PREFIX + "java_heap_gb",
+    "manifest_url": _PREFIX + "manifest_url",
+    "transit_data_folder": _PREFIX + "transit_data_folder",
+    "last_gtfs_folder": _PREFIX + "last_gtfs_folder",
 }
 
 

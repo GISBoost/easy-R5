@@ -4,10 +4,13 @@ import os
 
 from qgis.core import QgsApplication
 from qgis.PyQt.QtCore import QCoreApplication, QSettings, QTranslator
+from qgis.PyQt.QtGui import QIcon
+from qgis.PyQt.QtWidgets import QAction
 
 from .provider import EasyR5Provider
 
 _PROVIDER_ID = "easyr5"
+_MENU = "Easy-R5"
 
 
 class EasyR5Plugin:
@@ -15,6 +18,7 @@ class EasyR5Plugin:
         self.iface = iface
         self.provider = None
         self._translator = None
+        self._dl_action = None
 
         # value() can return None (key present but unset when "Override system
         # locale" is off) — [:2] on None would crash the whole plugin load.
@@ -50,7 +54,27 @@ class EasyR5Plugin:
             # dangling reference (calling removeProvider on it later would crash).
             self.provider = None
 
+        # The one dialog: cascading city/month/day picker for gtfs-dashboard
+        # recordings (see easy_r5/gui/). Best-effort — a GUI import error must
+        # not take down the provider.
+        try:
+            icon = QIcon(os.path.join(os.path.dirname(__file__), "resources", "icon.svg"))
+            self._dl_action = QAction(
+                icon, self.tr("Download transit recordings…"), self.iface.mainWindow())
+            self._dl_action.triggered.connect(self._open_download_recordings)
+            self.iface.addPluginToMenu(_MENU, self._dl_action)
+        except Exception:  # nosec B110 — an optional menu item must not break the plugin
+            self._dl_action = None
+
+    def _open_download_recordings(self):
+        from .gui.download_recordings_dialog import DownloadRecordingsDialog
+        DownloadRecordingsDialog(self.iface.mainWindow()).exec()
+
     def unload(self):
+        if self._dl_action is not None:
+            self.iface.removePluginMenu(_MENU, self._dl_action)
+            self._dl_action = None
+
         if self._translator is not None:
             QCoreApplication.removeTranslator(self._translator)
             self._translator = None

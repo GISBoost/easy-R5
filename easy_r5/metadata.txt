@@ -12,11 +12,12 @@ about=Runs the Conveyal R5 routing engine (v7.6, MIT) as a child process to
     from PyPI (SHA-256 verified, no pip) on first load and every other algorithm
     runs without it.
     Setup: DownloadR5 (Temurin 21 JDK + r5-v7.6-all.jar, SHA-256 verified),
-    BuildNetwork (cached network.dat + network.json with per-date active trip
-    counts). Diagnostics: TestR5Setup. Analysis: RunTravelTimeMatrix,
-    RunAccessibility, GenerateIsochrones, PreparePopulationLayer,
-    PopulationOverlay.
-version=0.1.0
+    DownloadRealizedGtfs (archival / realized feeds from GISBoost's
+    gtfs-dashboard index), BuildNetwork (cached network.dat + network.json with
+    per-date active trip counts). Diagnostics: TestR5Setup. Analysis:
+    RunTravelTimeMatrix, RunAccessibility, GenerateIsochrones,
+    PreparePopulationLayer, PopulationOverlay.
+version=0.2.0
 author=Michal Kaczorowski
 email=michal.kaczorowsx@gmail.com
 repository=https://github.com/GISBoost/easy-R5
@@ -30,7 +31,19 @@ experimental=True
 deprecated=False
 hasProcessingProvider=yes
 hasTranslations=yes
-changelog=0.1.0
+changelog=0.2.0
+    * feat(setup): DownloadRealizedGtfs — pick a city + date + variant (realized
+      P50/P85 or scheduled) and download that GTFS feed from GISBoost's
+      gtfs-dashboard index, into a folder ready for Build R5 network. No GitHub
+      API calls (the manifest is a static CDN file); no checksum published, so
+      the download is CRC-checked and sniffed for the GTFS files only.
+    * feat(gui): 'Plugins > Easy-R5 > Download transit recordings…' — a
+      cascading city > month > day picker over the live index. The plugin's
+      first and only dialog (see docs/prd/PR_easy-R5_v02_realized-gtfs.md §1).
+    * refactor(core): downloads — HTTP download + safe zip/tar extraction moved
+      out of DownloadR5 so both Setup algorithms share it.
+    * feat(core): gtfs_dashboard — manifest client (fetch + disk cache + resolve).
+    0.1.0
     * M5 — isochrones, population layers, release.
     * fix(deps): drop the pip fallback from the openpyxl bootstrap — urllib
       wheel + _vendor/ only, never shell out to pip (CLAUDE.md).

@@ -76,12 +76,19 @@ Status per kamień: `docs/prompts/README.md` i `docs/prd/PR_easy-R5_v01.md` §0.
 Wtyczka = provider Processing, sekcje jak w easy-OTP, **bez sekcji `Realtime/`**:
 
 ```
-Setup/       — DownloadR5 (JDK 21 + jar R5), DownloadTransitData, BuildNetwork
+Setup/       — DownloadR5 (JDK 21 + jar R5), DownloadRealizedGtfs,
+               DownloadTransitData, BuildNetwork
 Diagnostics/ — TestR5Setup
 Analysis/    — RunTravelTimeMatrix (flagowy), RunAccessibility, GenerateIsochrones,
                PreparePopulationLayer, PopulationOverlay, CompareScenarios,
                (później) RunScenarioAnalysis
 ```
+
+**`easy_r5/gui/` istnieje wyłącznie dla okna „Download transit recordings…"** —
+kaskadowego wyboru miasto→miesiąc→dzień z żywego indeksu gtfs-dashboard, którego nie
+da się wyrazić parametrami Processing (`docs/prd/PR_easy-R5_v02_realized-gtfs.md` §1).
+To jedyne GUI we wtyczce. Nie dodawaj kolejnych okien bez analogicznego uzasadnienia —
+wszystko inne to algorytm Processing.
 
 **Bez własnego generatora siatki heksagonalnej** — easy-OTP-owy `GenerateHexGrid` to
 opakowanie na `native:creategrid`; nie powielamy generycznego algorytmu QGIS, tylko

@@ -58,6 +58,8 @@ See [`docs/notes/product-scope.md`](docs/notes/product-scope.md) and
    in your user profile. One-time, ~200 MB (Temurin 21 JDK + the R5 jar).
 3. **Get data** — you supply the OSM extract (`.osm.pbf` from [Geofabrik](https://download.geofabrik.de/)
    or [BBBike](https://extract.bbbike.org/)) and the GTFS feed(s) (`.zip`) for your study area.
+   For a *realized* feed (what actually ran on a given day, P50/P85) or that day's scheduled
+   feed, see **Archival / realized GTFS** below.
 4. **Build a network** — *Setup → Build R5 network*: the `.osm.pbf` and a folder holding your
    GTFS `.zip`(s). Cached by content hash + R5 version, so re-runs are instant.
 5. **Analyse** — *Run travel time matrix* or *Run accessibility*: the network from step 4, an
@@ -69,6 +71,26 @@ The Gdańsk reference data — 1389 origins, 956 destinations, the r5r ground-tr
 comparison is in [`docs/notes/validation-gdansk.md`](docs/notes/validation-gdansk.md).
 
 ![Isochrones from Gdańsk Główny — 15 / 30 / 45 min, 07:00, transit + walk](docs/img/isochrones-gdansk.png)
+
+## Archival / realized GTFS
+
+*Setup → Download realized GTFS*, or **Plugins → Easy-R5 → Download transit recordings…**
+for a pick-from-a-list dialog, fetches a feed from
+[GISBoost's gtfs-dashboard](https://gisboost.github.io/gtfs-dashboard/) — the index of
+recordings produced by the [`easy-GTFS-RT`](https://github.com/GISBoost/easy-GTFS-RT)
+pipeline for ~25 cities on specific days. Pick a city, a day, and a variant:
+
+- **Realized P50 / P85** — the timetable rewritten to match what vehicles actually did that
+  day (median, or the conservative 85th percentile). This is the *only* way realtime
+  information enters Easy-R5; R5 does not read GTFS-RT.
+- **Scheduled** — the static GTFS as published for that day.
+
+It downloads into `…/transit-recordings/<city>/<date>/<variant>/`, ready to hand to
+*Build R5 network*. Realized and scheduled feeds share trip / stop ids, so each variant gets
+its own folder. This is **not** a general GTFS source — for feeds outside GISBoost's
+recordings, download from the operator or [Mobility Database](https://mobilitydatabase.org/).
+No checksum is published for these assets, so the download is CRC-checked and sniffed for the
+GTFS files, nothing stronger.
 
 ## Hex grid — use stock QGIS
 

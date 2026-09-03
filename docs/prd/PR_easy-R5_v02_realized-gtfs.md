@@ -1,6 +1,14 @@
 # PRD — Easy-R5 v0.2 · Pobieranie zrealizowanego GTFS z gtfs-dashboard
 
-**Status:** Draft (plan, przed kodowaniem)
+**Status:** ✅ zaimplementowane (R0–R4), 2026-09-03. `metadata.txt` `0.2.0`.
+Zweryfikowane end-to-end w QGIS 3.40 (`processing.run` + okno) na lokalnym
+serwerze z fałszywym manifestem: pobranie do katalogu per-wariant, idempotencja,
+błędy „brak daty" / „brak wariantu", kaskada miasto→miesiąc→dzień, znacznik
+„⟂ partial", wyszarzanie niedostępnych wariantów, sprzątanie menu w `unload()`.
+30 nowych testów pytest (`test_downloads`, `test_gtfs_dashboard`,
+`test_realized_gtfs_flow`). **Zostaje:** przebieg na realnym manifeście
+gtfs-dashboard i realnym assecie (rozmiar, ew. górny katalog w zipie);
+tłumaczenie PL nowych stringów (issue #1).
 **Data:** 2026-09-03
 **Autor:** Michał Kaczorowski
 **Kontekst wymagany do pracy:** ten plik + `PR_easy-R5_v01.md` (v0.1, frozen) +

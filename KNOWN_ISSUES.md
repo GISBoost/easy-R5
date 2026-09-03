@@ -4,7 +4,7 @@ Every entry here has a matching GitHub issue (CLAUDE.md policy).
 
 | # | Issue | Summary | Workaround | Status |
 |---|---|---|---|---|
-| 1 | [#1](https://github.com/GISBoost/easy-R5/issues/1) | The Polish translation is fully populated but machine-translated (local LLM); a few phrasings need a human pass. | None — the UI is usable in Polish and English. | Human review planned for v0.2 |
+| 1 | [#1](https://github.com/GISBoost/easy-R5/issues/1) | The Polish translation is machine-translated (local LLM) and now lags: strings added by the 0.1.x review fixes and the whole 0.2 downloader (`DownloadRealizedGtfs`, the recordings dialog) are English-only until the next `.ts` pass. | None — untranslated strings fall back to English; the plugin works in both. | Human review + re-`lupdate` planned before `experimental=False` |
 | 2 | [#2](https://github.com/GISBoost/easy-R5/issues/2) | Isochrone detail is limited by `GRID_SPACING` — a coarse grid gives lumpy contours. | Lower `GRID_SPACING` (quadratic cost). | Contour quality fixed in 0.1.0 (TIN + marching-squares); resolution knob remains |
 
 ## Not bugs, but worth knowing

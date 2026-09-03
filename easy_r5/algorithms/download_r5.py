@@ -11,10 +11,7 @@ from __future__ import annotations
 import json
 import os
 import platform
-import shutil
 import sys
-import tarfile
-import zipfile
 from pathlib import Path
 from urllib import request as urllib_request
 from urllib.error import URLError
@@ -31,9 +28,8 @@ from qgis.core import (
     QgsProcessingParameterFile,
 )
 
-from ..core import java_env, pins, settings
+from ..core import downloads, java_env, pins, settings
 
-_CHUNK = 64 * 1024
 _MIN_FREE_MB = 700  # JDK unpacked + jar
 
 
@@ -120,6 +116,15 @@ class DownloadR5(QgsProcessingAlgorithm):
         self.addOutput(QgsProcessingOutputString(self.RUNNER_MODE, self.tr("Runner mode")))
 
     def processAlgorithm(self, parameters, context, feedback):  # noqa: N802
+        try:
+            return self._run(parameters, context, feedback)
+        except downloads.DownloadCancelled:
+            feedback.pushWarning(self.tr("Cancelled by user."))
+            return {}
+        except downloads.DownloadError as exc:
+            raise QgsProcessingException(str(exc))
+
+    def _run(self, parameters, context, feedback):
         target = Path(self.parameterAsFile(parameters, self.TARGET_FOLDER, context))
         want_jdk = self.parameterAsBool(parameters, self.DOWNLOAD_JDK, context)
         want_r5 = self.parameterAsBool(parameters, self.DOWNLOAD_R5, context)
@@ -131,7 +136,7 @@ class DownloadR5(QgsProcessingAlgorithm):
         multi.setCurrentStep(0)
         self._check_arch()
         os_name = self._resolve_os(platform_idx)
-        self._check_writable(target)
+        downloads.check_writable(target)
         target.mkdir(parents=True, exist_ok=True)
         runner_cache = target / "runner_cache"
         runner_cache.mkdir(parents=True, exist_ok=True)
@@ -221,17 +226,15 @@ class DownloadR5(QgsProcessingAlgorithm):
                 "Temurin 21 JDK alongside it."
             ).format(cached))
 
-        self._check_disk(target)
+        downloads.check_free_space(target, _MIN_FREE_MB)
         multi.setCurrentStep(2)
         multi.pushInfo(self.tr("Querying the Adoptium API for the latest Temurin 21 JDK…"))
         link, checksum, pkg_name = self._query_adoptium(os_name)
 
         archive = target / pkg_name
-        tmp = target / (pkg_name + ".tmp")
+        multi.setCurrentStep(3)
         multi.pushInfo(self.tr("Downloading {}…").format(link))
-        self._download(link, tmp, archive, multi, 3, 3)
-        if multi.isCanceled():
-            return None, ""
+        downloads.download_file(link, archive, feedback=multi, user_agent=pins.USER_AGENT)
 
         multi.setCurrentStep(6)
         multi.pushInfo(self.tr("Verifying SHA-256…"))
@@ -245,10 +248,7 @@ class DownloadR5(QgsProcessingAlgorithm):
 
         multi.pushInfo(self.tr("Extracting…"))
         self._extract(archive, target, os_name)
-        try:
-            os.remove(archive)
-        except OSError:
-            pass
+        archive.unlink(missing_ok=True)
 
         binary = self._find_java(target)
         if binary is None:
@@ -304,12 +304,11 @@ class DownloadR5(QgsProcessingAlgorithm):
                 settings.set_("r5_jar_sha256", pins.R5_JAR_SHA256)
                 return jar_path
 
-        tmp = target / (pins.R5_JAR_FILENAME + ".tmp")
         multi.setCurrentStep(8)
         multi.pushInfo(self.tr("Downloading {}…").format(pins.R5_JAR_URL))
-        self._download(pins.R5_JAR_URL, tmp, jar_path, multi, 8, 1)
-        if multi.isCanceled():
-            return jar_path
+        downloads.download_file(
+            pins.R5_JAR_URL, jar_path, feedback=multi, user_agent=pins.USER_AGENT
+        )
 
         multi.setCurrentStep(9)
         ok, digest = java_env.verify_jar_sha256(jar_path, pins.R5_JAR_SHA256)
@@ -333,7 +332,8 @@ class DownloadR5(QgsProcessingAlgorithm):
         settings.set_("r5_jar_sha256", pins.R5_JAR_SHA256)
         return jar_path
 
-    # --- shared helpers (ported from easy-OTP download_jre.py) ----------
+    # --- platform / discovery helpers ---------------------------------
+    # HTTP download + archive extraction now live in core/downloads.py.
 
     def _check_arch(self):
         machine = platform.machine().lower()
@@ -356,103 +356,11 @@ class DownloadR5(QgsProcessingAlgorithm):
             return os_name
         return self._OS_NAMES[platform_idx - 1]
 
-    def _check_writable(self, dest):
-        parent = dest if dest.is_dir() else dest.parent
-        if not parent.is_dir():
-            raise QgsProcessingException(self.tr(
-                "Folder '{}' does not exist and neither does its parent."
-            ).format(dest))
-        probe = parent / ".easy_r5_write_test"
-        try:
-            probe.touch()
-            probe.unlink()
-        except PermissionError:
-            raise QgsProcessingException(self.tr(
-                "Cannot write to '{}': administrator rights required. Choose a "
-                "folder in your user profile."
-            ).format(parent))
-        except OSError as exc:
-            raise QgsProcessingException(
-                self.tr("Cannot write to '{}': {}").format(parent, exc)
-            )
-
-    def _check_disk(self, dest):
-        free_mb = shutil.disk_usage(dest).free / (1024 * 1024)
-        if free_mb < _MIN_FREE_MB:
-            raise QgsProcessingException(self.tr(
-                "Not enough disk space in '{}'. Need ~{} MB, have {:.0f} MB."
-            ).format(dest, _MIN_FREE_MB, free_mb))
-
-    def _download(self, url, tmp, final, multi, step_start, step_count):
-        req = urllib_request.Request(url, headers={"User-Agent": pins.USER_AGENT})
-        try:
-            with urllib_request.urlopen(req, timeout=60) as resp:  # nosec B310 — fixed HTTPS release/API URL
-                total = int(resp.headers.get("Content-Length") or 0)
-                done = 0
-                with open(tmp, "wb") as fh:
-                    while True:
-                        if multi.isCanceled():
-                            fh.close()
-                            self._rm(tmp)
-                            return
-                        chunk = resp.read(_CHUNK)
-                        if not chunk:
-                            break
-                        fh.write(chunk)
-                        done += len(chunk)
-                        if total:
-                            frac = done / total
-                            step = min(step_start + int(frac * step_count),
-                                       step_start + step_count - 1)
-                            multi.setCurrentStep(step)
-                            multi.setProgress(int(((frac * step_count) % 1.0) * 100))
-        except URLError as exc:
-            self._rm(tmp)
-            raise QgsProcessingException(
-                self.tr("Download failed ({}): {}").format(url, exc)
-            ) from exc
-        if multi.isCanceled():
-            self._rm(tmp)
-            return
-        os.rename(tmp, final)
-
-    @staticmethod
-    def _rm(path):
-        try:
-            os.remove(path)
-        except OSError:
-            pass
-
-    def _safe_zipextract(self, zf, dest):
-        dest_root = dest.resolve()
-        prefix = str(dest_root) + os.sep
-        for member in zf.infolist():
-            target = (dest_root / member.filename).resolve()
-            if str(target) != str(dest_root) and not str(target).startswith(prefix):
-                continue  # skip zip-slip
-            zf.extract(member, dest)
-
-    def _safe_tarextract(self, tf, dest):
-        dest_root = dest.resolve()
-        prefix = str(dest_root) + os.sep
-        for member in tf.getmembers():
-            if member.isdev() or member.issym() or member.islnk():
-                continue  # no device/symlink/hardlink members from a JDK tarball
-            target = (dest_root / member.name).resolve()
-            if str(target) != str(dest_root) and not str(target).startswith(prefix):
-                continue  # skip tar-slip
-            tf.extract(member, dest)
-
     def _extract(self, archive, dest, os_name):
         if os_name == "windows":
-            with zipfile.ZipFile(archive) as zf:
-                self._safe_zipextract(zf, dest)
+            downloads.safe_extract_zip(archive, dest)
         else:
-            with tarfile.open(archive) as tf:
-                if sys.version_info >= (3, 12):
-                    tf.extractall(dest, filter="data")
-                else:
-                    self._safe_tarextract(tf, dest)
+            downloads.safe_extract_tar(archive, dest)
 
     def _find_java(self, dest):
         binary_name = "java.exe" if sys.platform == "win32" else "java"
