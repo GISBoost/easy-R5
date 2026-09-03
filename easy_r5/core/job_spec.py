@@ -94,6 +94,96 @@ def build_build_job(osm_path, gtfs_paths, out_network, out_summary):
     }
 
 
+def build_matrix_job(
+    *,
+    network,
+    origins_csv,
+    destinations_csv,
+    origin_range,
+    date,
+    departure_time,
+    time_window_minutes,
+    percentiles,
+    max_trip_duration_minutes,
+    max_walk_time_minutes,
+    walk_speed_kmh,
+    bike_speed_kmh,
+    max_rides,
+    monte_carlo_draws,
+    access_modes,
+    egress_modes,
+    direct_modes,
+    transit_modes,
+    write_unreachable,
+    out_csv,
+):
+    """Build the ``matrix`` job: one-to-many travel times, PRD 3.2 shape.
+
+    ``max_walk_time_minutes`` is always written as a positive int — an empty or
+    non-positive value falls back to ``max_trip_duration_minutes`` (a lossless
+    cap: a single walk leg longer than the whole trip budget cannot belong to a
+    trip that fits the budget). The runner must never route with an unbounded
+    walk radius (PRD 2.1, lesson 2).
+    """
+    network = str(network or "").strip()
+    origins_csv = str(origins_csv or "").strip()
+    destinations_csv = str(destinations_csv or "").strip()
+    out_csv = str(out_csv or "").strip()
+    if not network:
+        raise JobSpecError("No network file given for the 'matrix' command.")
+    if not origins_csv or not destinations_csv:
+        raise JobSpecError("'matrix' needs both origins and destinations CSVs.")
+    if not out_csv:
+        raise JobSpecError("'matrix' needs an out_csv path.")
+
+    percentiles = validate_percentiles(percentiles)
+
+    trip_dur = int(max_trip_duration_minutes)
+    if trip_dur <= 0:
+        raise JobSpecError("max_trip_duration_minutes must be positive.")
+    try:
+        walk_cap = int(max_walk_time_minutes)
+    except (TypeError, ValueError):
+        walk_cap = 0
+    if walk_cap <= 0:
+        walk_cap = trip_dur
+
+    direct = [str(m).strip().upper() for m in direct_modes if str(m).strip()]
+    access = [str(m).strip().upper() for m in access_modes if str(m).strip()]
+    egress = [str(m).strip().upper() for m in egress_modes if str(m).strip()]
+    transit = [str(m).strip().upper() for m in transit_modes if str(m).strip()]
+    if not direct:
+        raise JobSpecError("'matrix' needs at least one direct mode.")
+
+    rng = list(origin_range) if origin_range is not None else None
+    if rng is not None and (len(rng) != 2 or rng[0] < 0 or rng[1] < rng[0]):
+        raise JobSpecError("origin_range must be [start, end] with 0 <= start <= end.")
+
+    return {
+        "command": "matrix",
+        "network": network,
+        "origins": origins_csv,
+        "destinations": destinations_csv,
+        "origin_range": rng,
+        "date": str(date).strip(),
+        "departure_time": str(departure_time).strip(),
+        "time_window_minutes": int(time_window_minutes),
+        "percentiles": percentiles,
+        "max_trip_duration_minutes": trip_dur,
+        "max_walk_time_minutes": walk_cap,
+        "walk_speed_kmh": float(walk_speed_kmh),
+        "bike_speed_kmh": float(bike_speed_kmh),
+        "max_rides": int(max_rides),
+        "monte_carlo_draws": int(monte_carlo_draws),
+        "access_modes": access,
+        "egress_modes": egress,
+        "direct_modes": direct,
+        "transit_modes": transit,
+        "write_unreachable": bool(write_unreachable),
+        "out_csv": out_csv,
+    }
+
+
 def write_job(job, tmp_dir):
     """Serialise ``job`` to a uniquely named JSON file in ``tmp_dir``.
 
