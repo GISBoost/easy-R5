@@ -1,0 +1,85 @@
+"""Build and validate the JSON job spec handed to EasyR5Runner.
+
+Pure stdlib, no QGIS imports — unit-testable outside the QGIS interpreter.
+
+M1 only produces the ``info`` job. The percentile validator lives here already
+because the runner protocol and later milestones (matrix, M3) depend on it and
+the M1 test suite covers it.
+"""
+
+from __future__ import annotations
+
+import json
+import uuid
+from pathlib import Path
+
+# R5's AnalysisWorkerTask.MAX_PERCENTILES, verified 2026-09-02
+# (validatePercentiles() throws IllegalArgumentException on six values).
+MAX_PERCENTILES = 5
+
+
+class JobSpecError(ValueError):
+    """A job spec is malformed or a parameter is out of the range R5 accepts."""
+
+
+def validate_percentiles(values):
+    """Return ``values`` unchanged, or raise ``JobSpecError``.
+
+    R5 accepts at most 5 percentiles, each an integer in 1..99, strictly
+    ascending. Validate here, before spawning Java — R5 throws an opaque
+    IllegalArgumentException otherwise.
+    """
+    values = list(values)
+    if not values:
+        raise JobSpecError("No percentiles given (need 1 to 5).")
+    if len(values) > MAX_PERCENTILES:
+        raise JobSpecError(
+            "R5 accepts at most {} percentiles (got {}).".format(
+                MAX_PERCENTILES, len(values)
+            )
+        )
+    for v in values:
+        if not isinstance(v, int) or isinstance(v, bool):
+            raise JobSpecError("Percentile {!r} is not an integer.".format(v))
+        if not 1 <= v <= 99:
+            raise JobSpecError(
+                "Percentile {} is out of range (must be 1 to 99).".format(v)
+            )
+    if any(b <= a for a, b in zip(values, values[1:])):
+        raise JobSpecError(
+            "Percentiles must be strictly ascending (got {}).".format(values)
+        )
+    return values
+
+
+def parse_percentiles(text):
+    """Parse a user string like ``"25, 50 ,75"`` into a validated list."""
+    tokens = [t for t in text.replace(",", " ").split() if t]
+    try:
+        values = [int(t) for t in tokens]
+    except ValueError as exc:
+        raise JobSpecError(
+            "Percentiles must be whole numbers separated by commas "
+            "(got {!r}).".format(text)
+        ) from exc
+    return validate_percentiles(values)
+
+
+def build_info_job(network_path):
+    """Build the ``info`` job: load a network.dat and report its metadata."""
+    network_path = str(network_path or "").strip()
+    if not network_path:
+        raise JobSpecError("No network file given for the 'info' command.")
+    return {"command": "info", "network": network_path}
+
+
+def write_job(job, tmp_dir):
+    """Serialise ``job`` to a uniquely named JSON file in ``tmp_dir``.
+
+    The caller owns the file and must delete it (and ``tmp_dir``) in a
+    ``finally`` block.
+    """
+    tmp_dir = Path(tmp_dir)
+    path = tmp_dir / "job_{}.json".format(uuid.uuid4().hex)
+    path.write_text(json.dumps(job, ensure_ascii=False) + "\n", encoding="utf-8")
+    return path
