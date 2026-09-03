@@ -39,11 +39,16 @@ def stable_ids(values, n):
     return ids
 
 
-def write_points_csv(source, context, feedback, id_field, out_path, *, label="points"):
+def write_points_csv(source, context, feedback, id_field, out_path, *, label="points",
+                     extra_fields=None):
     """Write ``source`` as ``id,lon,lat`` in EPSG:4326. Returns (ids, skipped).
 
     Rejects a non-point layer (``ValueError``). Features with null/empty
     geometry are skipped with a warning; a multipoint uses its centroid.
+
+    ``extra_fields`` appends those attribute columns after ``lat`` (numeric,
+    missing/blank -> 0) — RunAccessibility passes the opportunity fields so the
+    destinations CSV carries them the way r5r's does.
     """
     from qgis.core import (
         QgsCoordinateReferenceSystem,
@@ -66,8 +71,11 @@ def write_points_csv(source, context, feedback, id_field, out_path, *, label="po
         else None
     )
 
+    extra_fields = list(extra_fields or [])
+    extra_idx = [source.fields().lookupField(f) for f in extra_fields]
+
     raw_ids = []
-    coords = []
+    rows = []
     skipped = 0
     field_idx = source.fields().lookupField(id_field) if id_field else -1
     for feat in source.getFeatures():
@@ -83,18 +91,27 @@ def write_points_csv(source, context, feedback, id_field, out_path, *, label="po
         if transform is not None:
             pt = transform.transform(pt)
         raw_ids.append(feat.attribute(field_idx) if field_idx >= 0 else None)
-        coords.append((round(pt.x(), 6), round(pt.y(), 6)))
+        extras = [_num(feat.attribute(i)) if i >= 0 else 0 for i in extra_idx]
+        rows.append([round(pt.x(), 6), round(pt.y(), 6)] + extras)
 
     id_values = None if field_idx < 0 else raw_ids
-    ids = stable_ids(id_values, len(coords))
+    ids = stable_ids(id_values, len(rows))
 
     with open(out_path, "w", newline="", encoding="utf-8") as fh:
         writer = csv.writer(fh)
-        writer.writerow(["id", "lon", "lat"])
-        for pid, (lon, lat) in zip(ids, coords):
-            writer.writerow([pid, lon, lat])
+        writer.writerow(["id", "lon", "lat"] + extra_fields)
+        for pid, row in zip(ids, rows):
+            writer.writerow([pid] + row)
 
     return ids, skipped
+
+
+def _num(value):
+    """Attribute value -> number for a CSV column; None/blank/non-numeric -> 0."""
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0
 
 
 def read_points_csv(path):
