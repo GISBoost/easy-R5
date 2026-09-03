@@ -50,6 +50,8 @@ __pycache__/
 venv/
 .pytest_cache/
 .mypy_cache/
+# openpyxl bootstrap fallback dir (CLAUDE.md-sanctioned; wheels, not source)
+easy_r5/_vendor/
 
 # --- Node (geobuf packing in tools/) ---
 node_modules/

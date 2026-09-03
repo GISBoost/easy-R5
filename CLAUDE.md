@@ -38,9 +38,12 @@ Accepted** — od niego zależy cała warstwa `core/`.
 - **ZERO `pip install`** w `easy_r5/`. Pobieranie binariów przy setupie (JDK, jar R5)
   jest dozwolone — tak samo jak `DownloadJre` w easy-OTP. Instalowanie pakietów
   Pythona do interpretera QGIS-a — nie. Dopuszczalne wyjątki, oba wąskie:
-  1. `openpyxl` — **wyłącznie** dla `PreparePopulationLayer` (PRD §4.8), ładowany
-     dokładnie tak jak w easy-OTP (`core/dependencies.py`, wheel przez `urllib`).
-     **Wymaga potwierdzenia Michała, zanim agent to zaimplementuje.** Nie generalizuj.
+  1. `openpyxl` — **wyłącznie** dla `PreparePopulationLayer` / `PopulationOverlay`
+     (PRD §4.8), ładowany dokładnie tak jak w easy-OTP (`core/dependencies.py`,
+     wheel przez `urllib`, SHA-256, bez `pip`). **Potwierdzone przez Michała
+     2026-09-03 (M5).** Bootstrap woła się z `EasyR5Plugin.initGui()` best-effort.
+     Fallback rozpakowania: `easy_r5/_vendor/` (gitignored). Nie generalizuj —
+     żaden inny pakiet ani żaden inny algorytm.
   2. plan B z ADR-0001 (JPype) — tylko jeśli ADR-0001 zostanie zmieniony świadomą decyzją.
 - **ZERO R, ZERO GRASS** w kodzie wtyczki. (Reguła dotyczy `easy_r5/`; `tools/` jest
   z niej wyłączone — patrz niżej.)

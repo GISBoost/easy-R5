@@ -27,6 +27,15 @@ class EasyR5Plugin:
         return QCoreApplication.translate("EasyR5Plugin", message)
 
     def initGui(self):  # noqa: N802 — required QGIS plugin hook
+        # openpyxl is the one CLAUDE.md-sanctioned bootstrap: PreparePopulationLayer
+        # (PRD §4.8) needs it, nothing else does. Best-effort, never blocks startup.
+        try:
+            from .core.dependencies import ensure_openpyxl, install_openpyxl
+            if not ensure_openpyxl():
+                install_openpyxl()
+        except Exception:  # nosec B110 — a failed optional bootstrap must not break the plugin
+            pass
+
         registry = QgsApplication.processingRegistry()
         # Defensive: a previous instance whose unload() failed can leave a stale
         # provider registered. Remove it before adding ours.
