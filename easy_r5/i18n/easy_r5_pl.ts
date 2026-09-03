@@ -341,102 +341,107 @@ Pobieranie może być uszkodzone — spróbuj ponownie.</translation>
 <context>
     <name>GenerateIsochrones</name>
     <message>
-        <location filename="../algorithms/generate_isochrones.py" line="56"/>
+        <location filename="../algorithms/generate_isochrones.py" line="64"/>
         <source>Generate isochrones</source>
         <translation>Wygeneruj izochrony</translation>
     </message>
     <message>
-        <location filename="../algorithms/generate_isochrones.py" line="59"/>
+        <location filename="../algorithms/generate_isochrones.py" line="67"/>
         <source>Analysis</source>
         <translation>Analiza</translation>
     </message>
     <message>
-        <location filename="../algorithms/generate_isochrones.py" line="85"/>
+        <location filename="../algorithms/generate_isochrones.py" line="95"/>
         <source>Percentiles (1-99, ascending, up to 5)</source>
         <translation>Percentyle (1–99, rosnąco, maks. 5)</translation>
     </message>
     <message>
-        <location filename="../algorithms/generate_isochrones.py" line="88"/>
+        <location filename="../algorithms/generate_isochrones.py" line="98"/>
         <source>Cutoffs (minutes, comma-separated)</source>
         <translation>Progi czasowe (minuty, po przecinku)</translation>
     </message>
     <message>
-        <location filename="../algorithms/generate_isochrones.py" line="94"/>
+        <location filename="../algorithms/generate_isochrones.py" line="104"/>
         <source>Grid spacing (metres)</source>
         <translation>Rozstaw siatki (metry)</translation>
     </message>
     <message>
-        <location filename="../algorithms/generate_isochrones.py" line="100"/>
+        <location filename="../algorithms/generate_isochrones.py" line="110"/>
         <source>Output isochrones</source>
         <translation>Wynikowe izochrony</translation>
     </message>
     <message>
-        <location filename="../algorithms/generate_isochrones.py" line="116"/>
+        <location filename="../algorithms/generate_isochrones.py" line="126"/>
         <source>Cutoffs must be whole numbers of minutes.</source>
         <translation>Progi czasowe muszą być całkowitą liczbą minut.</translation>
     </message>
     <message>
-        <location filename="../algorithms/generate_isochrones.py" line="118"/>
+        <location filename="../algorithms/generate_isochrones.py" line="128"/>
         <source>Give at least one positive cutoff.</source>
         <translation>Podaj co najmniej jeden dodatni próg czasowy.</translation>
     </message>
     <message>
-        <location filename="../algorithms/generate_isochrones.py" line="122"/>
+        <location filename="../algorithms/generate_isochrones.py" line="132"/>
         <source>Origin points are required.</source>
         <translation>Wymagane są punkty źródłowe.</translation>
     </message>
     <message>
-        <location filename="../algorithms/generate_isochrones.py" line="146"/>
+        <location filename="../algorithms/generate_isochrones.py" line="156"/>
         <source>Could not create the output layer.</source>
         <translation>Nie udało się utworzyć warstwy wynikowej.</translation>
     </message>
     <message>
-        <location filename="../algorithms/generate_isochrones.py" line="158"/>
+        <location filename="../algorithms/generate_isochrones.py" line="168"/>
         <source>Origin {} reached no grid cell — no isochrone.</source>
         <translation>Źródło {} nie osiągnęło żadnej komórki siatki — brak izochrony.</translation>
     </message>
     <message>
-        <location filename="../algorithms/generate_isochrones.py" line="164"/>
+        <location filename="../algorithms/generate_isochrones.py" line="175"/>
         <source>{} isochrone polygons written.</source>
         <translation>Zapisano {} wielokątów izochron.</translation>
     </message>
     <message>
-        <location filename="../algorithms/generate_isochrones.py" line="201"/>
+        <location filename="../algorithms/generate_isochrones.py" line="212"/>
         <source>Grid would be ~{n:,.0f} points ({w:.0f} x {h:.0f} m at {s} m). Increase GRID_SPACING or use fewer / closer origins.</source>
         <translation>Siatka będzie miała około {n:,.0f} punktów ({w:.0f} x {h:.0f} m przy rozstawie {s} m). Zwiększ ROZSTAWIENIE SIATKI lub użyj mniej/bliższych źródeł.</translation>
     </message>
     <message>
-        <location filename="../algorithms/generate_isochrones.py" line="282"/>
-        <source>Origin {}: cutoff {} min failed ({}) — skipped.</source>
-        <translation>Źródło {}: próg czasowy {} min nie powiódł się ({} ) — pominięto.</translation>
-    </message>
-    <message>
-        <location filename="../algorithms/generate_isochrones.py" line="68"/>
-        <source>Travel-time isochrone polygons from one or more origin points, for one or more cutoffs. Builds a regular destination grid (GRID_SPACING, metres), runs a one-origin matrix against it, then contours each cutoff.
-
-One output feature per (origin, cutoff), tagged origin_id and cutoff_min. Polygons are cumulative — the 30-minute area contains the 15-minute one. Interior holes are kept where an area is genuinely unreachable (a lake, a rail yard, a street-network gap).
-
-R5 does not contour — that is done here. If one cutoff fails it is reported and skipped; the rest still come out. Grid cost is quadratic in 1/GRID_SPACING and blocked above ~400k points. MAX_WALK_TIME defaults to max(CUTOFFS) — lossless and the biggest speed lever.</source>
-        <translation>Poligony izochronne czasu podróży z jednego lub więcej punktów początkowych, dla jednego lub więcej progów czasowych. Tworzy regularną siatkę docelową (GRID_SPACING, metry), uruchamia macierz jednopunktową względem niej, a następnie konturowyje każdy próg.
-
-Jeden obiekt wyjściowy na każdą parę (źródło, próg), oznaczony identyfikatorem źródła origin_id i minimalnym progiem cutoff_min. Poligony są kumulatywne — obszar 30-minutowy zawiera ten z 15 minut. Zachowane są otwory wewnętrzne tam, gdzie obszar jest faktycznie niedostępny (jezioro, plac kolejowy, luka w sieci drogowej).
-
-R5 nie konturowuje — to odbywa się tutaj. Jeśli jeden próg zawiedzie, zostaje zgłoszony i pominięty; pozostałe są generowane. Koszt siatki jest kwadratowy względem 1/GRID_SPACING i blokowany powyżej ~400 tysięcy punktów. MAX_WALK_TIME domyślnie przyjmuje max(CUTOFFS) — bezstratnie i jest największą dźwignią przyspieszenia.</translation>
-    </message>
-    <message>
-        <location filename="../algorithms/generate_isochrones.py" line="205"/>
+        <location filename="../algorithms/generate_isochrones.py" line="216"/>
         <source>Destination grid: up to ~{:,.0f} points at {} m (clipped to origin reach).</source>
         <translation>Siatka celów: do ~{:,.0f} punktów co {} m (przycięta do zasięgu źródeł).</translation>
     </message>
     <message>
-        <location filename="../algorithms/generate_isochrones.py" line="125"/>
+        <location filename="../algorithms/generate_isochrones.py" line="135"/>
         <source>The origin layer has no valid CRS — set it before running.</source>
         <translation>Warstwa źródłowa nie ma poprawnego CRS — ustaw go przed uruchomieniem.</translation>
     </message>
     <message>
-        <location filename="../algorithms/generate_isochrones.py" line="187"/>
+        <location filename="../algorithms/generate_isochrones.py" line="198"/>
         <source>Could not derive a metric CRS for the origins (EPSG:{}).</source>
         <translation>Nie można wyprowadzić metrycznego układu współrzędnych dla źródeł (EPSG:{}).</translation>
+    </message>
+    <message>
+        <location filename="../algorithms/generate_isochrones.py" line="76"/>
+        <source>Travel-time isochrone polygons from one or more origin points, for one or more cutoffs. Builds a regular destination grid (GRID_SPACING, metres), runs a one-origin matrix against it, interpolates the times to a raster (TIN) and marching-squares contours each cutoff — the same approach r5r/r5py/Conveyal use; R5 itself has no isochrone output.
+
+One output feature per (origin, cutoff), tagged origin_id and cutoff_min, in the origin layer's CRS. Polygons are cumulative — the 30-minute area contains the 15-minute one. Interior holes are kept where an area is genuinely unreachable (a lake, a rail yard, a street-network gap); noise smaller than a few grid cells is dropped.
+
+Contouring runs once per cutoff, so a failure on one is reported and skipped without losing the rest. Grid cost is quadratic in 1/GRID_SPACING and blocked above ~400k points. MAX_WALK_TIME defaults to max(CUTOFFS) — lossless and the biggest speed lever.</source>
+        <translation>Poligony izochronne czasu podróży z jednego lub więcej punktów początkowych, dla jednego lub więcej progów czasowych. Buduje regularną siatkę docelową (GRID_SPACING, metry), uruchamia macierz jednopunktową względem niej, interpoluje czasy do rastra (TIN) i kontury metodą kwadratów marszowych dla każdego progu — to ten sam sposób stosowany przez r5r/r5py/Conveyal; sam R5 nie ma wyjścia izochronnego.
+
+Jedna cecha wyjściowa na każdą parę (punkt początkowy, próg czasowy), z tagami origin_id i cutoff_min, w układzie współrzędnych CRS warstwy źródłowej. Poligony są kumulatywne — obszar 30-minutowy zawiera ten 15-minutowy. Zachowane są wewnętrzne dziury tam, gdzie obszar jest faktycznie niedostępny (jezioro, składowisko kolejowe, luka w sieci ulicznej); szum mniejszy niż kilka komórek siatki jest usuwany.
+
+Konturowanie odbywa się raz dla każdego progu czasowego, więc awaria jednego jest zgłaszana i pomijana bez utraty pozostałych. Koszt siatki jest kwadratowy względem 1/GRID_SPACING i blokowany powyżej ~400 tys. punktów. MAX_WALK_TIME domyślnie przyjmuje wartość max(CUTOFFS) — bezstratnie i to największy dźwignia prędkości.</translation>
+    </message>
+    <message>
+        <location filename="../algorithms/generate_isochrones.py" line="304"/>
+        <source>Origin {}: could not build the travel-time raster ({}).</source>
+        <translation>Źródło {}: nie udało się zbudować rastra czasu podróży ({}).</translation>
+    </message>
+    <message>
+        <location filename="../algorithms/generate_isochrones.py" line="342"/>
+        <source>Origin {}: cutoff {} min failed to contour ({}) — skipped.</source>
+        <translation>Źródło {}: próg czasowy {} min nie udało się konturować ({} ) — pominięto.</translation>
     </message>
 </context>
 <context>

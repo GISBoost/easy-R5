@@ -4,8 +4,8 @@ Every entry here has a matching GitHub issue (CLAUDE.md policy).
 
 | # | Issue | Summary | Workaround | Status |
 |---|---|---|---|---|
-| 1 | [#1](https://github.com/GISBoost/easy-R5/issues/1) | Polish translation covers only 61/210 UI strings; the rest fall back to English under a `pl` locale. | None needed — English UI is complete. | Fix planned for v0.2 |
-| 2 | [#2](https://github.com/GISBoost/easy-R5/issues/2) | `GenerateIsochrones` polygons are grid-blobs, not smooth contours — edges are stair-stepped at `GRID_SPACING`. | Lower `GRID_SPACING`, or run `native:smoothgeometry` on the output. | Known / enhancement |
+| 1 | [#1](https://github.com/GISBoost/easy-R5/issues/1) | The Polish translation is fully populated but machine-translated (local LLM); a few phrasings need a human pass. | None — the UI is usable in Polish and English. | Human review planned for v0.2 |
+| 2 | [#2](https://github.com/GISBoost/easy-R5/issues/2) | Isochrone detail is limited by `GRID_SPACING` — a coarse grid gives lumpy contours. | Lower `GRID_SPACING` (quadratic cost). | Contour quality fixed in 0.1.0 (TIN + marching-squares); resolution knob remains |
 
 ## Not bugs, but worth knowing
 

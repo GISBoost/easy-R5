@@ -36,11 +36,12 @@ Processing toolbox → **Easy-R5**:
 | Diagnostics | **Test R5 setup** | checks the JDK, jar and runner independently. |
 | Analysis | **Run travel time matrix** | N origins × M destinations, percentiles over a departure window, batched processes, sampled time estimate, hard dead-date gate + post-run walk-only detector. Long CSV out. |
 | Analysis | **Run accessibility** | opportunities reachable per origin / cutoff / percentile (STEP / LOGISTIC / EXPONENTIAL decay), summed in Python from the matrix. Long CSV + an ORIGINS copy with `acc_<opp>_p<pct>_c<cutoff>` fields. |
-| Analysis | **Generate isochrones** | cumulative travel-time polygons, one per (origin, cutoff): a destination grid → one-origin matrix → union of the reachable cells, contoured in QGIS. Unreachable pockets stay as holes. |
+| Analysis | **Generate isochrones** | cumulative travel-time polygons, one per (origin, cutoff): a destination grid → one-origin matrix → TIN raster → `gdal:contour_polygon` per cutoff (the approach r5r/r5py/Conveyal all use — R5 has no isochrone output). Unreachable pockets stay as holes. |
 | Analysis | **Prepare population layer** | joins a GUS NSP 2021 sheet to census-tract geometry. |
 | Analysis | **Population overlay** | area-weighted population onto a hex grid (fractional, not rounded). |
 
-Isochrones are contoured **in QGIS** — R5 does not produce polygons. There is no hex-grid
+Isochrones are contoured **in QGIS** — R5 has no isochrone output (neither does r5r's or
+r5py's engine call; both grid-and-contour, like this). There is no hex-grid
 algorithm: use stock `native:creategrid` (recipe below).
 
 See [`docs/notes/product-scope.md`](docs/notes/product-scope.md) and
