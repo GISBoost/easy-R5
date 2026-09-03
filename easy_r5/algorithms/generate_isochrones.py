@@ -120,8 +120,11 @@ class GenerateIsochrones(MatrixBase, QgsProcessingAlgorithm):
         origins_src = self.parameterAsSource(parameters, self.ORIGINS, context)
         if origins_src is None:
             raise QgsProcessingException(self.tr("Origin points are required."))
+        origins_crs = origins_src.sourceCrs()
+        if not origins_crs.isValid():
+            raise QgsProcessingException(
+                self.tr("The origin layer has no valid CRS — set it before running."))
 
-        wgs84 = QgsCoordinateReferenceSystem("EPSG:4326")
         metric = self._metric_crs(origins_src, context)
         grid_layer = self._build_grid(origins_src, context, metric, spacing, cutoffs, feedback)
 
@@ -134,15 +137,16 @@ class GenerateIsochrones(MatrixBase, QgsProcessingAlgorithm):
             )
             meta = res["meta"]
 
+            # output in the origin layer's CRS, like RunAccessibility
             sink, sink_id = self.parameterAsSink(
                 parameters, self.OUTPUT_LAYER, context, self._out_fields(),
-                QgsWkbTypes.MultiPolygon, wgs84,
+                QgsWkbTypes.MultiPolygon, origins_crs,
             )
             if sink is None:
                 raise QgsProcessingException(self.tr("Could not create the output layer."))
 
             times = self._times_by_origin(matrix_csv, res["percentiles"][0])
-            to_wgs = QgsCoordinateTransform(metric, wgs84, context.transformContext())
+            to_out = QgsCoordinateTransform(metric, origins_crs, context.transformContext())
             grid_xy = {f["gid"]: f.geometry().asPoint() for f in grid_layer.getFeatures()}
 
             meta_values = [meta.get(k) for k in ("departure_time", "percentiles", "r5_version",
@@ -155,7 +159,7 @@ class GenerateIsochrones(MatrixBase, QgsProcessingAlgorithm):
                         self.tr("Origin {} reached no grid cell — no isochrone.").format(origin_id))
                     continue
                 written += self._blob_isochrones(
-                    per, grid_xy, spacing, cutoffs, to_wgs, origin_id, meta_values, sink, feedback
+                    per, grid_xy, spacing, cutoffs, to_out, origin_id, meta_values, sink, feedback
                 )
             feedback.pushInfo(self.tr("{} isochrone polygons written.").format(written))
             apply_style(context, sink_id, "isochrones.qml")
@@ -166,7 +170,9 @@ class GenerateIsochrones(MatrixBase, QgsProcessingAlgorithm):
     # --- grid ----------------------------------------------------------
 
     def _metric_crs(self, source, context):
-        """A metre-based CRS for the origins: the UTM zone under their centroid."""
+        """A metre-based working CRS for buffering: the UTM zone under the origins'
+        centroid. Only used internally for the grid + blob geometry; the output
+        layer is written back in the origin layer's own CRS."""
         ext = source.sourceExtent()
         c = source.sourceCrs()
         wgs84 = QgsCoordinateReferenceSystem("EPSG:4326")
@@ -174,9 +180,13 @@ class GenerateIsochrones(MatrixBase, QgsProcessingAlgorithm):
             ext = QgsCoordinateTransform(c, wgs84, context.transformContext()) \
                 .transformBoundingBox(ext)
         lon, lat = ext.center().x(), ext.center().y()
-        zone = int((lon + 180) / 6) + 1
+        zone = min(60, max(1, int((lon + 180) / 6) + 1))
         epsg = (32600 if lat >= 0 else 32700) + zone
-        return QgsCoordinateReferenceSystem.fromEpsgId(epsg)
+        metric = QgsCoordinateReferenceSystem("EPSG:{}".format(epsg))
+        if not metric.isValid():
+            raise QgsProcessingException(
+                self.tr("Could not derive a metric CRS for the origins (EPSG:{}).").format(epsg))
+        return metric
 
     def _build_grid(self, source, context, metric, spacing, cutoffs, feedback):
         to_metric = QgsCoordinateTransform(source.sourceCrs(), metric, context.transformContext())
@@ -233,7 +243,7 @@ class GenerateIsochrones(MatrixBase, QgsProcessingAlgorithm):
                     out.setdefault(row["from_id"], {})[row["to_id"]] = int(v)
         return out
 
-    def _blob_isochrones(self, per, grid_xy, spacing, cutoffs, to_wgs, origin_id,
+    def _blob_isochrones(self, per, grid_xy, spacing, cutoffs, to_out, origin_id,
                          meta_values, sink, feedback):
         """One filled polygon per cutoff: the union of reachable grid cells.
 
@@ -260,7 +270,7 @@ class GenerateIsochrones(MatrixBase, QgsProcessingAlgorithm):
                 blob = blob.buffer(spacing * 0.5, 4).buffer(-spacing * 0.5, 4).makeValid()
                 if blob.isEmpty():
                     continue
-                blob.transform(to_wgs)
+                blob.transform(to_out)
                 if not blob.isMultipart():
                     blob.convertToMultiType()
                 out = QgsFeature(self._out_fields())

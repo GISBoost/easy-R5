@@ -65,6 +65,11 @@ def write_points_csv(source, context, feedback, id_field, out_path, *, label="po
 
     wgs84 = QgsCoordinateReferenceSystem("EPSG:4326")
     src_crs = source.sourceCrs()
+    if not src_crs.isValid():
+        raise ValueError(
+            "{} layer has no valid CRS. Set its CRS (right-click the layer -> "
+            "Layer CRS -> Set CRS) so the points can be projected to WGS84.".format(label)
+        )
     transform = (
         QgsCoordinateTransform(src_crs, wgs84, context.transformContext())
         if src_crs != wgs84
