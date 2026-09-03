@@ -24,6 +24,7 @@ from qgis.core import (
 )
 
 from ..core import matrix, points
+from ..core.styling import apply_style
 from ._matrix_base import MatrixBase
 
 
@@ -110,6 +111,7 @@ class RunTravelTimeMatrix(MatrixBase, QgsProcessingAlgorithm):
             )
             if od_sink is not None:
                 outputs[self.OUTPUT_LAYER] = od_sink
+                apply_style(context, od_sink, "od_lines.qml")
             return outputs
         finally:
             shutil.rmtree(tmp, ignore_errors=True)

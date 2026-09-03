@@ -36,6 +36,7 @@ from qgis.core import (
     QgsWkbTypes,
 )
 
+from ..core.styling import apply_style
 from ._matrix_base import MatrixBase
 
 
@@ -152,6 +153,7 @@ class GenerateIsochrones(MatrixBase, QgsProcessingAlgorithm):
                     per, grid_xy, spacing, cutoffs, to_wgs, origin_id, meta_values, sink, feedback
                 )
             feedback.pushInfo(self.tr("{} isochrone polygons written.").format(written))
+            apply_style(context, sink_id, "isochrones.qml")
             return {self.OUTPUT_LAYER: sink_id}
         finally:
             shutil.rmtree(tmp, ignore_errors=True)

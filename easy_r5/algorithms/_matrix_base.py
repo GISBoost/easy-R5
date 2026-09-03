@@ -19,6 +19,7 @@ import math
 import time
 from pathlib import Path
 
+from qgis.PyQt.QtCore import QCoreApplication
 from qgis.core import (
     QgsProcessingException,
     QgsProcessingMultiStepFeedback,
@@ -33,6 +34,17 @@ from qgis.core import (
 )
 
 from ..core import job_spec, java_env, matrix, network_cache, pins, points, runner, settings
+
+
+def _tr(string: str) -> str:
+    """Translate shared-mixin strings under a fixed 'MatrixBase' context.
+
+    The concrete algorithms have their own tr() context (their class name), but
+    strings that live here must resolve under one stable context or the .qm
+    lookup misses — QGIS's i18n only matches on the exact context.
+    """
+    return QCoreApplication.translate("MatrixBase", string)
+
 
 MODE_OPTIONS = ["TRANSIT + WALK", "WALK", "BICYCLE", "CAR"]
 _TRANSIT_MODES = ["TRAM", "SUBWAY", "RAIL", "BUS", "FERRY", "CABLE_CAR", "GONDOLA", "FUNICULAR"]
@@ -78,15 +90,15 @@ class MatrixBase:
     def _add_matrix_params(self, percentile_help, with_destinations=True):
         self.addParameter(
             QgsProcessingParameterFile(
-                self.NETWORK, self.tr("R5 network (network.dat)"),
+                self.NETWORK, _tr("R5 network (network.dat)"),
                 behavior=QgsProcessingParameterFile.File, extension="dat",
             )
         )
         self.addParameter(
-            QgsProcessingParameterFeatureSource(self.ORIGINS, self.tr("Origin points"))
+            QgsProcessingParameterFeatureSource(self.ORIGINS, _tr("Origin points"))
         )
         oid = QgsProcessingParameterField(
-            self.ORIGIN_ID_FIELD, self.tr("Origin id field (blank = feature id)"),
+            self.ORIGIN_ID_FIELD, _tr("Origin id field (blank = feature id)"),
             parentLayerParameterName=self.ORIGINS, optional=True,
         )
         oid.setFlags(oid.flags() | QgsProcessingParameterDefinition.FlagOptional)
@@ -94,28 +106,28 @@ class MatrixBase:
         if with_destinations:
             self.addParameter(
                 QgsProcessingParameterFeatureSource(
-                    self.DESTINATIONS, self.tr("Destination points"))
+                    self.DESTINATIONS, _tr("Destination points"))
             )
             did = QgsProcessingParameterField(
-                self.DEST_ID_FIELD, self.tr("Destination id field (blank = feature id)"),
+                self.DEST_ID_FIELD, _tr("Destination id field (blank = feature id)"),
                 parentLayerParameterName=self.DESTINATIONS, optional=True,
             )
             did.setFlags(did.flags() | QgsProcessingParameterDefinition.FlagOptional)
             self.addParameter(did)
 
         dt = QgsProcessingParameterString(
-            self.DATE, self.tr("Date (yyyy-MM-dd; required for transit)"), optional=True
+            self.DATE, _tr("Date (yyyy-MM-dd; required for transit)"), optional=True
         )
         dt.setFlags(dt.flags() | QgsProcessingParameterDefinition.FlagOptional)
         self.addParameter(dt)
         self.addParameter(
             QgsProcessingParameterString(
-                self.DEPARTURE_TIME, self.tr("Departure time (HH:mm)"), defaultValue="07:00"
+                self.DEPARTURE_TIME, _tr("Departure time (HH:mm)"), defaultValue="07:00"
             )
         )
         self.addParameter(
             QgsProcessingParameterNumber(
-                self.TIME_WINDOW, self.tr("Departure window (minutes)"),
+                self.TIME_WINDOW, _tr("Departure window (minutes)"),
                 type=QgsProcessingParameterNumber.Integer, defaultValue=120, minValue=1,
             )
         )
@@ -124,61 +136,61 @@ class MatrixBase:
         )
         self.addParameter(
             QgsProcessingParameterNumber(
-                self.MAX_TRIP_DURATION, self.tr("Max trip duration (minutes)"),
+                self.MAX_TRIP_DURATION, _tr("Max trip duration (minutes)"),
                 type=QgsProcessingParameterNumber.Integer, defaultValue=90, minValue=1,
             )
         )
         self.addParameter(
             QgsProcessingParameterNumber(
-                self.WALK_SPEED, self.tr("Walk speed (km/h)"),
+                self.WALK_SPEED, _tr("Walk speed (km/h)"),
                 type=QgsProcessingParameterNumber.Double, defaultValue=3.6, minValue=0.1,
             )
         )
         self.addParameter(
             QgsProcessingParameterNumber(
-                self.MAX_RIDES, self.tr("Max transit rides (transfers + 1)"),
+                self.MAX_RIDES, _tr("Max transit rides (transfers + 1)"),
                 type=QgsProcessingParameterNumber.Integer, defaultValue=3, minValue=1,
             )
         )
         self.addParameter(
             QgsProcessingParameterEnum(
-                self.MODE, self.tr("Travel mode"), options=MODE_OPTIONS, defaultValue=0
+                self.MODE, _tr("Travel mode"), options=MODE_OPTIONS, defaultValue=0
             )
         )
         self._advanced(
             QgsProcessingParameterNumber(
-                self.MAX_WALK_TIME, self.tr("Max walk time (minutes; blank = lossless default)"),
+                self.MAX_WALK_TIME, _tr("Max walk time (minutes; blank = lossless default)"),
                 type=QgsProcessingParameterNumber.Integer, optional=True, minValue=1,
             )
         )
         self._advanced(
             QgsProcessingParameterNumber(
-                self.MONTE_CARLO_DRAWS, self.tr("Monte Carlo draws per minute"),
+                self.MONTE_CARLO_DRAWS, _tr("Monte Carlo draws per minute"),
                 type=QgsProcessingParameterNumber.Integer, defaultValue=5, minValue=1,
             )
         )
         self._advanced(
             QgsProcessingParameterNumber(
-                self.BATCH_SIZE, self.tr("Origins per batch process"),
+                self.BATCH_SIZE, _tr("Origins per batch process"),
                 type=QgsProcessingParameterNumber.Integer, defaultValue=500,
                 minValue=100, maxValue=5000,
             )
         )
         self._advanced(
             QgsProcessingParameterBoolean(
-                self.ESTIMATE_FIRST, self.tr("Time a sample of origins first"), defaultValue=True
+                self.ESTIMATE_FIRST, _tr("Time a sample of origins first"), defaultValue=True
             )
         )
         self._advanced(
             QgsProcessingParameterBoolean(
                 self.ALLOW_NO_SERVICE,
-                self.tr("Run even if the date has no transit service (diagnostic)"),
+                _tr("Run even if the date has no transit service (diagnostic)"),
                 defaultValue=False,
             )
         )
         self._advanced(
             QgsProcessingParameterNumber(
-                self.JAVA_HEAP_GB, self.tr("Java heap (GB; blank = auto)"),
+                self.JAVA_HEAP_GB, _tr("Java heap (GB; blank = auto)"),
                 type=QgsProcessingParameterNumber.Integer, optional=True, minValue=1,
             )
         )
@@ -197,7 +209,7 @@ class MatrixBase:
         """
         network_path = Path(self.parameterAsFile(parameters, self.NETWORK, context))
         if not network_path.is_file():
-            raise QgsProcessingException(self.tr("Network file not found: {}").format(network_path))
+            raise QgsProcessingException(_tr("Network file not found: {}").format(network_path))
         summary = self._load_summary(network_path)
         service_days = summary.get("service_days") or {}
 
@@ -206,7 +218,7 @@ class MatrixBase:
         if dests_src is None:
             dests_src = self.parameterAsSource(parameters, self.DESTINATIONS, context)
         if origins_src is None or dests_src is None:
-            raise QgsProcessingException(self.tr("Origin and destination layers are required."))
+            raise QgsProcessingException(_tr("Origin and destination layers are required."))
 
         date = self.parameterAsString(parameters, self.DATE, context).strip()
         departure_time = self.parameterAsString(parameters, self.DEPARTURE_TIME, context).strip()
@@ -234,22 +246,22 @@ class MatrixBase:
         is_transit = bool(transit_modes)
 
         if is_transit and not date:
-            raise QgsProcessingException(self.tr("A date is required for a transit run."))
+            raise QgsProcessingException(_tr("A date is required for a transit run."))
         if not date:
             date = datetime.date.today().isoformat()
         if is_transit and service_days and int(service_days.get(date, 0)) == 0:
             if not allow_no_service:
                 nearest = matrix.nearest_served_days(service_days, date, 3)
                 raise QgsProcessingException(
-                    self.tr(
+                    _tr(
                         "The GTFS feed has no active trips on {date}. R5 would silently "
                         "return walk-only results. Nearest served days: {days}. "
                         "(Advanced: ALLOW_NO_SERVICE overrides this for diagnostics.)"
-                    ).format(date=date, days=", ".join(nearest) or self.tr("none in the feed span"))
+                    ).format(date=date, days=", ".join(nearest) or _tr("none in the feed span"))
                 )
             feedback.pushWarning(
-                self.tr("ALLOW_NO_SERVICE: {date} has no transit service — expect a walk-only "
-                        "failure after the run.").format(date=date)
+                _tr("ALLOW_NO_SERVICE: {date} has no transit service — expect a walk-only "
+                    "failure after the run.").format(date=date)
             )
 
         max_walk = self.parameterAsInt(parameters, self.MAX_WALK_TIME, context)
@@ -257,9 +269,9 @@ class MatrixBase:
             max_walk = walk_fallback
         elif max_walk < walk_fallback:
             feedback.pushWarning(
-                self.tr("MAX_WALK_TIME ({w} min) is below the lossless default ({d} min): "
-                        "faster, but trips with a long walk leg will be missed.").format(
-                    w=max_walk, d=walk_fallback)
+                _tr("MAX_WALK_TIME ({w} min) is below the lossless default ({d} min): "
+                    "faster, but trips with a long walk leg will be missed.").format(
+                        w=max_walk, d=walk_fallback)
             )
 
         try:
@@ -288,11 +300,11 @@ class MatrixBase:
             raise QgsProcessingException(str(exc))
         if not origin_ids or not dest_ids:
             raise QgsProcessingException(
-                self.tr("No usable points after dropping empty geometries "
-                        "({} origins, {} destinations skipped).").format(o_skipped, d_skipped)
+                _tr("No usable points after dropping empty geometries "
+                    "({} origins, {} destinations skipped).").format(o_skipped, d_skipped)
             )
         feedback.pushInfo(
-            self.tr("{o} origins x {d} destinations = {n} pairs.").format(
+            _tr("{o} origins x {d} destinations = {n} pairs.").format(
                 o=len(origin_ids), d=len(dest_ids), n=len(origin_ids) * len(dest_ids)
             )
         )
@@ -315,14 +327,14 @@ class MatrixBase:
             multi.setCurrentStep(0)
             self._estimate(tmp, origins_csv, origin_ids, job_common, env, heap_mb, multi)
         if multi.isCanceled():
-            raise QgsProcessingException(self.tr("Cancelled by user."))
+            raise QgsProcessingException(_tr("Cancelled by user."))
 
         batch_csvs = []
         transit_used = 0
         try:
             for b in range(n_batches):
                 if multi.isCanceled():
-                    raise QgsProcessingException(self.tr("Cancelled by user."))
+                    raise QgsProcessingException(_tr("Cancelled by user."))
                 multi.setCurrentStep(b + 1)
                 start = b * batch_size
                 end = min(len(origin_ids), start + batch_size)
@@ -334,7 +346,7 @@ class MatrixBase:
                     env, java_env.xmx_arg(heap_mb), job_spec.write_job(job, tmp),
                     extra_jvm_args=["-Djava.io.tmpdir=" + str(tmp)],
                 )
-                multi.pushInfo(self.tr("Batch {b}/{n}: origins {s}-{e}").format(
+                multi.pushInfo(_tr("Batch {b}/{n}: origins {s}-{e}").format(
                     b=b + 1, n=n_batches, s=start, e=end
                 ))
                 result = runner.run_job(
@@ -344,11 +356,11 @@ class MatrixBase:
                 transit_used += int(result.results.get("transit_used_pairs", 0))
                 batch_csvs.append(batch_csv)
         except runner.RunnerCancelled:
-            raise QgsProcessingException(self.tr("Cancelled by user."))
+            raise QgsProcessingException(_tr("Cancelled by user."))
         except runner.RunnerError as exc:
             if exc.code == "OUT_OF_MEMORY":
                 raise QgsProcessingException(
-                    self.tr(
+                    _tr(
                         "R5 ran out of memory (heap {gb} GB, batch size {bs}). Lower the "
                         "batch size, thin the origin grid, or raise the Java heap in the "
                         "plugin settings."
@@ -357,11 +369,11 @@ class MatrixBase:
             raise QgsProcessingException(str(exc))
 
         rows = matrix.merge_batch_csvs(batch_csvs, matrix_csv)
-        feedback.pushInfo(self.tr("Matrix: {n} reachable pairs.").format(n=rows))
+        feedback.pushInfo(_tr("Matrix: {n} reachable pairs.").format(n=rows))
 
         if is_transit and transit_used == 0:
             raise QgsProcessingException(
-                self.tr(
+                _tr(
                     "Not one OD pair is faster by transit than on foot — R5 returned "
                     "walk-only results. Most likely the date has no service or the GTFS "
                     "does not match the network."
@@ -407,24 +419,24 @@ class MatrixBase:
             env, java_env.xmx_arg(heap_mb), job_spec.write_job(job, tmp),
             extra_jvm_args=["-Djava.io.tmpdir=" + str(tmp)],
         )
-        feedback.pushInfo(self.tr("Timing {n} sample origins…").format(n=len(idx)))
+        feedback.pushInfo(_tr("Timing {n} sample origins…").format(n=len(idx)))
         t0 = time.monotonic()
         try:
             runner.run_job(cmd, feedback, cwd=tmp, stderr_log=tmp / "stderr_est.log",
                            r5_version=pins.R5_VERSION)
         except runner.RunnerError as exc:
-            feedback.pushWarning(self.tr("Estimate run failed ({}). Continuing.").format(exc))
+            feedback.pushWarning(_tr("Estimate run failed ({}). Continuing.").format(exc))
             return
         per_origin = (time.monotonic() - t0) / max(1, len(idx))
         full_min = per_origin * len(origin_ids) / 60
         feedback.pushInfo(
-            self.tr("~{s:.2f} s/origin on this network -> ~{m:.1f} min for {n} origins.").format(
+            _tr("~{s:.2f} s/origin on this network -> ~{m:.1f} min for {n} origins.").format(
                 s=per_origin, m=full_min, n=len(origin_ids)
             )
         )
         if full_min > _SLOW_RUN_MINUTES:
             feedback.pushWarning(
-                self.tr("Estimated {m:.0f} min — consider fewer origins or a coarser grid.").format(
+                _tr("Estimated {m:.0f} min — consider fewer origins or a coarser grid.").format(
                     m=full_min
                 )
             )

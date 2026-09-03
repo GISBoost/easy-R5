@@ -33,6 +33,7 @@ from qgis.core import (
 )
 
 from ..core import accessibility
+from ..core.styling import apply_style
 from ._matrix_base import MatrixBase
 
 _META_FIELDS = ("r5_version", "network_hash", "run_date", "departure_time",
@@ -151,6 +152,7 @@ class RunAccessibility(MatrixBase, QgsProcessingAlgorithm):
             feedback.pushInfo(self.tr("Wrote {n} rows to {p}").format(n=len(rows), p=out_csv))
 
             sink_id = self._write_layer(parameters, context, res, rows, meta)
+            apply_style(context, sink_id, "accessibility.qml")
             return {self.OUTPUT_CSV: str(out_csv), self.OUTPUT_LAYER: sink_id}
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
