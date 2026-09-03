@@ -5,6 +5,25 @@
 
 ---
 
+## ✅ Implementation status (2026-09-03)
+
+**Implemented, committed on `main`** (`f5a78d7`..`d5554a5`). `core/accessibility`
+(**STEP is a strict `travelTime < cutoff`** — verified from R5's
+`StepDecayFunction` bytecode), `RunAccessibility`, the shared `MatrixBase` mixin,
+`docs/notes/validation-gdansk.md`. Unit tests for the decay boundary, unreachable
+→ 0, multiple opportunity columns, an origin with nothing reachable.
+
+**The milestone's real deliverable is done and is an exact match:** with r5r's
+unrecorded departure date reconstructed as **2026-08-24**, Easy-R5 reproduces
+**every one of the 27 780 rows** of `gdansk_service_accessibility.csv`
+identically (RMSE 0.00), despite R5 7.6 vs r5r's 7.5.1. The date-reconstruction
+table and the strict-`<` finding are written up in `validation-gdansk.md`.
+
+**Still needs Michał:** the Gdańsk accessibility map next to the one in
+`tools/accessibility_cities/out/` — same spatial pattern? (numbers already exact.)
+
+Full picture: [`../handoffs/2026-09-03_M3-M5-implementation.md`](../handoffs/2026-09-03_M3-M5-implementation.md).
+
 ## Context to load first
 
 - `docs/prd/PR_easy-R5_v01.md` — **§4.5**, **§5.2** (method fields in the output), **§6 M4**.

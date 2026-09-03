@@ -6,6 +6,27 @@
 
 ---
 
+## ✅ Implementation status (2026-09-03)
+
+**Implemented, verified end-to-end, committed on `main`** (`b4c5f16`..`88dca58`).
+`EasyR5Runner` command `matrix` (ports `Probe.java`), `core/points`,
+`core/matrix`, `job_spec.build_matrix_job`, `RunTravelTimeMatrix` (thin since the
+`MatrixBase` refactor in `f5a78d7`). Unit tests for the job spec, stable ids and
+the batch helpers.
+
+**Every acceptance criterion checked against R5 7.6 on the Gdańsk network:**
+1389 × 956 in **1 min 43 s** (< 2 min); origin 0 matches `Probe.java` to the
+minute; cancel → no orphan `java.exe`; 6 percentiles rejected before the JVM;
+dead date blocks and names served days; `ALLOW_NO_SERVICE` on a dead date → runs
+then fails the walk-only detector; `max_walk_time_minutes` always numeric
+(unit test); EPSG:2180 == EPSG:4326 origins.
+
+**Still needs Michał:** a run from the QGIS dialog on his own layers; spot-check
+OD pairs against the operator's journey planner; a run too big for the machine
+(the OOM message).
+
+Full picture: [`../handoffs/2026-09-03_M3-M5-implementation.md`](../handoffs/2026-09-03_M3-M5-implementation.md).
+
 ## Context to load first
 
 - `docs/prd/PR_easy-R5_v01.md` — **§2** and **§2.1** (measured facts and the three production

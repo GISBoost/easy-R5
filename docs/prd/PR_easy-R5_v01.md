@@ -15,6 +15,31 @@ w sekcji 2 pochodzą z realnego uruchomienia R5 na sieci Gdańska, nie z dokumen
 
 ---
 
+## 0. Stan implementacji (2026-09-03)
+
+**Całe v0.1 (M1–M5) jest zaimplementowane i zacommitowane na `main`.** 8 algorytmów
+Processing, `metadata.txt` `version=0.1.0`, `experimental=True`. 120 testów pytest
+zielonych, flake8 czysto.
+
+| kamień / algorytm | stan |
+|---|---|
+| M1 · `DownloadR5`, `TestR5Setup`, runner `info` | ✅ zaimplementowane; ⏳ weryfikacja Michała na czystym profilu |
+| M2 · `BuildNetwork`, cache, `service_days` | ✅ zaimplementowane; agent zbudował sieć Gdańska (nv5); ⏳ Michał na dużym PBF |
+| M3 · `RunTravelTimeMatrix` (§4.4) | ✅ **zweryfikowane end-to-end vs R5 7.6** — Gdańsk 1389×956 w 1:43, origin 0 = sonda |
+| M4 · `RunAccessibility` (§4.5) + walidacja | ✅ **odtwarza `gdansk_service_accessibility.csv` co do wiersza** (data 2026-08-24, RMSE 0.00) — `docs/notes/validation-gdansk.md` |
+| M5 · `GenerateIsochrones` (§4.6) | ✅ siatka → TIN → `gdal:contour_polygon` (metoda r5r/r5py/Conveyal; R5 nie ma natywnych izochron) |
+| M5 · `PreparePopulationLayer` (§4.8) | ✅ port z easy-OTP, zgodny co do bajta z `PrepareStudentLayer` |
+| M5 · `PopulationOverlay` (§4.9) | ✅ port z easy-OTP, pole Float |
+| M5 · siatka heksagonalna (§4.7) | ✅ świadomie **bez algorytmu** — przepis w `README.md` |
+| M5 · style, i18n PL (213/213), README, KNOWN_ISSUES | ✅ (tłumaczenie maszynowe — korekta ludzka: issue #1) |
+
+**Zostaje dla Michała:** pełny przebieg na czystym profilu QGIS (instalacja ZIP →
+`DownloadR5` realne pobranie → `BuildNetwork` na dużym PBF → analiza z okna
+dialogowego), potem `experimental=False`. Szczegóły:
+[`../handoffs/2026-09-03_M3-M5-implementation.md`](../handoffs/2026-09-03_M3-M5-implementation.md).
+
+---
+
 ## 1. Cel
 
 Wtyczka QGIS, która daje analitykowi bez R, condy i Dockera dostęp do silnika R5:
@@ -253,7 +278,7 @@ Testy jednostkowe (`easy_r5/test/`) muszą działać **poza QGIS-em** dla: `job_
 Provider: `id="easyr5"`, `name="Easy-R5"`. Grupy: `Setup`, `Diagnostics`, `Analysis`.
 Wszystkie stringi widoczne dla użytkownika w `self.tr()`.
 
-### 4.1 `DownloadR5` (Setup)
+### 4.1 `DownloadR5` (Setup) ✅
 
 | Parametr | Typ | Domyślnie |
 |---|---|---|
@@ -270,14 +295,14 @@ raz i pinujemy — nie osłabiamy do MD5). Zapis ścieżek do QSettings. Kompila
 **Wzorzec:** `easy_otp/algorithms/download_jre.py` — bezpieczne rozpakowanie ZIP, brak
 wymogu admina, `nosec` tam gdzie Bandit krzyczy.
 
-### 4.2 `TestR5Setup` (Diagnostics)
+### 4.2 `TestR5Setup` (Diagnostics) ✅
 
 Sprawdza kolejno i raportuje **każdy krok osobno** (nie „wszystko albo nic"):
 JDK istnieje i `-version` zwraca 21+ → jar istnieje i SHA-256 się zgadza → runner kompiluje
 się/jest w cache → `command=info` na wskazanej sieci (opcjonalnie) → jedno trywialne
 zapytanie o czas przejazdu. Wynik: tekst + `RESULT`-y w logu.
 
-### 4.3 `BuildNetwork` (Setup)
+### 4.3 `BuildNetwork` (Setup) ✅
 
 | Parametr | Typ | Domyślnie |
 |---|---|---|
@@ -290,7 +315,7 @@ Wynik: ścieżka do `network.dat` + wypisane w logu podsumowanie z `network.json
 (feedy, przystanki, zakres dat z `service_days`, strefa czasowa, bounds).
 Cache: pomiń budowę, jeśli hash wejść + wersja R5 się zgadzają.
 
-### 4.4 `RunTravelTimeMatrix` (Analysis) — algorytm flagowy
+### 4.4 `RunTravelTimeMatrix` (Analysis) — algorytm flagowy ✅ (zweryfikowane vs R5 7.6)
 
 | Parametr | Typ | Domyślnie / uwagi |
 |---|---|---|
@@ -319,7 +344,7 @@ Zachowanie: twarda walidacja daty **przed** startem (§5.3), pomiar na próbce (
 walk-only po przebiegu (§5.8). Postęp z `PROGRESS`. Anulowanie w każdej chwili. Pary nieosiągalne pomijane
 (lub `NULL`, gdy użytkownik chce pełną macierz — parametr `INCLUDE_UNREACHABLE`, advanced).
 
-### 4.5 `RunAccessibility` (Analysis)
+### 4.5 `RunAccessibility` (Analysis) ✅ (odtwarza wynik r5r co do wiersza)
 
 Nadbudowa nad macierzą; **liczona w Pythonie** (R5 natywnej ścieżki nie udostępnia — sekcja 2).
 
@@ -338,7 +363,7 @@ Dodatkowo pola metody: `r5_version`, `run_date`, `departure_time`, `time_window`
 CSV długi (`id,opportunity,percentile,cutoff,accessibility`) — **ten sam układ co r5r**,
 co umożliwia diff w M4.
 
-### 4.6 `GenerateIsochrones` (Analysis)
+### 4.6 `GenerateIsochrones` (Analysis) ✅
 
 Siatka regularna destinations (parametr `GRID_SPACING`, domyślnie 250 m, w metrycznym CRS
 lokalnym) → macierz z 1 origin → raster czasu przejazdu (`gdal:gridnearest`/rasteryzacja
@@ -363,7 +388,7 @@ w `tools/accessibility_cities/` (`HOWTO_MANUAL.md` krok 4: `native:creategrid` T
 HSPACING/VSPACING=500 m, potem `native:extractbylocation` z całymi heksami) — i tyle.
 Jeśli praktyka pokaże, że użytkownicy się na tym wykładają, wraca to jako osobny ticket.
 
-### 4.8 `PreparePopulationLayer` (Analysis)
+### 4.8 `PreparePopulationLayer` (Analysis) ✅
 
 Port z `easy_otp/algorithms/prepare_student_layer.py`, **przemianowany** —
 nazwa „student" była zawężeniem: algorytm wczytuje dowolny arkusz GUS NSP 2021 i łączy dane
@@ -396,7 +421,7 @@ Kopiowany razem z `easy_otp/core/xlsx_reader.py`.
 > zero zależności) jest wykonalna, bo podproces i tak już istnieje, ale to pisanie parsera
 > tam, gdzie działający wheel jest sprawdzony od v0.2 easy-OTP.
 
-### 4.9 `PopulationOverlay` (Analysis)
+### 4.9 `PopulationOverlay` (Analysis) ✅
 
 Port z `easy_otp/algorithms/population_overlay.py` bez zmian semantyki: interpolacja arealna
 demografii na siatkę. **Zachowaj pole typu Float** — reference model w QGIS zaokrąglał do
@@ -456,7 +481,7 @@ jest częścią kopiowanego kodu.
 Rozwój pod `0.0.x`, `experimental=True`. Bump do **0.1.0** dopiero po M5.
 Po każdym kamieniu: test w QGIS → review → poprawki → commit.
 
-### M1 — szkielet wtyczki + silnik na dysku
+### M1 — szkielet wtyczki + silnik na dysku ✅ zaimplementowane
 **Zakres:** struktura wtyczki (`__init__.py`/`classFactory`, `easy_r5_plugin.py` z
 `initGui`/`unload`, `provider.py`, `metadata.txt`, `LICENSE`, `resources/icon.svg`),
 `DownloadR5`, `TestR5Setup`, runner z `command=info`.
@@ -469,7 +494,7 @@ Po każdym kamieniu: test w QGIS → review → poprawki → commit.
 **Weryfikacja przez człowieka:** instalacja z ZIP na czystym profilu; brak praw admina;
 odinstalowanie nie zostawia procesu Javy.
 
-### M2 — budowa sieci
+### M2 — budowa sieci ✅ zaimplementowane
 **Zakres:** `command=build` w runnerze, `BuildNetwork`, `network_cache`, `service_days`.
 **Kryteria akceptacji:**
 - Sieć Gdańska (`gdansk.osm.pbf` + `gdansk_gtfs.zip`) buduje się i `network.json` raportuje
@@ -480,7 +505,7 @@ odinstalowanie nie zostawia procesu Javy.
 **Weryfikacja przez człowieka:** budowa sieci dla własnego miasta; sprawdzenie, że OOM przy
 dużym PBF daje radę, a nie stack trace.
 
-### M3 — macierz czasów przejazdu
+### M3 — macierz czasów przejazdu ✅ zaimplementowane + zweryfikowane
 **Zakres:** `command=matrix`, `RunTravelTimeMatrix`, batchowanie, postęp, anulowanie,
 obsługa OOM, `points.py`, `matrix.py`.
 **Kryteria akceptacji:**
@@ -500,7 +525,7 @@ obsługa OOM, `points.py`, `matrix.py`.
 **Weryfikacja przez człowieka:** porównanie kilku par OD z wyszukiwarką przewoźnika;
 uruchomienie na własnej warstwie punktowej w innym CRS.
 
-### M4 — dostępność + odtworzenie wyniku referencyjnego
+### M4 — dostępność + odtworzenie wyniku referencyjnego ✅ zaimplementowane — trafienie co do wiersza
 **Zakres:** `accessibility.py`, `RunAccessibility`, style warstw.
 **Kryteria akceptacji (najważniejsze w całym PRD):**
 - Uruchomienie dla Gdańska z parametrami `run_accessibility.R` (07:00, okno 120 min,
@@ -513,7 +538,7 @@ uruchomienie na własnej warstwie punktowej w innym CRS.
 **Weryfikacja przez człowieka:** mapa dostępności Gdańska obok tej z `tools/` — wzrokowo
 ten sam wzorzec przestrzenny.
 
-### M5 — izochrony + wydanie 0.1.0
+### M5 — izochrony + wydanie 0.1.0 ✅ zaimplementowane; ⏳ pipeline na czystym profilu
 **Zakres:** `GenerateIsochrones`, `PreparePopulationLayer` + `PopulationOverlay` (§4.8–4.9),
 style, README, `metadata.txt` (changelog), tłumaczenie PL (`.ts`/`.qm`), `KNOWN_ISSUES.md`.
 **Kryteria akceptacji:**

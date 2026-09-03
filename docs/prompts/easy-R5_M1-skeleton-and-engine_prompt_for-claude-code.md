@@ -7,6 +7,19 @@
 
 ---
 
+## ✅ Implementation status (2026-09-03)
+
+**Implemented and committed on `main`** (`ac24b41`..`4f801c9`). Plugin skeleton,
+Processing provider `easyr5`, `DownloadR5`, `TestR5Setup`, `EasyR5Runner.java`
+command `info`. Unit tests for the job spec, the stdout-protocol parser and the
+Java-env helpers.
+
+**Still needs Michał:** ZIP install on a clean profile; `DownloadR5` real
+download (Adoptium + GitHub Releases, no admin rights, SHA-256); `TestR5Setup`
+output.
+
+Full picture: [`../handoffs/2026-09-03_M3-M5-implementation.md`](../handoffs/2026-09-03_M3-M5-implementation.md).
+
 ## Context to load first
 
 - `CLAUDE.md` — hard constraints. Especially: no `pip install`, no R in the plugin, pinned

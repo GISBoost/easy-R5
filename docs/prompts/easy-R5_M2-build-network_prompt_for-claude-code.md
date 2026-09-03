@@ -6,6 +6,24 @@
 
 ---
 
+## ✅ Implementation status (2026-09-03)
+
+**Implemented and committed on `main`** (`d5b7f2d`..`52847ac`). `EasyR5Runner`
+command `build`, `core/gtfs_calendar.compute_service_days` (pure stdlib, all real
+Polish feed shapes), `core/network_cache` (key = sha256 of input bytes + R5
+version; sentinel = `network.dat` + `network.json`), `BuildNetwork`. Unit tests
+for the cache key and `service_days`.
+
+Agent-verified with R5 7.6: Gdańsk builds in ~27 s → 1619 stops / 573 trip
+patterns / `Europe/Warsaw`; the freshly built `nv5` network reloads via `info`;
+`service_days["2026-08-25"] > 0`, out of span = 0.
+
+**Still needs Michał:** `BuildNetwork` on a large PBF (wall time, peak RAM);
+cache hit on re-run; no orphaned `java.exe` after cancelling a build; a foreign
+`network.dat` → `NETWORK_VERSION_MISMATCH`.
+
+Full picture: [`../handoffs/2026-09-03_M3-M5-implementation.md`](../handoffs/2026-09-03_M3-M5-implementation.md).
+
 ## Context to load first
 
 - `docs/prd/PR_easy-R5_v01.md` — **§3.2 `command: "build"`**, **§4.3 `BuildNetwork`**,

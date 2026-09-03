@@ -6,6 +6,35 @@
 
 ---
 
+## ✅ Implementation status (2026-09-03)
+
+**Implemented, verified in QGIS 3.40, committed on `main`** (`ecf3896`..`96ab9dc`).
+
+- `GenerateIsochrones` — grid → one-origin matrix → `qgis:tininterpolation`
+  raster → `gdal:contour_polygon` per cutoff. Checked the R5 7.6 jar and the
+  bindings: **R5 has no native isochrone output**; r5r `isochrone()` =
+  grid + `isoband` contour in R, r5py = grid + shapely, Conveyal = grid +
+  browser contour — grid-then-contour *is* the standard. Interior holes are kept
+  where an area is genuinely unreachable; contouring runs once per cutoff so one
+  failure is isolated.
+- `PreparePopulationLayer` + `PopulationOverlay` + `core/xlsx_reader` + a trimmed
+  `core/dependencies` (openpyxl only). **openpyxl exception confirmed by Michał
+  2026-09-03**, recorded in `CLAUDE.md`. `PreparePopulationLayer` matches
+  easy-OTP's `PrepareStudentLayer` byte-for-byte; `PopulationOverlay` keeps a
+  Float field.
+- **No hex-grid algorithm** (PRD §4.7) — the stock-QGIS recipe is in `README.md`.
+- `styles/*.qml` auto-applied; `i18n/easy_r5_pl.ts` + `.qm` (**213/213** strings,
+  machine-translated, human pass = issue #1); `metadata.txt` `0.1.0`,
+  `experimental=True`; `KNOWN_ISSUES.md` + GitHub issues #1 #2; ZIP built.
+- All vector outputs follow the input CRS.
+
+**Still needs Michał — the whole §7 clean-install pipeline:** install the ZIP on
+a fresh profile, `DownloadR5` real download, `BuildNetwork` on a large PBF, then
+the full analysis chain from the QGIS dialog. **Flip `experimental=False` only
+after that.** Human review of the Polish translation (issue #1).
+
+Full picture: [`../handoffs/2026-09-03_M3-M5-implementation.md`](../handoffs/2026-09-03_M3-M5-implementation.md).
+
 ## Context to load first
 
 - `docs/prd/PR_easy-R5_v01.md` — **§4.6** (isochrones), **§4.7** (hex grid), **§6 M5**,

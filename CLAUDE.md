@@ -11,10 +11,16 @@ wtyczek QGIS.
 Repo zawiera też `tools/` — samodzielne narzędzia badawcze (analizy dostępności i
 izochron dla 6+ miast PL), migrowane z easy-OTP. Patrz ADR-0003.
 
-## Stan projektu (2026-09-02)
-**Faza przygotowawcza — nie ma jeszcze kodu wtyczki.** Zebrane są konteksty i decyzje;
-ADR-y mają status *Proposed*. **Nie zaczynaj implementacji, dopóki ADR-0001 nie jest
-Accepted** — od niego zależy cała warstwa `core/`.
+## Stan projektu (2026-09-03)
+**Całe v0.1 (M1–M5) zaimplementowane i na `main`.** 8 algorytmów Processing,
+`metadata.txt` `0.1.0` / `experimental=True`, 120 testów pytest zielonych, flake8 czysto.
+M3 zweryfikowane end-to-end vs R5 7.6; M4 odtwarza wynik r5r dla Gdańska **co do wiersza**
+(`docs/notes/validation-gdansk.md`); M5 zweryfikowane w QGIS 3.40.
+**Zostaje:** przebieg Michała na czystym profilu (instalacja ZIP → `DownloadR5` realne
+pobranie → `BuildNetwork` na dużym PBF → analiza z okna dialogowego), potem
+`experimental=False`. Pełny obraz:
+[`docs/handoffs/2026-09-03_M3-M5-implementation.md`](docs/handoffs/2026-09-03_M3-M5-implementation.md).
+Status per kamień: `docs/prompts/README.md` i `docs/prd/PR_easy-R5_v01.md` §0.
 
 ## Źródło prawdy
 - **`docs/adr/`** — decyzje architektoniczne. Zacznij od `0001-r5-binding.md` (jak
