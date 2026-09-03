@@ -16,7 +16,7 @@ R5_JAR_URL = (
 # Conveyal publishes only .md5/.sha1 for the release asset. This SHA-256 was
 # computed once from the official jar and cross-checked against the published
 # .sha1 (63e5d0df5fede001e48b58f2804a5e0b76f1806b). Never weaken to MD5.
-R5_JAR_SHA256 = "8bf56cd06964c42ff4b776977d3c39118692bdf3349dc01959d899ec20fb289e"
+R5_JAR_SHA256 = "8bf56cd06964c42ff4b776977d3c39118692bdf3349dc01959d899ec20fb289e"  # pragma: allowlist secret
 R5_JAR_MIN_BYTES = 55 * 1024 * 1024
 R5_JAR_MAX_BYTES = 80 * 1024 * 1024
 # The network.dat format string this R5 build reads/writes
@@ -39,4 +39,4 @@ ADOPTIUM_LATEST_URL = (
 RUNNER_MAIN_CLASS = "EasyR5Runner"
 RUNNER_SOURCE_FILENAME = "EasyR5Runner.java"
 
-USER_AGENT = "easy-R5/0.0.1"
+USER_AGENT = "easy-R5/0.1.0"

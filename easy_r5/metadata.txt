@@ -6,8 +6,10 @@ about=Runs the Conveyal R5 routing engine (v7.6, MIT) as a child process to
     compute one-to-many and many-to-many travel-time matrices,
     cumulative-opportunity accessibility and travel-time isochrones over a
     departure-time window, returning styled QGIS layers. R5 and a Temurin 21 JDK
-    are downloaded on first setup — no pip, no R, no Docker, no administrator
-    rights.
+    are downloaded on first setup — no R, no Docker, no administrator rights.
+    The two population algorithms need openpyxl; its pure-Python wheel is fetched
+    from PyPI (SHA-256 verified, no pip) on first load and every other algorithm
+    runs without it.
     Setup: DownloadR5 (Temurin 21 JDK + r5-v7.6-all.jar, SHA-256 verified),
     BuildNetwork (cached network.dat + network.json with per-date active trip
     counts). Diagnostics: TestR5Setup. Analysis: RunTravelTimeMatrix,

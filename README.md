@@ -52,8 +52,8 @@ See [`docs/notes/product-scope.md`](docs/notes/product-scope.md) and
 
 1. **Install** — Easy-R5 is not yet in the QGIS plugin repository. Either copy the
    `easy_r5/` folder into your QGIS profile's `python/plugins/`, or build a ZIP from a
-   checkout (`py -c "import zipfile,os; z=zipfile.ZipFile('easy_r5.zip','w',zipfile.ZIP_DEFLATED); [z.write(os.path.join(d,f), os.path.join(d,f)) for d,_,fs in os.walk('easy_r5') for f in fs if '__pycache__' not in d and not f.endswith(('.pyc','.pyo'))]; z.close()"`)
-   and use *Plugins → Manage and Install → Install from ZIP*. Then enable it.
+   checkout (`py tools/build_plugin_zip.py` → `builds/easy_r5-<version>.zip`) and use
+   *Plugins → Manage and Install → Install from ZIP*. Then enable it.
 2. **Download the engine** — run *Setup → Download R5 engine and Java 21*, pick a target folder
    in your user profile. One-time, ~200 MB (Temurin 21 JDK + the R5 jar).
 3. **Get data** — you supply the OSM extract (`.osm.pbf` from [Geofabrik](https://download.geofabrik.de/)
@@ -103,6 +103,7 @@ Easy-R5 ships no hex-grid algorithm. To reproduce `gdansk_hex_origins.csv`'s lay
 | R5 | **pinned** `r5-v7.6-all.jar` — see [ADR-0002](docs/adr/0002-pinned-versions.md) | same algorithm, SHA-256 verified |
 | OSM extract | any `.osm.pbf` covering the study area | you supply it (Geofabrik, BBBike) |
 | GTFS feed(s) | any valid feed | you supply it (the operator, transitfeeds, MobilityData) |
+| `openpyxl` (optional) | 3.1.5 | **only** *Prepare population layer* / *Population overlay* need it. The plugin fetches the pure-Python wheel from PyPI (SHA-256 verified, no `pip`) on first load; if that fails it prints a one-line manual-install hint. Every other algorithm works without it. |
 
 ## Licence
 

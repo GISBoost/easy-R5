@@ -86,3 +86,7 @@ hs_err_pid*.log
 
 # --- Keep: sample/reference geometry that is small and is checked in deliberately ---
 !docs/**/*.geojson
+
+# --- Keep: the built plugin ZIP for the QGIS repository upload (small, is the deliverable) ---
+!builds/
+!builds/*.zip

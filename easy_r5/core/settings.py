@@ -28,8 +28,6 @@ _KEY = {
     "java_heap_gb": _PREFIX + "java_heap_gb",
 }
 
-assert all(v.startswith(_PREFIX) for v in _KEY.values())
-
 
 def get(name, default=""):
     return QSettings().value(_KEY[name], default)

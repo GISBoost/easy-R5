@@ -432,6 +432,17 @@ class DownloadR5(QgsProcessingAlgorithm):
                 continue  # skip zip-slip
             zf.extract(member, dest)
 
+    def _safe_tarextract(self, tf, dest):
+        dest_root = dest.resolve()
+        prefix = str(dest_root) + os.sep
+        for member in tf.getmembers():
+            if member.isdev() or member.issym() or member.islnk():
+                continue  # no device/symlink/hardlink members from a JDK tarball
+            target = (dest_root / member.name).resolve()
+            if str(target) != str(dest_root) and not str(target).startswith(prefix):
+                continue  # skip tar-slip
+            tf.extract(member, dest)
+
     def _extract(self, archive, dest, os_name):
         if os_name == "windows":
             with zipfile.ZipFile(archive) as zf:
@@ -441,7 +452,7 @@ class DownloadR5(QgsProcessingAlgorithm):
                 if sys.version_info >= (3, 12):
                     tf.extractall(dest, filter="data")
                 else:
-                    tf.extractall(dest)  # nosec B202 — SHA-256 verified before extraction
+                    self._safe_tarextract(tf, dest)
 
     def _find_java(self, dest):
         binary_name = "java.exe" if sys.platform == "win32" else "java"
