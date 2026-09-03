@@ -1,7 +1,16 @@
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.osmlib.OSM;
+import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.SoftwareVersion;
+import com.conveyal.r5.analyst.FreeFormPointSet;
+import com.conveyal.r5.analyst.PointSet;
+import com.conveyal.r5.analyst.TravelTimeComputer;
+import com.conveyal.r5.analyst.cluster.RegionalTask;
+import com.conveyal.r5.analyst.scenario.Scenario;
+import com.conveyal.r5.api.util.LegMode;
+import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.kryo.KryoNetworkSerializer;
+import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.transit.DuplicateFeedException;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -10,6 +19,10 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.locationtech.jts.geom.Envelope;
 
+import java.io.BufferedWriter;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.io.FileDescriptor;
 import java.io.FileOutputStream;
 import java.io.PrintStream;
@@ -17,8 +30,10 @@ import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.stream.Stream;
@@ -76,6 +91,9 @@ public class EasyR5Runner {
                 case "build":
                     doBuild(job);
                     break;
+                case "matrix":
+                    doMatrix(job);
+                    break;
                 default:
                     Emit.error("BAD_JOB_SPEC", "Unknown command '" + command + "'.");
             }
@@ -92,16 +110,34 @@ public class EasyR5Runner {
             Emit.error("BAD_JOB_SPEC", "'info' needs a 'network' path.");
             return;
         }
+        TransportNetwork network = loadNetwork(networkPath);
+
+        Emit.result("r5_version", r5Version());
+        Emit.result("network_format_version", KryoNetworkSerializer.NETWORK_FORMAT_VERSION);
+        Emit.result("timezone", String.valueOf(network.getTimeZone()));
+        Emit.result("feeds", String.join(",", network.transitLayer.feedChecksums.keySet()));
+        Emit.result("stops", Integer.toString(network.transitLayer.getStopCount()));
+        Emit.result("trip_patterns", Integer.toString(network.transitLayer.tripPatterns.size()));
+        Emit.result("routes", Integer.toString(network.transitLayer.routes.size()));
+        Emit.result("street_vertices", Integer.toString(network.streetLayer.getVertexCount()));
+        Emit.result("bounds", bounds(network));
+
+        Emit.done(networkPath, 0);
+    }
+
+    /**
+     * Read a serialised network, mapping the Kryo failure modes to stable error
+     * codes. On failure this emits ERROR and exits (never returns null in
+     * practice — the return type only satisfies the compiler).
+     */
+    private static TransportNetwork loadNetwork(String networkPath) {
         File networkFile = new File(networkPath);
         if (!networkFile.isFile()) {
             Emit.error("IO_ERROR", "Network file not found: " + networkPath);
-            return;
         }
-
         Emit.info("Loading network: " + networkPath);
-        TransportNetwork network;
         try {
-            network = KryoNetworkSerializer.read(networkFile);
+            return KryoNetworkSerializer.read(networkFile);
         } catch (Throwable t) {
             String m = String.valueOf(t.getMessage());
             String lower = m.toLowerCase(Locale.ROOT);
@@ -118,20 +154,333 @@ public class EasyR5Runner {
                         "R5 could not read the network file. It may be corrupt or truncated. "
                         + "Engine detail: " + m);
             }
+            return null;  // unreachable: Emit.error exited
+        }
+    }
+
+    // --- command: matrix -------------------------------------------------
+
+    /**
+     * One-to-many travel times for a slice of origins against every
+     * destination, streamed as a long-format CSV
+     * (<code>from_id,to_id,travel_time_p&lt;pct&gt;,...</code>).
+     *
+     * <p>The recipe (RegionalTask fields, FreeFormPointSet binary layout) is
+     * ported from docs/reference/probe/Probe.java, verified against a real
+     * network 2026-09-02. Load-bearing details:
+     * <ul>
+     *   <li>the destination point set is built <b>once</b> and reused for every
+     *       origin — first origin ~900 ms (linking + EgressCostTable), the rest
+     *       ~20-40 ms;</li>
+     *   <li><code>r.maxWalkTime</code> is always set (Python guarantees a
+     *       numeric <code>max_walk_time_minutes</code>) — unbounded, R5 searches
+     *       an unlimited walk radius per access/egress/transfer;</li>
+     *   <li>unreachable cells (Integer.MAX_VALUE, or over the trip budget) are
+     *       written as an empty field, never 0 and never 2147483647;</li>
+     *   <li>for a transit run, a walk-only companion computation per origin
+     *       feeds <code>RESULT transit_used_pairs</code> — the independent
+     *       walk-only detector (PRD 5.8).</li>
+     * </ul>
+     */
+    private static void doMatrix(JsonNode job) throws Exception {
+        String networkPath = job.path("network").asText("").trim();
+        String originsPath = job.path("origins").asText("").trim();
+        String destsPath = job.path("destinations").asText("").trim();
+        String outCsv = job.path("out_csv").asText("").trim();
+        if (networkPath.isEmpty() || originsPath.isEmpty() || destsPath.isEmpty() || outCsv.isEmpty()) {
+            Emit.error("BAD_JOB_SPEC", "'matrix' needs network, origins, destinations, out_csv.");
+            return;
+        }
+        for (String p : new String[]{originsPath, destsPath}) {
+            if (!new File(p).isFile()) {
+                Emit.error("IO_ERROR", "Point file not found: " + p);
+                return;
+            }
+        }
+
+        int[] percentiles = intArray(job.path("percentiles"));
+        if (percentiles.length == 0) {
+            Emit.error("BAD_JOB_SPEC", "'matrix' needs at least one percentile.");
+            return;
+        }
+        int medianIdx = medianIndex(percentiles);
+        int maxTripMinutes = job.path("max_trip_duration_minutes").asInt(90);
+        boolean writeUnreachable = job.path("write_unreachable").asBoolean(false);
+
+        TransportNetwork network = loadNetwork(networkPath);
+
+        List<Pt> origins = readPoints(Path.of(originsPath));
+        List<Pt> dests = readPoints(Path.of(destsPath));
+        if (origins.isEmpty() || dests.isEmpty()) {
+            Emit.error("BAD_JOB_SPEC", "origins/destinations CSV has no usable rows.");
+            return;
+        }
+        Emit.info("origins=" + origins.size() + " destinations=" + dests.size()
+                + " percentiles=" + percentiles.length);
+
+        warnUnlinked(network, origins, "origins");
+        int linkedDests = warnUnlinked(network, dests, "destinations");
+        if (linkedDests == 0) {
+            Emit.error("NO_POINTS_LINKED",
+                    "Not one destination point could be linked to the street network. "
+                    + "Check that the points fall inside the OSM extent the network was built from.");
             return;
         }
 
-        Emit.result("r5_version", r5Version());
-        Emit.result("network_format_version", KryoNetworkSerializer.NETWORK_FORMAT_VERSION);
-        Emit.result("timezone", String.valueOf(network.getTimeZone()));
-        Emit.result("feeds", String.join(",", network.transitLayer.feedChecksums.keySet()));
-        Emit.result("stops", Integer.toString(network.transitLayer.getStopCount()));
-        Emit.result("trip_patterns", Integer.toString(network.transitLayer.tripPatterns.size()));
-        Emit.result("routes", Integer.toString(network.transitLayer.routes.size()));
-        Emit.result("street_vertices", Integer.toString(network.streetLayer.getVertexCount()));
-        Emit.result("bounds", bounds(network));
+        // Build the destination point set once — this is the 900 ms cost that
+        // must not be paid per origin.
+        PointSet pointSet = buildPointSet(dests);
 
-        Emit.done(networkPath, 0);
+        int start = 0;
+        int end = origins.size();
+        JsonNode range = job.path("origin_range");
+        if (range.isArray() && range.size() == 2) {
+            start = Math.max(0, range.get(0).asInt());
+            end = Math.min(origins.size(), range.get(1).asInt());
+        }
+        List<Pt> slice = origins.subList(start, Math.max(start, end));
+
+        EnumSet<TransitModes> transitModes = parseTransitModes(job.path("transit_modes"));
+        boolean transitRun = !transitModes.isEmpty();
+
+        long rowsWritten = 0;
+        long transitUsedPairs = 0;
+        int total = slice.size();
+        int done = 0;
+        long lastProgress = 0;
+
+        try (BufferedWriter w = Files.newBufferedWriter(Path.of(outCsv), StandardCharsets.UTF_8)) {
+            StringBuilder header = new StringBuilder("from_id,to_id");
+            for (int p : percentiles) {
+                header.append(",travel_time_p").append(p);
+            }
+            w.write(header.toString());
+            w.write('\n');
+
+            for (Pt origin : slice) {
+                RegionalTask task = baseTask(network, origin, job, percentiles, transitModes);
+                task.destinationPointSets = new PointSet[]{pointSet};
+                int[][] transit = new TravelTimeComputer(task, network).computeTravelTimes().travelTimes.getValues();
+
+                int[] walkMedian = null;
+                if (transitRun) {
+                    RegionalTask walkTask = baseTask(network, origin, job, percentiles,
+                            EnumSet.noneOf(TransitModes.class));
+                    walkTask.destinationPointSets = new PointSet[]{pointSet};
+                    int[][] walk = new TravelTimeComputer(walkTask, network)
+                            .computeTravelTimes().travelTimes.getValues();
+                    walkMedian = walk[medianIdx];
+                }
+
+                for (int d = 0; d < dests.size(); d++) {
+                    boolean anyReached = false;
+                    StringBuilder cells = new StringBuilder();
+                    for (int p = 0; p < percentiles.length; p++) {
+                        int tt = transit[p][d];
+                        cells.append(',');
+                        if (tt < Integer.MAX_VALUE && tt <= maxTripMinutes) {
+                            cells.append(tt);
+                            anyReached = true;
+                        }
+                    }
+                    if (anyReached || writeUnreachable) {
+                        w.write(origin.id);
+                        w.write(',');
+                        w.write(dests.get(d).id);
+                        w.write(cells.toString());
+                        w.write('\n');
+                        rowsWritten++;
+                    }
+                    if (transitRun && walkMedian != null) {
+                        int t = transit[medianIdx][d];
+                        int wk = walkMedian[d];
+                        if (t < Integer.MAX_VALUE && (wk >= Integer.MAX_VALUE || t < wk)) {
+                            transitUsedPairs++;
+                        }
+                    }
+                }
+
+                done++;
+                long now = System.currentTimeMillis();
+                if (now - lastProgress >= 1000 || done == total) {
+                    Emit.progress(done, total);
+                    lastProgress = now;
+                }
+            }
+        }
+
+        Emit.result("transit_used_pairs", Long.toString(transitUsedPairs));
+        Emit.result("origins_done", Integer.toString(total));
+        Emit.done(outCsv, rowsWritten);
+    }
+
+    /** RegionalTask per Probe.java baseTask(), parametrised from the job. */
+    private static RegionalTask baseTask(TransportNetwork network, Pt origin, JsonNode job,
+                                         int[] percentiles, EnumSet<TransitModes> transitModes) {
+        RegionalTask r = new RegionalTask();
+        r.scenario = new Scenario();
+        r.scenario.id = "id";
+        r.scenarioId = r.scenario.id;
+        r.zoneId = network.getTimeZone();
+        r.fromLat = origin.lat;
+        r.fromLon = origin.lon;
+        r.walkSpeed = (float) (job.path("walk_speed_kmh").asDouble(3.6) / 3.6);
+        r.bikeSpeed = (float) (job.path("bike_speed_kmh").asDouble(12.0) / 3.6);
+        int maxTrip = job.path("max_trip_duration_minutes").asInt(90);
+        int maxWalk = job.path("max_walk_time_minutes").asInt(maxTrip);
+        r.streetTime = maxTrip;
+        r.maxTripDurationMinutes = maxTrip;
+        r.maxWalkTime = maxWalk;
+        r.maxBikeTime = maxTrip;
+        r.maxCarTime = maxTrip;
+        r.maxRides = job.path("max_rides").asInt(3);
+        r.bikeTrafficStress = 3;
+        r.directModes = parseLegModes(job.path("direct_modes"), LegMode.WALK);
+        r.accessModes = parseLegModes(job.path("access_modes"), LegMode.WALK);
+        r.egressModes = parseLegModes(job.path("egress_modes"), LegMode.WALK);
+        r.transitModes = transitModes;
+        r.date = LocalDate.parse(job.path("date").asText());
+        int fromTime = secondsOfDay(job.path("departure_time").asText("07:00"));
+        r.fromTime = fromTime;
+        r.toTime = fromTime + job.path("time_window_minutes").asInt(120) * 60;
+        r.monteCarloDraws = job.path("monte_carlo_draws").asInt(5);
+        r.makeTauiSite = false;
+        r.recordTimes = true;
+        r.recordAccessibility = false;
+        r.percentiles = percentiles;
+        return r;
+    }
+
+    /** FreeFormPointSet binary format, per Probe.java / r5r's buildDestinationPointSet. */
+    private static PointSet buildPointSet(List<Pt> pts) throws Exception {
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        DataOutputStream out = new DataOutputStream(bos);
+        out.writeInt(pts.size());
+        for (Pt p : pts) {
+            out.writeUTF(p.id);
+        }
+        for (Pt p : pts) {
+            out.writeDouble(p.lat);
+        }
+        for (Pt p : pts) {
+            out.writeDouble(p.lon);
+        }
+        for (Pt p : pts) {
+            out.writeDouble(1.0);
+        }
+        return new FreeFormPointSet(new ByteArrayInputStream(bos.toByteArray()));
+    }
+
+    /**
+     * Count how many points link to the street network; WARN if any fail.
+     * Not fatal for origins (PRD 5.6 = warn, not block); the caller aborts only
+     * when zero destinations link.
+     */
+    private static int warnUnlinked(TransportNetwork network, List<Pt> pts, String label) {
+        double radius = com.conveyal.r5.streets.StreetLayer.LINK_RADIUS_METERS;
+        int linked = 0;
+        for (Pt p : pts) {
+            if (network.streetLayer.findSplit(p.lat, p.lon, radius, StreetMode.WALK) != null) {
+                linked++;
+            }
+        }
+        if (linked < pts.size()) {
+            Emit.warn("UNLINKED_POINTS", (pts.size() - linked) + " of " + pts.size() + " "
+                    + label + " are not near any street and will be unreachable - check the "
+                    + "OSM extent and that the points are not offshore.");
+        }
+        return linked;
+    }
+
+    private static List<Pt> readPoints(Path path) throws Exception {
+        List<String> lines = Files.readAllLines(path);
+        if (lines.isEmpty()) {
+            return new ArrayList<>();
+        }
+        String[] header = lines.get(0).split(",");
+        int iId = colIndex(header, "id");
+        int iLon = colIndex(header, "lon");
+        int iLat = colIndex(header, "lat");
+        List<Pt> out = new ArrayList<>();
+        for (int i = 1; i < lines.size(); i++) {
+            if (lines.get(i).isBlank()) {
+                continue;
+            }
+            String[] c = lines.get(i).split(",");
+            out.add(new Pt(c[iId].trim(),
+                    Double.parseDouble(c[iLon].trim()),
+                    Double.parseDouble(c[iLat].trim())));
+        }
+        return out;
+    }
+
+    private static int colIndex(String[] header, String name) {
+        for (int i = 0; i < header.length; i++) {
+            if (header[i].trim().equalsIgnoreCase(name)) {
+                return i;
+            }
+        }
+        throw new IllegalArgumentException("point CSV has no '" + name + "' column");
+    }
+
+    private static int[] intArray(JsonNode node) {
+        if (!node.isArray()) {
+            return new int[0];
+        }
+        int[] out = new int[node.size()];
+        for (int i = 0; i < node.size(); i++) {
+            out[i] = node.get(i).asInt();
+        }
+        return out;
+    }
+
+    /** Index of the value closest to 50 — the percentile used for the walk-only compare. */
+    private static int medianIndex(int[] percentiles) {
+        int best = 0;
+        for (int i = 1; i < percentiles.length; i++) {
+            if (Math.abs(percentiles[i] - 50) < Math.abs(percentiles[best] - 50)) {
+                best = i;
+            }
+        }
+        return best;
+    }
+
+    private static int secondsOfDay(String hhmm) {
+        String[] parts = hhmm.trim().split(":");
+        return Integer.parseInt(parts[0]) * 3600 + Integer.parseInt(parts[1]) * 60;
+    }
+
+    private static EnumSet<LegMode> parseLegModes(JsonNode arr, LegMode fallback) {
+        EnumSet<LegMode> set = EnumSet.noneOf(LegMode.class);
+        if (arr.isArray()) {
+            for (JsonNode n : arr) {
+                String s = n.asText("").trim().toUpperCase(Locale.ROOT);
+                if (!s.isEmpty()) {
+                    set.add(LegMode.valueOf(s));
+                }
+            }
+        }
+        if (set.isEmpty()) {
+            set.add(fallback);
+        }
+        return set;
+    }
+
+    private static EnumSet<TransitModes> parseTransitModes(JsonNode arr) {
+        EnumSet<TransitModes> set = EnumSet.noneOf(TransitModes.class);
+        if (arr.isArray()) {
+            for (JsonNode n : arr) {
+                String s = n.asText("").trim().toUpperCase(Locale.ROOT);
+                if (!s.isEmpty()) {
+                    set.add(TransitModes.valueOf(s));
+                }
+            }
+        }
+        return set;
+    }
+
+    /** One origin/destination row from an id,lon,lat CSV. */
+    record Pt(String id, double lon, double lat) {
     }
 
     // --- command: build ---------------------------------------------------
