@@ -25,6 +25,7 @@ from qgis.core import (
     QgsFeatureSink,
     QgsField,
     QgsFields,
+    QgsFeatureRequest,
     QgsGeometry,
     QgsProcessing,
     QgsProcessingAlgorithm,
@@ -65,15 +66,19 @@ class GenerateIsochrones(MatrixBase, QgsProcessingAlgorithm):
 
     def shortHelpString(self) -> str:  # noqa: N802
         return self.tr(
-            "Travel-time isochrone polygons from one or more origin points. "
-            "Builds a regular destination grid (GRID_SPACING, metres), runs a "
-            "one-origin matrix against it, then rasterises and contours each "
-            "cutoff.\n\n"
-            "R5 does not contour — that is done here in GDAL. If one cutoff fails "
-            "to contour it is reported and skipped; the rest still come out.\n\n"
-            "Grid cost is quadratic in 1/GRID_SPACING — the run is blocked above "
-            "a few hundred thousand grid points. MAX_WALK_TIME defaults to "
-            "max(CUTOFFS), which is lossless and the biggest speed lever."
+            "Travel-time isochrone polygons from one or more origin points, for "
+            "one or more cutoffs. Builds a regular destination grid "
+            "(GRID_SPACING, metres), runs a one-origin matrix against it, then "
+            "contours each cutoff.\n\n"
+            "One output feature per (origin, cutoff), tagged origin_id and "
+            "cutoff_min. Polygons are cumulative — the 30-minute area contains "
+            "the 15-minute one. Interior holes are kept where an area is "
+            "genuinely unreachable (a lake, a rail yard, a street-network gap).\n\n"
+            "R5 does not contour — that is done here. If one cutoff fails it is "
+            "reported and skipped; the rest still come out. Grid cost is "
+            "quadratic in 1/GRID_SPACING and blocked above ~400k points. "
+            "MAX_WALK_TIME defaults to max(CUTOFFS) — lossless and the biggest "
+            "speed lever."
         )
 
     def initAlgorithm(self, config=None):  # noqa: N802
@@ -176,8 +181,9 @@ class GenerateIsochrones(MatrixBase, QgsProcessingAlgorithm):
     def _build_grid(self, source, context, metric, spacing, cutoffs, feedback):
         to_metric = QgsCoordinateTransform(source.sourceCrs(), metric, context.transformContext())
         ext = to_metric.transformBoundingBox(source.sourceExtent())
-        # generous reach: ~1.1 km per cutoff-minute covers rail/car upper bounds
-        pad = max(cutoffs) * 1100
+        # reach padding: ~0.9 km per cutoff-minute (≈ 54 km/h) covers transit /
+        # car within a metro area without an absurdly large grid
+        pad = max(cutoffs) * 900
         ext = QgsRectangle(ext.xMinimum() - pad, ext.yMinimum() - pad,
                            ext.xMaximum() + pad, ext.yMaximum() + pad)
         n = (ext.width() / spacing) * (ext.height() / spacing)
@@ -186,11 +192,22 @@ class GenerateIsochrones(MatrixBase, QgsProcessingAlgorithm):
                 "Grid would be ~{n:,.0f} points ({w:.0f} x {h:.0f} m at {s} m). Increase "
                 "GRID_SPACING or use fewer / closer origins."
             ).format(n=n, w=ext.width(), h=ext.height(), s=spacing))
-        feedback.pushInfo(self.tr("Destination grid: ~{:,.0f} points at {} m.").format(n, spacing))
+        feedback.pushInfo(
+            self.tr("Destination grid: up to ~{:,.0f} points at {} m (clipped to origin reach).")
+            .format(n, spacing))
 
         grid = processing.run("native:creategrid", {
             "TYPE": 0, "EXTENT": ext, "HSPACING": spacing, "VSPACING": spacing,
             "HOVERLAY": 0, "VOVERLAY": 0, "CRS": metric, "OUTPUT": "memory:",
+        }, context=context, feedback=None)["OUTPUT"]
+        # keep only cells within `pad` of an origin — drops the bbox corners that
+        # spread origins would otherwise fill with unreachable points
+        origins_layer = source.materialize(QgsFeatureRequest())
+        origins_metric = processing.run("native:reprojectlayer", {
+            "INPUT": origins_layer, "TARGET_CRS": metric, "OUTPUT": "memory:",
+        }, context=context, feedback=None)["OUTPUT"]
+        grid = processing.run("native:extractwithindistance", {
+            "INPUT": grid, "REFERENCE": origins_metric, "DISTANCE": pad, "OUTPUT": "memory:",
         }, context=context, feedback=None)["OUTPUT"]
         grid.dataProvider().addAttributes([QgsField("gid", QVariant.String)])
         grid.updateFields()
@@ -220,11 +237,12 @@ class GenerateIsochrones(MatrixBase, QgsProcessingAlgorithm):
                          meta_values, sink, feedback):
         """One filled polygon per cutoff: the union of reachable grid cells.
 
-        Each reachable cell contributes a square (half-diagonal buffer) so
-        adjacent cells merge into a solid, hole-free blob. Robust where GDAL
-        contouring is not — a fragmented travel-time surface just yields a
-        blobbier polygon, never a crash. One cutoff failing does not stop the
-        rest.
+        Cumulative — the 30-minute polygon fully contains the 15-minute one.
+        Interior rings are **kept**: an unreachable pocket inside the reachable
+        area (a lake, a rail yard, a gap in the street network) is a real
+        no-service hole and belongs in the isochrone. Only sub-cell specks are
+        smoothed away by the close/open pass. Robust where GDAL contouring is
+        not; one cutoff failing does not stop the rest.
         """
         r = spacing * 0.72  # > half-diagonal of a spacing-sized cell
         written = 0
@@ -238,7 +256,7 @@ class GenerateIsochrones(MatrixBase, QgsProcessingAlgorithm):
                 if not squares:
                     continue
                 blob = QgsGeometry.unaryUnion(squares)
-                # round off the staircase edges: close then open by half a cell
+                # round the staircase and fill sub-cell specks, keeping real holes
                 blob = blob.buffer(spacing * 0.5, 4).buffer(-spacing * 0.5, 4).makeValid()
                 if blob.isEmpty():
                     continue

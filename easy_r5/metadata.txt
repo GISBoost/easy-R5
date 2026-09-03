@@ -24,6 +24,7 @@ tags=accessibility,r5,conveyal,transit,gtfs,travel time,isochrone,public transpo
 experimental=True
 deprecated=False
 hasProcessingProvider=yes
+hasTranslations=yes
 changelog=0.1.0
     * M5 — isochrones, population layers, release.
     * feat(analysis): GenerateIsochrones — travel-time polygons per cutoff from
