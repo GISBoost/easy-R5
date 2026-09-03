@@ -392,6 +392,7 @@ class MatrixBase:
         return {
             "origin_ids": origin_ids, "dest_ids": dest_ids,
             "origins_csv": origins_csv, "dests_csv": dests_csv,
+            "origins_crs": origins_src.sourceCrs(),
             "meta": meta, "percentiles": percentiles,
             "is_transit": is_transit, "mode_label": MODE_OPTIONS[mode],
         }

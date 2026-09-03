@@ -90,13 +90,14 @@ def nearest_served_days(service_days, date_iso, k=3):
     return served[:k]
 
 
-def build_od_lines(csv_path, origin_xy, dest_xy, meta, sink):
+def build_od_lines(csv_path, origin_xy, dest_xy, meta, sink, to_crs=None):
     """Add one straight OD line per matrix row to ``sink`` (optional output).
 
-    ``origin_xy`` / ``dest_xy`` map an id to a ``(lon, lat)`` tuple. ``meta`` is
-    the run-method dict (PRD 5.2) copied onto every feature so two matrices that
-    differ only by percentile are still tellable apart. The first travel-time
-    column becomes ``travel_time``.
+    ``origin_xy`` / ``dest_xy`` map an id to a ``(lon, lat)`` tuple (EPSG:4326).
+    ``to_crs`` is an optional ``QgsCoordinateTransform`` applied to each line so
+    the sink can carry the caller's CRS. ``meta`` is the run-method dict (PRD 5.2)
+    copied onto every feature so two matrices that differ only by percentile are
+    still tellable apart. The first travel-time column becomes ``travel_time``.
     """
     from qgis.core import (
         QgsFeature,
@@ -115,11 +116,12 @@ def build_od_lines(csv_path, origin_xy, dest_xy, meta, sink):
             if o is None or d is None:
                 continue
             feat = QgsFeature()
-            feat.setGeometry(
-                QgsGeometry.fromPolylineXY(
-                    [QgsPointXY(o[0], o[1]), QgsPointXY(d[0], d[1])]
-                )
+            geom = QgsGeometry.fromPolylineXY(
+                [QgsPointXY(o[0], o[1]), QgsPointXY(d[0], d[1])]
             )
+            if to_crs is not None:
+                geom.transform(to_crs)
+            feat.setGeometry(geom)
             tt = row.get(tt_col) if tt_col else ""
             feat.setAttributes(
                 [row["from_id"], row["to_id"], float(tt) if tt else None]

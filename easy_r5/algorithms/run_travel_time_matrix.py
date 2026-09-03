@@ -107,7 +107,8 @@ class RunTravelTimeMatrix(MatrixBase, QgsProcessingAlgorithm):
 
             outputs = {self.OUTPUT_CSV: str(out_csv)}
             od_sink = self._build_od_layer(
-                parameters, context, out_csv, res["origins_csv"], res["dests_csv"], meta
+                parameters, context, out_csv, res["origins_csv"], res["dests_csv"], meta,
+                res["origins_crs"],
             )
             if od_sink is not None:
                 outputs[self.OUTPUT_LAYER] = od_sink
@@ -116,20 +117,23 @@ class RunTravelTimeMatrix(MatrixBase, QgsProcessingAlgorithm):
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
-    def _build_od_layer(self, parameters, context, out_csv, origins_csv, dests_csv, meta):
+    def _build_od_layer(self, parameters, context, out_csv, origins_csv, dests_csv, meta,
+                        origins_crs):
         if parameters.get(self.OUTPUT_LAYER) in (None, ""):
             return None
-        from qgis.core import QgsCoordinateReferenceSystem
+        from qgis.core import QgsCoordinateReferenceSystem, QgsCoordinateTransform
 
         sink, sink_id = self.parameterAsSink(
             parameters, self.OUTPUT_LAYER, context,
-            matrix.od_line_fields(), QgsWkbTypes.LineString,
-            QgsCoordinateReferenceSystem("EPSG:4326"),
+            matrix.od_line_fields(), QgsWkbTypes.LineString, origins_crs,
         )
         if sink is None:
             return None
+        wgs84 = QgsCoordinateReferenceSystem("EPSG:4326")
+        to_crs = (QgsCoordinateTransform(wgs84, origins_crs, context.transformContext())
+                  if origins_crs != wgs84 else None)
         matrix.build_od_lines(
             out_csv, points.read_points_csv(origins_csv), points.read_points_csv(dests_csv),
-            meta, sink,
+            meta, sink, to_crs,
         )
         return sink_id
