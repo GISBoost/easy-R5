@@ -1,0 +1,37 @@
+[general]
+name=Easy-R5
+qgisMinimumVersion=3.22
+description=Transit accessibility analysis with the Conveyal R5 routing engine.
+about=Runs the Conveyal R5 routing engine (v7.6, MIT) as a child process to
+    compute one-to-many and many-to-many travel-time matrices and
+    cumulative-opportunity accessibility over a departure-time window, returning
+    styled QGIS layers. R5 and a Temurin 21 JDK are downloaded on first setup —
+    no pip, no R, no Docker, no administrator rights.
+    Milestone M1 ships the plugin skeleton, setup and diagnostics only:
+    DownloadR5 (Temurin 21 JDK + r5-v7.6-all.jar, SHA-256 verified, paths saved
+    to QSettings, one-file Java runner compiled to a cache directory) and
+    TestR5Setup (independent step checks for the JDK, the jar, the runner and an
+    optional network probe). Network building, travel-time matrices,
+    accessibility and isochrones arrive in later milestones.
+version=0.0.1
+author=Michal Kaczorowski
+email=michal.kaczorowsx@gmail.com
+repository=https://github.com/GISBoost/easy-R5
+tracker=https://github.com/GISBoost/easy-R5/issues
+homepage=https://github.com/GISBoost/easy-R5
+category=Analysis
+icon=resources/icon.svg
+license=GPL-3.0-or-later
+tags=accessibility,r5,conveyal,transit,gtfs,travel time,isochrone,public transport,routing,java
+experimental=True
+deprecated=False
+hasProcessingProvider=yes
+changelog=0.0.1
+    * M1 — plugin skeleton + R5 engine on disk.
+    * feat: Processing provider "Easy-R5" (id easyr5).
+    * feat(setup): DownloadR5 — Temurin 21 JDK + r5-v7.6-all.jar, SHA-256
+      verified, paths saved under the easy_r5/ QSettings namespace, one-file
+      Java runner compiled to <target>/runner_cache/.
+    * feat(diagnostics): TestR5Setup — reports each check independently
+      (JDK / jar / runner / optional command=info on a network.dat).
+    * feat(java): EasyR5Runner.java — command "info" only; full stdout protocol.
