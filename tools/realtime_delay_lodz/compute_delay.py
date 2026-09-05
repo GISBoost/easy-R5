@@ -1,8 +1,19 @@
 """Compute per-hex accessibility delta (realized_p50 - static) and the
 population-weighted city summary. Reads the two RunAccessibility OUTPUT_LAYER
 gpkgs from run_accessibility.py, writes:
-  - layer hex_delay in delay_lodz.gpkg: hex_id, pop_total, delta_<category>
+  - layer hex_delay in delay_lodz.gpkg: hex_id, pop_total, delta_<category>,
+    base0_<category>
   - out/city_delay_summary.csv: population-weighted mean delta per category
+
+A hexagon where the *static* schedule already reaches 0 points of a category
+within the cutoff has delta=0 too (0-0=0), but that is not "unaffected by
+delays" -- it is "no baseline access to lose or gain", i.e. not comparable at
+all. Counting it as a real zero would dilute the signal with places the
+category was never reachable from in the first place. So delta_<category> is
+set to NULL (not 0) wherever the static count was 0, and base0_<category>
+(1/0) flags those hexagons explicitly so they show up in the layer and can be
+styled/filtered separately in QGIS. City summary stats are computed only over
+non-NULL deltas.
 
 Must run inside the QGIS Python environment. Run prepare_data.py and
 run_accessibility.py first.
@@ -56,6 +67,7 @@ def write_hex_delay(hex_grid_lyr, pop, static, realized):
     fields.append(QgsField("pop_total", QVariant.Double))
     for cat in CATEGORIES:
         fields.append(QgsField(f"delta_{cat}", QVariant.Double))
+        fields.append(QgsField(f"base0_{cat}", QVariant.Int))
 
     mem = QgsVectorLayer(f"Polygon?crs={hex_grid_lyr.crs().authid() or hex_grid_lyr.crs().toWkt()}",
                           "hex_delay", "memory")
@@ -72,9 +84,12 @@ def write_hex_delay(hex_grid_lyr, pop, static, realized):
         row = {"hex_id": hid, "pop_total": pop[hid]}
         for cat in CATEGORIES:
             s, r = static[hid][cat], realized[hid][cat]
-            delta = None if s is None or r is None else float(r) - float(s)
+            base0 = s is None or float(s) == 0.0
+            delta = None if (base0 or r is None) else float(r) - float(s)
             feat[f"delta_{cat}"] = delta
+            feat[f"base0_{cat}"] = 1 if base0 else 0
             row[f"delta_{cat}"] = delta
+            row[f"base0_{cat}"] = base0
         mem.dataProvider().addFeature(feat)
         rows_for_csv.append(row)
 
@@ -95,27 +110,31 @@ def write_city_summary(rows):
     summary = {}
     for cat in CATEGORIES:
         weighted_sum, weight_sum, n = 0.0, 0.0, 0
+        base0_n = 0
         for row in rows:
-            delta = row[f"delta_{cat}"]
-            if delta is None:
+            if row[f"base0_{cat}"]:
+                base0_n += 1
                 continue
+            delta = row[f"delta_{cat}"]
             weighted_sum += row["pop_total"] * delta
             weight_sum += row["pop_total"]
             n += 1
         summary[cat] = {
             "mean_delta_pop_weighted": (weighted_sum / weight_sum) if weight_sum else None,
             "hexagons_with_value": n,
+            "hexagons_zero_baseline": base0_n,
         }
         print(f"[summary] {cat}: pop-weighted mean delta = "
               f"{summary[cat]['mean_delta_pop_weighted']:.3f} "
-              f"({n}/{len(rows)} hexagons had a value)")
+              f"({n}/{len(rows)} hexagons comparable, {base0_n} excluded -- "
+              "static already reached 0 points of this category)")
 
     out_csv = OUT / "city_delay_summary.csv"
     with open(out_csv, "w", newline="", encoding="utf-8") as fh:
         w = csv.writer(fh)
-        w.writerow(["category", "mean_delta_pop_weighted", "hexagons_with_value"])
+        w.writerow(["category", "mean_delta_pop_weighted", "hexagons_with_value", "hexagons_zero_baseline"])
         for cat, s in summary.items():
-            w.writerow([cat, s["mean_delta_pop_weighted"], s["hexagons_with_value"]])
+            w.writerow([cat, s["mean_delta_pop_weighted"], s["hexagons_with_value"], s["hexagons_zero_baseline"]])
     print(f"[ok] wrote {out_csv}")
 
 

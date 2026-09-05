@@ -24,6 +24,14 @@ Categories: **school** (`amenity=school`, not kindergarten), **pharmacy**
 (`amenity=pharmacy`), **university** (curated OSM extract, reused from
 `accessibility_lodz/lodz_universities.csv`), **mall** (`shop=mall`).
 
+**Zero-baseline hexagons are excluded, not zeroed.** A hexagon where the *static*
+schedule already reaches 0 points of a category within 30 min has `delta = 0-0 = 0`
+too, but that is not "unaffected by delays" — it is "nothing to lose or gain in the
+first place", and counting it as a real zero dilutes the signal with the city's
+outskirts, which is mostly all-zero for schools/pharmacies/universities/malls at a 30
+min cutoff. `delta_<category>` is `NULL` wherever the static count was 0, and
+`base0_<category>` (1/0) flags those hexagons explicitly in the layer.
+
 ## Data reused from prior sessions (nothing new downloaded)
 
 | Input | Source |
@@ -56,22 +64,27 @@ different set of runs. This is the hard prerequisite for the comparison to mean 
    `CUTOFFS=30`, everything else left at the algorithm's defaults (07:00, 120 min window,
    P50, TRANSIT+WALK, STEP decay, lossless `MAX_WALK_TIME`). Resumable via a
    `.params.json` sidecar per case, same pattern as `../modal_complementarity_lodz/run_modal_cases.py`.
-3. **`compute_delay.py`** — `delta_<category> = acc_realized - acc_static` per hexagon,
-   writes layer `hex_delay` (`hex_id`, `pop_total`, 4 `delta_<category>` fields — nothing
-   else) into `delay_lodz.gpkg`, plus `out/city_delay_summary.csv` (population-weighted
-   mean delta per category).
+3. **`compute_delay.py`** — `delta_<category> = acc_realized - acc_static` per hexagon
+   (`NULL` where the static count was 0 — see above), writes layer `hex_delay`
+   (`hex_id`, `pop_total`, 4× `delta_<category>` + `base0_<category>`) into
+   `delay_lodz.gpkg`, plus `out/city_delay_summary.csv` (population-weighted mean delta
+   per category, computed only over non-`base0` hexagons, plus how many were excluded).
 
 ## Real numbers from the verified run (2026-08-21)
 
 - Hex grid: 5662 hexagons (250 m), 5631 with `pop_total > 0`; population overlay off by
   0.034% vs the precinct sum (18 precincts excluded, GUS-suppressed `population=NULL`).
 - POI counts: 311 schools, 350 pharmacies, 47 universities, 58 malls.
-- Population-weighted city-wide mean `delta` (realized P50 minus static, points reachable
-  within 30 min, 07:00-09:00): **school -0.128, pharmacy -0.078, university +0.009,
-  mall -0.087**. Per-hex range is much wider (e.g. `delta_school` from -14 to +10,
-  `delta_pharmacy` from -19 to +14) — the city-wide average is small because gains and
-  losses partly cancel out; the worst losses (school, pharmacy) visually concentrate in
-  the dense city-centre network, where more transfers make delays compound.
+- Population-weighted city-wide mean `delta`, **excluding zero-baseline hexagons**
+  (realized P50 minus static, points reachable within 30 min, 07:00-09:00):
+  **school -0.131** (3867/5662 hexagons comparable, 1795 excluded), **pharmacy -0.081**
+  (3725, 1937 excluded), **university -0.003** (1092, 4570 excluded — most of the city
+  is simply >30 min from any university regardless of delays), **mall -0.113** (2158,
+  3504 excluded). Before excluding zero-baseline hexagons the naive means looked
+  smaller and, for university, had the wrong sign (+0.009 vs the correct -0.003) —
+  exactly the noise those hexagons were adding. Per-hex range is much wider than the
+  city mean (e.g. `delta_school` from -14 to +10); the worst losses visually concentrate
+  in the dense city-centre network, where more transfers make delays compound.
 - **Note on running this**: `run_accessibility.py`'s two `RunAccessibility` passes
   (5662 origins here, vs. 1479 in `modal_complementarity_lodz`) took long enough that a
   single `mcp__qgis__execute_code` call timed out on the MCP transport and reported
