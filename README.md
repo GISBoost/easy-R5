@@ -34,8 +34,8 @@ Processing toolbox → **Easy-R5**:
 | Setup | **Download R5 engine and Java 21** | fetches Temurin 21 + `r5-v7.6-all.jar` (SHA-256 pinned), compiles the runner. No admin rights. |
 | Setup | **Build R5 network** | one `.osm.pbf` + a folder of GTFS `.zip` → cached `network.dat` + a `network.json` summary with a per-date active-trip count. |
 | Diagnostics | **Test R5 setup** | checks the JDK, jar and runner independently. |
-| Analysis | **Run travel time matrix** | N origins × M destinations, percentiles over a departure window, batched processes, sampled time estimate, hard dead-date gate + post-run walk-only detector. Long CSV out. |
-| Analysis | **Run accessibility** | opportunities reachable per origin / cutoff / percentile (STEP / LOGISTIC / EXPONENTIAL decay), summed in Python from the matrix. Long CSV + an ORIGINS copy with `acc_<opp>_p<pct>_c<cutoff>` fields. |
+| Analysis | **Run travel time matrix** | N origins × M destinations, percentiles over a departure window, batched processes, sampled time estimate, hard dead-date gate + post-run walk-only detector. Long CSV out. `TRANSIT_SUBMODES` narrows which transit modes R5 routes over (e.g. `TRAM` only, or `TRAM, BUS`) — blank means all. |
+| Analysis | **Run accessibility** | opportunities reachable per origin / cutoff / percentile (STEP / LOGISTIC / EXPONENTIAL decay), summed in Python from the matrix. Long CSV + an ORIGINS copy with `acc_<opp>_p<pct>_c<cutoff>` fields. Same `TRANSIT_SUBMODES` narrowing as the matrix — run once for `TRAM` and once for `BUS` to compare modal accessibility. |
 | Analysis | **Generate isochrones** | cumulative travel-time polygons, one per (origin, cutoff): a destination grid → one-origin matrix → TIN raster → `gdal:contour_polygon` per cutoff (the approach r5r/r5py/Conveyal all use — R5 has no isochrone output). Unreachable pockets stay as holes. |
 | Analysis | **Prepare population layer** | joins a GUS NSP 2021 sheet to census-tract geometry. |
 | Analysis | **Population overlay** | area-weighted population onto a hex grid (fractional, not rounded). |

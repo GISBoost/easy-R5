@@ -37,7 +37,7 @@ from ..core.styling import apply_style
 from ._matrix_base import MatrixBase
 
 _META_FIELDS = ("r5_version", "network_hash", "run_date", "departure_time",
-                "time_window", "percentile", "modes", "decay")
+                "time_window", "percentile", "modes", "transit_submodes", "decay")
 
 
 class RunAccessibility(MatrixBase, QgsProcessingAlgorithm):

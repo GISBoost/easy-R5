@@ -58,6 +58,45 @@ MODE_MAP = {
 _SLOW_RUN_MINUTES = 30
 
 
+def _resolve_transit_submodes(mode, selected_indices):
+    """Map TRANSIT_SUBMODES enum indices to a transit-mode list (PRD 5).
+
+    Ignored (always []) for a MODE with no transit component. A blank
+    selection means "all modes" - today's hardcoded default, unchanged.
+    Non-blank selections are normalized to _TRANSIT_MODES order regardless
+    of UI pick order, so cache keys / metadata stay deterministic.
+    """
+    default_modes = MODE_MAP[mode][1]
+    if not default_modes:
+        return []
+    if not selected_indices:
+        return list(default_modes)
+    chosen = {_TRANSIT_MODES[i] for i in selected_indices}
+    return [m for m in default_modes if m in chosen]
+
+
+def _transit_submodes_meta(mode, selected_indices, transit_modes):
+    """Value for meta['transit_submodes'] (PRD v0.1 5.2: method recorded in output).
+
+    "N/A" for a non-transit MODE (nothing ran, not "everything ran" -
+    matches the "-" the PRD's own 4.1 table uses for the walk-only case).
+    """
+    if not MODE_MAP[mode][1]:
+        return "N/A"
+    if not selected_indices:
+        return "ALL"
+    return ",".join(transit_modes)
+
+
+def _mode_label(mode, selected_indices, transit_modes):
+    """mode_label with the submode picks appended when a non-blank
+    TRANSIT_SUBMODES selection was made (PRD 5 item 4)."""
+    label = MODE_OPTIONS[mode]
+    if MODE_MAP[mode][1] and selected_indices:
+        label = "{} ({})".format(label, ", ".join(transit_modes))
+    return label
+
+
 class MatrixBase:
     """Mixin: shared parameters + the batched matrix run. Not an algorithm itself."""
 
@@ -75,6 +114,7 @@ class MatrixBase:
     WALK_SPEED = "WALK_SPEED"
     MAX_RIDES = "MAX_RIDES"
     MODE = "MODE"
+    TRANSIT_SUBMODES = "TRANSIT_SUBMODES"
     MONTE_CARLO_DRAWS = "MONTE_CARLO_DRAWS"
     BATCH_SIZE = "BATCH_SIZE"
     ESTIMATE_FIRST = "ESTIMATE_FIRST"
@@ -157,6 +197,12 @@ class MatrixBase:
                 self.MODE, _tr("Travel mode"), options=MODE_OPTIONS, defaultValue=0
             )
         )
+        self.addParameter(
+            QgsProcessingParameterEnum(
+                self.TRANSIT_SUBMODES, _tr("Transit sub-modes (blank = all)"),
+                options=_TRANSIT_MODES, allowMultiple=True, optional=True, defaultValue=[],
+            )
+        )
         self._advanced(
             QgsProcessingParameterNumber(
                 self.MAX_WALK_TIME, _tr("Max walk time (minutes; blank = lossless default)"),
@@ -227,6 +273,7 @@ class MatrixBase:
         walk_speed = self.parameterAsDouble(parameters, self.WALK_SPEED, context)
         max_rides = self.parameterAsInt(parameters, self.MAX_RIDES, context)
         mode = self.parameterAsEnum(parameters, self.MODE, context)
+        submode_indices = self.parameterAsEnums(parameters, self.TRANSIT_SUBMODES, context)
         monte_carlo = self.parameterAsInt(parameters, self.MONTE_CARLO_DRAWS, context)
         batch_size = self.parameterAsInt(parameters, self.BATCH_SIZE, context)
         estimate_first = self.parameterAsBool(parameters, self.ESTIMATE_FIRST, context)
@@ -242,8 +289,13 @@ class MatrixBase:
         except job_spec.JobSpecError as exc:
             raise QgsProcessingException(str(exc))
 
-        direct_mode, transit_modes = MODE_MAP[mode]
+        direct_mode = MODE_MAP[mode][0]
+        transit_modes = _resolve_transit_submodes(mode, submode_indices)
         is_transit = bool(transit_modes)
+        if not MODE_MAP[mode][1] and submode_indices:
+            feedback.pushWarning(
+                _tr("TRANSIT_SUBMODES is ignored because MODE is not 'TRANSIT + WALK'.")
+            )
 
         if is_transit and not date:
             raise QgsProcessingException(_tr("A date is required for a transit run."))
@@ -412,13 +464,15 @@ class MatrixBase:
             # still tellable apart.
             "percentile": ",".join(str(p) for p in percentiles),
             "modes": MODE_OPTIONS[mode],
+            "transit_submodes": _transit_submodes_meta(mode, submode_indices, transit_modes),
         }
         return {
             "origin_ids": origin_ids, "dest_ids": dest_ids,
             "origins_csv": origins_csv, "dests_csv": dests_csv,
             "origins_crs": origins_src.sourceCrs(),
             "meta": meta, "percentiles": percentiles,
-            "is_transit": is_transit, "mode_label": MODE_OPTIONS[mode],
+            "is_transit": is_transit,
+            "mode_label": _mode_label(mode, submode_indices, transit_modes),
         }
 
     # --- helpers -------------------------------------------------------

@@ -151,6 +151,7 @@ _META_FIELDS = (
     "time_window",
     "percentile",
     "modes",
+    "transit_submodes",
 )
 
 
