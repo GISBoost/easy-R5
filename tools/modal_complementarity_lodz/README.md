@@ -1,4 +1,4 @@
-# tools/modal_complementarity_lodz — F2: data prep for the flagship analysis
+# tools/modal_complementarity_lodz — F2/F3: the flagship modal-complementarity analysis
 
 **Standalone data-prep tooling**, not part of the plugin. Builds the ONE R5 network and the
 ONE origins/destinations layer set that all four accessibility runs of
@@ -76,8 +76,46 @@ routes, so the answer came from `trip_headsign` in `trips.txt` instead:
 
 None of these routes were removed from the network or from any count in this milestone.
 
+## F3 — the four modal-case runs (`run_modal_cases.py`, `check_invariants.py`, `compute_metrics.py`, `poi_control.py`)
+
+Run in this order, all inside the QGIS Python environment (same caveat as `prepare_data.py` —
+`check_invariants.py` is the one exception, pure stdlib, runs with plain `py`):
+
+```python
+exec(open("tools/modal_complementarity_lodz/run_modal_cases.py", encoding="utf-8").read())
+# then, plain `py check_invariants.py` (or inside QGIS, same effect) — stops on I1/I2/I3 failure
+exec(open("tools/modal_complementarity_lodz/compute_metrics.py", encoding="utf-8").read())
+exec(open("tools/modal_complementarity_lodz/poi_control.py", encoding="utf-8").read())
+```
+
+`run_modal_cases.py` is resumable — a case is skipped if `out/acc_<id>.csv` already matches the
+requested parameters (`out/acc_<id>.params.json`).
+
+**This run's numbers** (see [`COLUMNS.md`](COLUMNS.md) for what every field means):
+
+| check | value | gate |
+|---|---|---|
+| Four runs' wall time (W / T / B / TB) | 37.0 / 82.6 / 93.2 / 104.4 s (≈5.3 min total) | measured, in `out/run_meta.json` |
+| `I1`, `I2` violations | **0** out of 177,480 rows | must be 0 |
+| `I3` (R5 respects `TRANSIT_SUBMODES`) | **0.308** | must be > 0.05 |
+| POI control, Spearman ρ (hex-centroid vs exact-POI `srv_total_30min`) | **0.9886** | ≥ 0.95 |
+| Hexagons failing the K=1,000 reliability gate (shares NULL there) | 474 / 1,479 | documented in `run_meta.json` |
+| `Ā^TB(30)`, person-weighted (headline city number) | **82,747** people | — |
+| City `subadd(30)` | **0.9047** (< 1, sub-additive — matches the literature) | — |
+
+Outputs (all gitignored, in `out/`): `acc_<W\|T\|B\|TB>.csv` (+ `.gpkg`, `.meta.json`,
+`.params.json`), `acc_poi_control.csv`, `run_meta.json`, `invariants.json`, `poi_control.json`,
+`hex_modal.csv`, `city_summary.csv`. Plus the `hex_modal` layer added to `lodz_modal.gpkg`.
+
+**Scope decision, flagged for Michał:** the per-hex metric fields on `hex_modal` are computed
+for opportunity=`pop_total` only (not every opportunity × percentile combination — see
+`COLUMNS.md`'s "Scope of the per-hex fields"). This wasn't explicit in the F3 prompt; the
+alternative (~1,700 fields covering every percentile/opportunity) had no identified consumer in
+F4/F5, so this is a judgment call, not a hidden assumption — flag if a different scope is
+wanted before F4 cartography locks in field names.
+
 ## What is gitignored
 
-`network_static/`, `gtfs_static/`, `*.gpkg`, `out/`, `__pycache__/` — data, not code. Only
-`prepare_data.py`, `.gitignore` and this `README.md` are versioned, per `CLAUDE.md`'s
+`network_static/`, `gtfs_static/`, `*.gpkg`, `out/`, `__pycache__/` — data, not code. Only the
+`.py` scripts, `.gitignore`, `COLUMNS.md` and this `README.md` are versioned, per `CLAUDE.md`'s
 "wersjonujemy kod i dokumentację, nie dane".
