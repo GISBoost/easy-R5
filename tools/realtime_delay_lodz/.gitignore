@@ -1,0 +1,8 @@
+gtfs_static/
+gtfs_realized_p50/
+network_static/
+network_realized_p50/
+*.gpkg
+*.qgz
+out/
+__pycache__/
