@@ -1,0 +1,5 @@
+network_static/
+gtfs_static/
+*.gpkg
+out/
+__pycache__/
