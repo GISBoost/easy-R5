@@ -1,4 +1,4 @@
-# tools/modal_complementarity_lodz — F2/F3: the flagship modal-complementarity analysis
+# tools/modal_complementarity_lodz — F2/F3/F4: the flagship modal-complementarity analysis
 
 **Standalone data-prep tooling**, not part of the plugin. Builds the ONE R5 network and the
 ONE origins/destinations layer set that all four accessibility runs of
@@ -114,8 +114,55 @@ alternative (~1,700 fields covering every percentile/opportunity) had no identif
 F4/F5, so this is a judgment call, not a hidden assumption — flag if a different scope is
 wanted before F4 cartography locks in field names.
 
+## F4 — cartography (`make_figures.py`) — **P3 done, P1/P2 blocked**
+
+```python
+exec(open("tools/modal_complementarity_lodz/make_figures.py", encoding="utf-8").read())
+```
+
+**P3** (`docs/img/flagship-lodz-modal-bars.png`) — done, verified visually. Person-weighted
+accessibility by modal case × cutoff, the `no_transfer` marker line, subadd annotations.
+
+**P1/P2** (`docs/img/flagship-lodz-tram-share-*.png`, `flagship-lodz-transfer-premium-*.png`)
+— **not produced.** The text layer, legend-woven sentence, disclaimer, source line and tram
+network inset all render correctly, but the `hex_modal` choropleth fill itself renders as a
+blank map panel, in every configuration tried:
+
+| Renderer tried | Result |
+|---|---|
+| `QgsRuleBasedRenderer`, full rule tree (7 classes + 2 sentinel rules) | blank |
+| `QgsRuleBasedRenderer`, simplest possible (1 root + 1 catch-all child, solid fill) | blank |
+| `QgsGraduatedSymbolRenderer` with a `CASE WHEN...` classification expression | blank |
+| `QgsSingleSymbolRenderer` (QGIS's own default, unstyled) | **renders fine** |
+
+So the map item, the layer, the CRS (tested both the native UWPP_1992 and reprojected
+EPSG:2180 — same result either way) and the extent are all fine; something specific to how
+this QGIS 3.40.5 build paints a *classified* (rule-based or graduated) vector renderer inside a
+`QgsLayoutItemMap` during `QgsLayoutExporter.exportToImage()` is not working. `renderer.
+originalSymbolsForFeature()` confirms every feature matches exactly one rule/range correctly —
+the classification logic itself is right; only the actual paint step produces nothing.
+Diagnosed 2026-09-05 via `mcp__qgis__execute_code`, ~10 isolated tests; not resolved. Two
+unrelated bugs found and fixed along the way, both load-bearing for anyone touching this file
+next:
+
+1. `QgsLayout.setUnits(QgsUnitTypes.LayoutPixels)` silently breaks text sizing (labels render
+   at a fixed ~8px regardless of requested size) — fixed by working in millimeters/points
+   internally (`mm()`/`pt()` helpers) while keeping the public API in "design pixels" matching
+   the PRD's px spec.
+2. `hex_modal`'s native CRS (UWPP_1992, F2/F3, no EPSG code) reads as `isValid() == True` but
+   was a red herring for the blank-map bug above — real, unrelated to the renderer issue.
+
+**What Michał can try by hand:** open `lodz_modal.gpkg`'s `hex_modal` layer in the QGIS GUI,
+apply a graduated style through the Layer Properties dialog (not via `saveNamedStyle()`/PyQGIS
+scripting) on the same field, and see whether it renders on the canvas and prints via Layout
+Manager — that isolates whether this is a scripting-API-specific issue or a genuine QGIS 3.40.5
+rendering bug. The `.qml` files this script already produced
+(`styles/flagship-lodz-tram-share.qml`, `styles/flagship-lodz-transfer-premium.qml`) can be
+applied to `hex_modal` via *Layer → Properties → Style → Load Style* to skip re-specifying the
+classes.
+
 ## What is gitignored
 
 `network_static/`, `gtfs_static/`, `*.gpkg`, `out/`, `__pycache__/` — data, not code. Only the
-`.py` scripts, `.gitignore`, `COLUMNS.md` and this `README.md` are versioned, per `CLAUDE.md`'s
-"wersjonujemy kod i dokumentację, nie dane".
+`.py` scripts, `.gitignore`, `COLUMNS.md`, `styles/` (`.qml` + `palette.md`) and this
+`README.md` are versioned, per `CLAUDE.md`'s "wersjonujemy kod i dokumentację, nie dane".
