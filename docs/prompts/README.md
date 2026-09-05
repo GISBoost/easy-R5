@@ -48,9 +48,9 @@ Osobna seria, niezależna od kamieni v0.1. Implementuje
 | [`easy-R5_F1-transit-submodes_prompt_for-claude-code.md`](easy-R5_F1-transit-submodes_prompt_for-claude-code.md) | F1 — parametr `TRANSIT_SUBMODES` we wtyczce | v0.1 | ✅ zaimplementowane + zweryfikowane end-to-end w QGIS (real R5 7.6) |
 | [`easy-R5_F2-data-prep_prompt_for-claude-code.md`](easy-R5_F2-data-prep_prompt_for-claude-code.md) | F2 — sieć, siatka, populacja area-weighted, POI→heks, warstwa celów | F1 | ✅ zaimplementowane + zweryfikowane w QGIS (`tools/modal_complementarity_lodz/`), data **2026-08-24** |
 | ~~`easy-R5_F2b-rail-feed_prompt_for-claude-code.md`~~ | ~~F2b — feed ŁKA~~ | — | **Parked** (kolej poza zakresem) |
-| [`easy-R5_F3-runs-and-metrics_prompt_for-claude-code.md`](easy-R5_F3-runs-and-metrics_prompt_for-claude-code.md) | F3 — **4** przebiegi (W/T/B/TB), niezmienniki I1–I3, metryki | F2 | ⏳ |
-| [`easy-R5_F4-cartography_prompt_for-claude-code.md`](easy-R5_F4-cartography_prompt_for-claude-code.md) | F4 — hero image + figury | F3 | ⏳ |
-| [`easy-R5_F5-writeup_prompt_for-claude-code.md`](easy-R5_F5-writeup_prompt_for-claude-code.md) | F5 — wyniki, README, teksty | F4 | ⏳ |
+| [`easy-R5_F3-runs-and-metrics_prompt_for-claude-code.md`](easy-R5_F3-runs-and-metrics_prompt_for-claude-code.md) | F3 — **4** przebiegi (W/T/B/TB), niezmienniki I1–I3, metryki | F2 | ✅ zaimplementowane + zweryfikowane w QGIS: I1/I2/I3 przechodzą (I3=0,308), ρ_POI=0,9886 |
+| [`easy-R5_F4-cartography_prompt_for-claude-code.md`](easy-R5_F4-cartography_prompt_for-claude-code.md) | F4 — hero image + figury | F3 | 🟡 częściowo: P3 gotowy, P1/P2 zablokowane błędem renderowania QGIS 3.40.5 — `tools/modal_complementarity_lodz/README.md` §F4 |
+| [`easy-R5_F5-writeup_prompt_for-claude-code.md`](easy-R5_F5-writeup_prompt_for-claude-code.md) | F5 — wyniki, README, teksty | F4 | ✅ zaimplementowane (`docs/notes/flagship-lodz-modal-results.md`, blok w `README.md`, `out/text_pl.md`) — zrobione mimo niepełnego F4 (P1/P2 brakuje), bo teksty nie zależą od samych obrazów; do potwierdzenia z Michałem |
 | [`easy-R5_F6-bad-day_prompt_for-claude-code.md`](easy-R5_F6-bad-day_prompt_for-claude-code.md) | F6 *(opcjonalny)* — warstwa „zły dzień": 4 przebiegi na zrealizowanym P85 | F5 | ⏳ *(prompt ma nieaktualny nagłówek v2 z 8 przebiegami — ignorować, robimy 4, jak v1)* |
 
 **F1 jest jedynym kamieniem, który dotyka `easy_r5/`.** F2–F6 to `tools/` i `docs/`.

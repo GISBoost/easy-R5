@@ -11,6 +11,19 @@ R5 v7.6, Java 21, QGIS 3.22 LTR+, Easy-R5 0.1.0.
 > Nie jest to PRD wersji 0.2 — pozostałe pozycje z `roadmap-candidates.md` są nadal
 > nierozstrzygnięte i ta analiza nie przesądza żadnej z nich poza T-nowe §5.
 
+## 0. Stan realizacji
+
+| Kamień | Status | Data | Uwagi |
+|---|---|---|---|
+| F1 — `TRANSIT_SUBMODES` | ✅ zrobione | 2026-09-05 | zweryfikowane end-to-end w QGIS na realnym R5 7.6 |
+| F2 — dane | ✅ zrobione | 2026-09-05 | `tools/modal_complementarity_lodz/`; 9893 kursy, populacja w 0,088% tolerancji |
+| F3 — przebiegi i metryki | ✅ zrobione | 2026-09-05 | I1/I2/I3 przechodzą (I3=0,308), ρ_POI=0,9886, subadd_city(30)=0,9047 |
+| F4 — kartografia | 🟡 częściowo | 2026-09-05 | P3 (wykres) gotowy; P1/P2 (mapy) zablokowane błędem renderowania w QGIS 3.40.5 — patrz `tools/modal_complementarity_lodz/README.md` §F4 |
+| F5 — teksty | ✅ zrobione | 2026-09-05 | `docs/notes/flagship-lodz-modal-results.md`, blok w `README.md`, `out/text_pl.md` |
+| F6 — zły dzień (P85) | ⏳ sparkowany | — | wymaga nowej, dwutrybowej wersji promptu; patrz `docs/notes/flagship-analysis-decision.md` v3 |
+
+Kolej (ŁKA) sparkowana w całej analizie — patrz `docs/notes/flagship-analysis-decision.md` v3.
+
 ---
 
 ## 1. Pytanie badawcze

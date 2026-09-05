@@ -14,6 +14,18 @@ QGIS with no R, no conda and no Docker.
 Sibling project: [**easy-OTP**](https://github.com/GISBoost/easy-OTP), the same idea on
 OpenTripPlanner 1.5.
 
+<!-- P1 hero image pending — tools/modal_complementarity_lodz/README.md's F4 section explains
+     why (a QGIS 3.40.5 rendering bug, not yet fixed). Drop the generated
+     docs/img/flagship-lodz-tram-share-en.png in and this block is ready. -->
+
+**How much of Łódź depends on its trams?** Four `Run accessibility` passes on one network —
+walk / tram+walk / bus+walk / full network, varying only `TRANSIT_SUBMODES` — answer it:
+27.5% of the city's 30-minute reach disappears without the tram, 21.7% without the bus, and
+13.6% exists only because of the tram↔bus transfer (317 s total routing time, real R5 7.6).
+This is a dependency measure, not a policy forecast — the model doesn't reroute buses or add
+replacement service. [How we measured this →](docs/notes/flagship-lodz-modal-results.md) ·
+[reproduce it →](tools/modal_complementarity_lodz/README.md)
+
 | | easy-OTP | Easy-R5 |
 |---|---|---|
 | Engine | OpenTripPlanner 1.5 (Java 8) | Conveyal R5 (Java 21) |

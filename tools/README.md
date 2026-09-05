@@ -27,6 +27,7 @@ own runner once it works is the plan — see
 | [`accessibility_cities/`](accessibility_cities/README.md) | The same r5r/R5 pipeline generalized to Warszawa, Kraków, Gdańsk, Poznań, Szczecin (plus GZM and Kielce). **Gdańsk is Easy-R5's reference dataset** — PRD M4 diffs the plugin against `gdansk/gdansk_service_accessibility.csv`. |
 | [`isochrones_lodz/`](isochrones_lodz/README.md) | Isochrone sweeps (all 6 cities, scheduled + realized variants) feeding [mapy-analizy/izochrony-transport](https://gisboost.github.io/mapy-analizy/izochrony-transport/). Also the source of the hardest-won performance lessons — read the script headers. |
 | [`ses_income_lodz/`](ses_income_lodz/README.md) | Proxy income index per census tract for 6 cities (2023 election results × CBOS income survey, **not** real income) — the SES layer the two accessibility studies join against. |
+| [`modal_complementarity_lodz/`](modal_complementarity_lodz/README.md) | The flagship Easy-R5 analysis: how much of Łódź's transit reach depends on the tram vs. the bus vs. the transfer between them, on the plugin's own `RunAccessibility` (not r5r) via the new `TRANSIT_SUBMODES` parameter. |
 
 ## Read these before writing plugin code
 
