@@ -126,7 +126,12 @@ def write_gpkg_and_csv(rows):
     layer = QgsVectorLayer(f"{GPKG}|layername=hex_destinations", "hex_destinations", "ogr")
     geom_by_id = {str(f["hex_id"]): f.geometry() for f in layer.getFeatures()}
 
-    mem = QgsVectorLayer(f"Point?crs={layer.crs().authid()}", "hex_modal", "memory")
+    # NOT layer.crs().authid() -- hex_destinations' CRS (UWPP_1992) has no EPSG
+    # code, so the authid is "" and a "Point?crs=" URI silently falls back to an
+    # invalid/undefined CRS (found via a blank map render in F4). setCrs() after
+    # construction works for any CRS, authid or not.
+    mem = QgsVectorLayer("Point", "hex_modal", "memory")
+    mem.setCrs(layer.crs())
     mem.dataProvider().addAttributes(fields)
     mem.updateFields()
     feats = []
