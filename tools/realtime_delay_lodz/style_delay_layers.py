@@ -68,3 +68,14 @@ def style_net_delta(layer):
 def save_qml(layer, path: Path):
     layer.saveNamedStyle(str(path))
     print(f"[ok] saved style {path}")
+
+
+def classify(value, edges=NET_EDGES):
+    """Pure-Python counterpart of the QGIS ranges above -- which of the 7 classes
+    a value falls into (0 = most negative .. 6 = most positive). Used by
+    chart_distance_delta.py so a bar chart can reuse the exact same colours
+    as the map legend instead of picking its own scale."""
+    for i in range(len(edges) - 1):
+        if value <= edges[i + 1]:
+            return i
+    return len(edges) - 2

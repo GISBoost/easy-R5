@@ -239,3 +239,30 @@ stays visible even over hexagons the choropleth filters out as null, mirroring t
 Michał's own print atlas. See `mapy-analizy/opoznienia-dostepnosc/README.md` for the page
 itself; re-run `export_geojson.py` and refresh that repo's `data/` whenever the local pipeline
 output changes (manual, no CI).
+
+## A chart for the print board: `chart_distance_delta.py`
+
+A bar chart to sit next to the maps: population-weighted mean `net_delta` by distance from
+the **population-weighted centroid of all hexagons** (not a guessed CBD point — see
+`_population_centre()`), binned every 1 km, one bar per resolution. Bar colour reuses
+`style_delay_layers.RDBU7`/`classify()` exactly — same 7-class, zero-isolated legend as the
+maps and the web version, so a reader who has seen either does not have to learn a new scale.
+Each bar is labelled with its `n` (⚠ under `MIN_N_WARN=20`, so a thin bin cannot be read as
+confidently as a thick one just because it is drawn the same size).
+
+Rendering conventions (Agg backend before `pyplot`, thin recessive grid, a wrapped caption
+under the axes carrying provenance/caveats, every figure shipping `<prefix>.png` +
+`<prefix>.csv` of the exact plotted values + `<prefix>.json` with params and a source SHA-256)
+are copied from `easy-OTP/tools/transit_charts`'s `render/style.py` — a sibling project's
+chart tooling, **copied, not imported** (the same "copy, don't depend across projects" rule
+`CLAUDE.md` applies to plugin code applies here).
+
+**Real result (2026-08-21, both resolutions): no clean "worse toward the centre" gradient.**
+Instead, a sharp, resolution-robust dip at **2-3 km from the population centre**
+(pop.-weighted mean net_delta ≈ **-2.43** at 250 m, n=295; **≈ -2.05** at 500 m, n=70) — an
+order of magnitude worse than every other 1 km ring, which mostly sit within ±0.5. The
+innermost ring (0-1 km) is mildly *positive* at both resolutions. Read literally: delays don't
+punish "the centre" uniformly, they punish a specific ring a bit further out — plausibly where
+transfer-dependent trips are common but the network has less slack than in the very core.
+Worth digging into which routes/hexagons drive that ring before quoting it as an explanation,
+not just a measurement. Outputs: `out/charts/distance_vs_net_delta_{250,500}m.{png,csv,json}`.
