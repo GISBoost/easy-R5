@@ -4,6 +4,12 @@ gpkgs from run_accessibility.py, writes:
   - layer hex_delay in delay_lodz.gpkg: hex_id, pop_total, delta_<category>,
     base0_<category>
   - out/city_delay_summary.csv: population-weighted mean delta per category
+  - layer hex_net_opportunities: hex_id, pop_total, net_delta (sum of
+    delta_<category> over whichever categories were comparable for that hex),
+    net_delta_n (how many of the 4 categories went into that sum) -- the
+    single-number hero-map layer: how many opportunities (of any kind) does
+    this hexagon net gain or lose to delays
+  - out/city_net_summary.csv: population-weighted mean net_delta
 
 A hexagon where the *static* schedule already reaches 0 points of a category
 within the cutoff has delta=0 too (0-0=0), but that is not "unaffected by
@@ -109,6 +115,74 @@ def write_hex_delay(hex_grid_lyr, pop, static, realized, gpkg):
     return rows_for_csv
 
 
+def write_hex_net_opportunities(hex_grid_lyr, rows, gpkg):
+    """Hero-map layer: one number per hex -- how many opportunities (summed
+    across all 4 categories) does this hexagon net gain or lose to delays.
+    A category missing (base0) is skipped, not treated as 0 -- net_delta_n
+    records how many of the 4 categories actually went into the sum, so a
+    hexagon comparable on only 1 category isn't silently equated with one
+    comparable on all 4. NULL net_delta means none of the 4 were comparable."""
+    fields = QgsFields()
+    fields.append(QgsField("hex_id", QVariant.Int))
+    fields.append(QgsField("pop_total", QVariant.Double))
+    fields.append(QgsField("net_delta", QVariant.Double))
+    fields.append(QgsField("net_delta_n", QVariant.Int))
+
+    mem = QgsVectorLayer(f"Polygon?crs={hex_grid_lyr.crs().authid() or hex_grid_lyr.crs().toWkt()}",
+                          "hex_net_opportunities", "memory")
+    mem.dataProvider().addAttributes(fields)
+    mem.updateFields()
+
+    geoms = {f["hex_id"]: f.geometry() for f in hex_grid_lyr.getFeatures()}
+    net_rows = []
+    for row in rows:
+        hid = row["hex_id"]
+        deltas = [row[f"delta_{cat}"] for cat in CATEGORIES if row[f"delta_{cat}"] is not None]
+        net_delta = sum(deltas) if deltas else None
+        feat = QgsFeature(mem.fields())
+        feat.setGeometry(geoms[hid])
+        feat["hex_id"] = hid
+        feat["pop_total"] = row["pop_total"]
+        feat["net_delta"] = net_delta
+        feat["net_delta_n"] = len(deltas)
+        mem.dataProvider().addFeature(feat)
+        net_rows.append({"hex_id": hid, "pop_total": row["pop_total"],
+                          "net_delta": net_delta, "net_delta_n": len(deltas)})
+
+    opts = QgsVectorFileWriter.SaveVectorOptions()
+    opts.driverName = "GPKG"
+    opts.layerName = "hex_net_opportunities"
+    opts.actionOnExistingFile = QgsVectorFileWriter.CreateOrOverwriteLayer
+    err = QgsVectorFileWriter.writeAsVectorFormatV3(mem, str(gpkg), mem.transformContext(), opts)
+    if err[0] != QgsVectorFileWriter.NoError:
+        raise RuntimeError(f"Failed to write hex_net_opportunities: {err}")
+    print(f"[ok] wrote layer hex_net_opportunities ({len(net_rows)} hexagons) to {gpkg}")
+    return net_rows
+
+
+def write_net_summary(net_rows, out_suffix=""):
+    OUT.mkdir(exist_ok=True)
+    weighted_sum, weight_sum, n, zero_n = 0.0, 0.0, 0, 0
+    for row in net_rows:
+        if row["net_delta"] is None:
+            continue
+        weighted_sum += row["pop_total"] * row["net_delta"]
+        weight_sum += row["pop_total"]
+        n += 1
+        if row["net_delta"] == 0:
+            zero_n += 1
+    mean = (weighted_sum / weight_sum) if weight_sum else None
+    print(f"[summary] net_delta (sum over comparable categories): pop-weighted mean = "
+          f"{mean:.3f} ({n}/{len(net_rows)} hexagons had >=1 comparable category, "
+          f"{zero_n} netted exactly 0)")
+    out_csv = OUT / f"city_net_summary{out_suffix}.csv"
+    with open(out_csv, "w", newline="", encoding="utf-8") as fh:
+        w = csv.writer(fh)
+        w.writerow(["mean_net_delta_pop_weighted", "hexagons_with_value", "hexagons_net_zero"])
+        w.writerow([mean, n, zero_n])
+    print(f"[ok] wrote {out_csv}")
+
+
 def write_city_summary(rows, out_suffix=""):
     OUT.mkdir(exist_ok=True)
     summary = {}
@@ -148,6 +222,8 @@ def main(gpkg=GPKG, out_suffix=""):
     pop, hex_grid_lyr = load_pop(gpkg)
     rows = write_hex_delay(hex_grid_lyr, pop, static, realized, gpkg)
     write_city_summary(rows, out_suffix)
+    net_rows = write_hex_net_opportunities(hex_grid_lyr, rows, gpkg)
+    write_net_summary(net_rows, out_suffix)
     print("[done] compute_delay.py finished.")
 
 

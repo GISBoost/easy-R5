@@ -192,11 +192,70 @@ Sanity check (Field Calculator → statystyki albo *Properties → Fields* na `d
 z filtrem `base0_school = 0`): rozkład nie może być samymi zerami/NULL-ami. U nas:
 3867/5662 heksagonów porównywalnych, średnia ważona populacją −0,131.
 
-## Krok 8 — styl i zapis
+## Krok 8 — warstwa "hero": `hex_net_opportunities`
 
-*Properties → Symbology → Graduated*: pole `delta_<kategoria>`, ramp *RdBu*, 7 klas.
-Powtórz osobno dla każdej z 4 kategorii (jedna warstwa, zmieniasz tylko pole w
-symbologii — nie potrzeba czterech kopii warstwy). Zapisz projekt.
+Jedna liczba na heksagon — suma `delta_<kategoria>` po tych kategoriach, które akurat
+były porównywalne (kategorię z `base0=1` pomijamy, nie zerujemy — inaczej jeden brak
+bazy zafałszowałby sumę).
+
+1. **Field Calculator** na `hex_delay`, nowe pole `net_delta` (Double):
+   ```
+   CASE
+     WHEN "delta_school" IS NULL AND "delta_pharmacy" IS NULL
+          AND "delta_university" IS NULL AND "delta_mall" IS NULL
+     THEN NULL
+     ELSE coalesce("delta_school", 0) + coalesce("delta_pharmacy", 0)
+          + coalesce("delta_university", 0) + coalesce("delta_mall", 0)
+   END
+   ```
+2. Nowe pole `net_delta_n` (Integer) — ile z 4 kategorii weszło do sumy (sprawdź to
+   pole, zanim uwierzysz skrajnej wartości `net_delta` — mogła ją wygenerować jedna
+   kategoria, nie cztery):
+   ```
+   (CASE WHEN "delta_school" IS NOT NULL THEN 1 ELSE 0 END)
+   + (CASE WHEN "delta_pharmacy" IS NOT NULL THEN 1 ELSE 0 END)
+   + (CASE WHEN "delta_university" IS NOT NULL THEN 1 ELSE 0 END)
+   + (CASE WHEN "delta_mall" IS NOT NULL THEN 1 ELSE 0 END)
+   ```
+3. **Retain fields**: `hex_id`, `pop_total`, `net_delta`, `net_delta_n` →
+   `hex_net_opportunities`.
+
+## Krok 9 — legenda: ręczne, wyśrodkowane na zerze klasy (nie automatyczne)
+
+**Nie używaj automatycznego "Equal Interval" ani "Quantile"** — `delta` to mała liczba
+całkowita z realnym, znaczącym zerem, a rozkład jest mocno wyzerowany z długim ogonem
+(np. `delta_school` przy 250 m: 2361/3867 porównywalnych heksagonów to dokładnie 0, ale
+zakres sięga od -14 do +10). Automatyczna klasyfikacja wrzuci np. `[-2, +2]` do jednego
+przedziału — "brak zmiany" i "strata 2 punktów" wyjdą tym samym kolorem, czyli dokładnie
+tą niejednoznacznością, o którą pytałeś.
+
+*Properties → Symbology → Graduated*, pole `delta_<kategoria>` (albo `net_delta` na
+`hex_net_opportunities`), dowolna metoda tylko po to, żeby dostać 7 wierszy — potem
+**podwójny klik na każdy zakres**, żeby wpisać ręcznie dokładne granice i kolor:
+
+| klasa | `delta_<kategoria>` | `net_delta` | kolor (ColorBrewer RdBu-7) |
+|---|---|---|---|
+| 1 | ≤ -4 | ≤ -6 | `#b2182b` ciemna czerwień |
+| 2 | -3 .. -2 | -5 .. -2 | `#d6604d` czerwień |
+| 3 | -1 | -1 | `#f4a582` blady czerwony |
+| 4 | **0 (brak zmiany)** | **0 (brak zmiany)** | `#f7f7f7` blady szary — celowo *obecny*, nie pusty |
+| 5 | +1 | +1 | `#92c5de` blady niebieski |
+| 6 | +2 .. +3 | +2 .. +5 | `#4393c3` niebieski |
+| 7 | ≥ +4 | ≥ +6 | `#2166ac` ciemny niebieski |
+
+Granice wpisuj na wartościach `.5` (np. `-3.5`, nie `-4` albo `-3`), żeby żadna liczba
+całkowita nie trafiła dokładnie na granicę klasy — bez tego QGIS może przypisać ją do
+niewłaściwego przedziału.
+
+Heksagony z `NULL` (brak bazy — `base0_<kategoria>=1`, albo wszystkie 4 kategorie NULL
+dla `net_delta`) **nie pasują do żadnej klasy i renderer nie rysuje dla nich żadnego
+symbolu** — są całkowicie przezroczyste, wizualnie odróżnione od klasy "0", która ma
+widoczne (choć blade) wypełnienie. To jest zamierzone: "nie dotyczy" vs "sprawdzone, bez
+zmian" to dwie różne rzeczy, obie różne od "mała realna zmiana" (blady czerwony/niebieski).
+
+Powtórz dla każdej z 4 kategorii (jedna warstwa `hex_delay`, zmieniasz tylko pole w
+symbologii — nie potrzeba czterech kopii warstwy) i dla `net_delta` na
+`hex_net_opportunities`. Zapisz projekt.
 
 To jest dokładnie ta sama analiza i te same liczby co w skryptowej wersji (`README.md`)
 — tylko krok po kroku w GUI, bez Pythona i bez MCP.

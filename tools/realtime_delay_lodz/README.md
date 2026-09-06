@@ -33,6 +33,69 @@ outskirts, which is mostly all-zero for schools/pharmacies/universities/malls at
 min cutoff. `delta_<category>` is `NULL` wherever the static count was 0, and
 `base0_<category>` (1/0) flags those hexagons explicitly in the layer.
 
+## Legend: manual, zero-isolated classes — not automatic equal-interval/quantile
+
+`delta` is a small integer with a genuinely meaningful zero, and the distribution is
+heavily zero-inflated with a long thin tail — e.g. 250 m `delta_school`: 2361 of 3867
+comparable hexagons are exactly 0, but the range runs out to -14 and +10. QGIS's
+automatic classifiers (equal interval, quantile) don't know that 0 is special, so a
+"7 classes, equal interval" scheme puts a wide band like **[-2, +2] in one bucket** —
+"no change" and "lost 2 opportunities" get painted the same colour, exactly the
+ambiguity that prompted this section. **The fix is a manual classification that gives 0
+its own singleton class**, built in `style_delay_layers.py` as an explicit
+`QgsGraduatedSymbolRenderer` (the `mcp__qgis__set_layer_style` tool only offers
+automatic classing, so this one needs a few lines of `QgsRendererRange` instead — same
+pattern as the earlier `QgsVectorLayerJoinInfo` workaround in `modal_complementarity_lodz`):
+
+| class | `delta_<category>` | `net_delta` | colour (ColorBrewer RdBu-7) |
+|---|---|---|---|
+| 1 | ≤ -4 | ≤ -6 | `#b2182b` dark red |
+| 2 | -3 .. -2 | -5 .. -2 | `#d6604d` red |
+| 3 | -1 | -1 | `#f4a582` pale red |
+| 4 | **0 (no change)** | **0 (no change)** | `#f7f7f7` pale grey — deliberately *present*, not blank |
+| 5 | +1 | +1 | `#92c5de` pale blue |
+| 6 | +2 .. +3 | +2 .. +5 | `#4393c3` blue |
+| 7 | ≥ +4 | ≥ +6 | `#2166ac` dark blue |
+
+Two different things now look different, on purpose:
+- **NULL** (`base0_<category>=1`, no baseline to compare) gets **no symbol at all** —
+  fully transparent, verified directly (`renderer.symbolForFeature()` on 500 known-NULL
+  features all returned `None`). This reads as "not applicable here."
+- **Exactly 0** gets the pale grey `#f7f7f7` fill *with* a thin outline — present,
+  comparable data that happens to show no change. This reads as "checked, no change" —
+  visually distinct from both "not applicable" (blank) and "small real change" (light
+  red/blue), which was the actual ask: stop hiding a real ±1 or ±2 inside the same bucket
+  as "nothing happened."
+- Class edges are placed at half-integers (e.g. `-3.5`, not `-4` or `-3`) so an integer
+  delta can never land exactly on a boundary — no off-by-one ambiguity.
+
+`styles/hex_delay-delta_school-base.qml` and `styles/hex_net_opportunities-base.qml` are
+saved as editable starting points — swap the classified field in Symbology to reuse the
+same 7 classes/colours for `delta_pharmacy`/`delta_university`/`delta_mall`.
+
+## Hero layer: `hex_net_opportunities` — one number, gains vs. losses
+
+A single map answering "here you lose this many opportunities, here you gain that many"
+needs one number per hexagon, not four separate category layers. `hex_net_opportunities`
+(written by `compute_delay.py` into the same gpkg) has just `hex_id`, `pop_total`,
+`net_delta`, `net_delta_n`:
+
+- `net_delta` = **sum of `delta_<category>` over whichever categories are comparable**
+  for that hexagon (categories with a zero static baseline are skipped, not zeroed —
+  same principle as `base0` above, just summed across categories instead of applied to
+  one). `NULL` only when *none* of the 4 categories had a baseline there.
+- `net_delta_n` (0-4) records **how many** categories went into the sum, so a hexagon
+  comparable on all 4 categories isn't visually equated with one comparable on only 1 —
+  check this field before reading too much into an extreme `net_delta` from a single
+  category swamping the sum.
+- Styled with the same manual, zero-isolated approach as above, wider bins (`net_delta`
+  ranges roughly ±35 vs. ±19 for a single category) — see the table above.
+
+Real numbers (2026-08-21): 250 m — pop-weighted mean net_delta **-0.311**
+(4177/5662 hexagons had ≥1 comparable category, 2075 netted exactly 0); 500 m —
+**+0.118** (1076/1479, 537 netted exactly 0). The sign flip matches the per-category one
+below (250 m vs 500 m) — `net_delta` inherits it since it's a sum of the same numbers.
+
 ## Data reused from prior sessions (nothing new downloaded)
 
 | Input | Source |
@@ -87,9 +150,13 @@ compute_delay.main(gpkg=compute_delay.HERE / "delay_lodz_500m.gpkg", out_suffix=
    `.params.json` sidecar per case, same pattern as `../modal_complementarity_lodz/run_modal_cases.py`.
 3. **`compute_delay.py`** — `delta_<category> = acc_realized - acc_static` per hexagon
    (`NULL` where the static count was 0 — see above), writes layer `hex_delay`
-   (`hex_id`, `pop_total`, 4× `delta_<category>` + `base0_<category>`) into the same
-   gpkg, plus `out/city_delay_summary.csv` / `_500m.csv` (population-weighted mean delta
-   per category, computed only over non-`base0` hexagons, plus how many were excluded).
+   (`hex_id`, `pop_total`, 4× `delta_<category>` + `base0_<category>`) plus the
+   single-number hero layer `hex_net_opportunities` (see below) into the same gpkg,
+   plus `out/city_delay_summary.csv` / `_500m.csv` and `out/city_net_summary.csv` /
+   `_500m.csv` (population-weighted means, computed only over comparable hexagons).
+4. **`style_delay_layers.py`** — not part of the data pipeline, applies the manual
+   zero-isolated classification (see "Legend" below) to a `delta_<category>` or
+   `net_delta` layer already loaded in the project.
 
 ## Real numbers from the verified run (2026-08-21)
 
@@ -148,3 +215,10 @@ sign and in the same order of magnitude across resolutions.
 - If a category's `delta` distribution looks suspicious (all zero, all NULL, an absurd
   magnitude), that is very likely a parameter or data problem, not a real result — say so
   before trusting it.
+
+## Next (not started): a static hero image, then a web version
+
+Once a static hero image (most likely from `hex_net_opportunities`) is finalised, the
+plan is to publish an interactive version on the `mapy-analizy` site (where Michał's
+other interactive analyses live) — deliberately **not started yet**, per Michał: finish
+the static version first, figure out the web version as a separate step afterwards.
