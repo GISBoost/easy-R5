@@ -1,11 +1,19 @@
-"""Export hex_delay + hex_net_opportunities (both resolutions) to GeoJSON for
-the interactive web version at mapy-analizy/opoznienia-dostepnosc.
+"""Export hex_delay + hex_net_opportunities (both resolutions), plus the
+boundary and siatka reference layers, to GeoJSON for the interactive web
+version at mapy-analizy/opoznienia-dostepnosc.
 
 Reads delay_lodz.gpkg / delay_lodz_500m.gpkg (produced by prepare_data.py +
-run_accessibility.py + compute_delay.py), writes into the SIBLING mapy-analizy
-repo's data/ folder -- a manual, occasional re-export, same pattern as
-uczelnie-dostepnosc's README ("Odswiezenie danych = ponowne uruchomienie
-pipeline'u ... i re-eksport do data/, na razie recznie").
+run_accessibility.py + compute_delay.py; boundary/siatka added directly via
+the QGIS provider API while preparing Michal's print atlas -- see git log),
+writes into the SIBLING mapy-analizy repo's data/ folder -- a manual,
+occasional re-export, same pattern as uczelnie-dostepnosc's README
+("Odswiezenie danych = ponowne uruchomienie pipeline'u ... i re-eksport do
+data/, na razie recznie").
+
+Writes: hex_250.geojson, hex_500.geojson (the choropleth data), siatka_250.geojson,
+siatka_500.geojson (hex_id + geometry only, outline-reference grid -- includes
+hexagons the data layer filters out as null), boundary.geojson (city outline,
+resolution-independent), manifest.json.
 
 Must run inside the QGIS Python environment, e.g. mcp__qgis__execute_code.
 """
@@ -86,30 +94,51 @@ def export_resolution(res_key: str, gpkg: Path):
     reprojected = processing.run("native:reprojectlayer", {
         "INPUT": merged, "TARGET_CRS": "EPSG:4326", "OUTPUT": QgsProcessing.TEMPORARY_OUTPUT,
     })["OUTPUT"]
+    _write_geojson(reprojected, MAPY_DATA / f"hex_{res_key}.geojson")
+    return reprojected.featureCount()
 
-    out_path = MAPY_DATA / f"hex_{res_key}.geojson"
+
+def _write_geojson(layer, out_path: Path):
     opts = QgsVectorFileWriter.SaveVectorOptions()
     opts.driverName = "GeoJSON"
     opts.layerOptions = ["COORDINATE_PRECISION=6"]
     opts.actionOnExistingFile = QgsVectorFileWriter.CreateOrOverwriteFile
-    err = QgsVectorFileWriter.writeAsVectorFormatV3(
-        reprojected, str(out_path), reprojected.transformContext(), opts)
+    err = QgsVectorFileWriter.writeAsVectorFormatV3(layer, str(out_path), layer.transformContext(), opts)
     if err[0] != QgsVectorFileWriter.NoError:
         raise RuntimeError(f"Failed to write {out_path}: {err}")
-
     size_kb = out_path.stat().st_size / 1024
-    print(f"[ok] {out_path.name}: {reprojected.featureCount()} features, {size_kb:.0f} KB")
-    return reprojected.featureCount()
+    print(f"[ok] {out_path.name}: {layer.featureCount()} features, {size_kb:.0f} KB")
 
 
-def export_manifest(boundary_gpkg: Path, feature_counts: dict):
-    boundary = QgsVectorLayer(f"{boundary_gpkg}|layername=boundary", "boundary", "ogr")
+def export_boundary(gpkg: Path):
+    """City outline -- same real-world polygon regardless of hex resolution,
+    exported once from the 250 m gpkg (see prepare_data.py -- it's copied
+    identically into both)."""
+    boundary = QgsVectorLayer(f"{gpkg}|layername=boundary", "boundary", "ogr")
     if not boundary.isValid():
-        raise RuntimeError(f"Could not load boundary from {boundary_gpkg}")
+        raise RuntimeError(f"Could not load boundary from {gpkg}")
     reprojected = processing.run("native:reprojectlayer", {
         "INPUT": boundary, "TARGET_CRS": "EPSG:4326", "OUTPUT": QgsProcessing.TEMPORARY_OUTPUT,
     })["OUTPUT"]
-    ext = reprojected.extent()
+    _write_geojson(reprojected, MAPY_DATA / "boundary.geojson")
+    return reprojected
+
+
+def export_siatka(res_key: str, gpkg: Path):
+    """Outline-only hex grid reference, geometry only -- includes hexagons
+    filtered out of hex_<res>.geojson (null delta/net_delta), unlike the data
+    layer, so the full grid extent stays visible as a graticule."""
+    siatka = QgsVectorLayer(f"{gpkg}|layername=siatka", "siatka", "ogr")
+    if not siatka.isValid():
+        raise RuntimeError(f"Could not load siatka from {gpkg}")
+    reprojected = processing.run("native:reprojectlayer", {
+        "INPUT": siatka, "TARGET_CRS": "EPSG:4326", "OUTPUT": QgsProcessing.TEMPORARY_OUTPUT,
+    })["OUTPUT"]
+    _write_geojson(reprojected, MAPY_DATA / f"siatka_{res_key}.geojson")
+
+
+def export_manifest(boundary_layer, feature_counts: dict):
+    ext = boundary_layer.extent()
     bounds = [[ext.yMinimum(), ext.xMinimum()], [ext.yMaximum(), ext.xMaximum()]]
 
     manifest = {
@@ -139,7 +168,9 @@ def main():
         if not gpkg.exists():
             raise RuntimeError(f"{gpkg} missing -- run the local pipeline first.")
         feature_counts[res_key] = export_resolution(res_key, gpkg)
-    export_manifest(RESOLUTIONS["250"], feature_counts)
+        export_siatka(res_key, gpkg)
+    boundary_layer = export_boundary(RESOLUTIONS["250"])
+    export_manifest(boundary_layer, feature_counts)
     print("[done] export_geojson.py finished.")
 
 

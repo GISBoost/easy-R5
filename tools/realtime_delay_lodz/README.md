@@ -226,9 +226,16 @@ sign and in the same order of magnitude across resolutions.
   magnitude), that is very likely a parameter or data problem, not a real result — say so
   before trusting it.
 
-## Next (not started): a static hero image, then a web version
+## Web version: `mapy-analizy/opoznienia-dostepnosc`
 
-Once a static hero image (most likely from `hex_net_opportunities`) is finalised, the
-plan is to publish an interactive version on the `mapy-analizy` site (where Michał's
-other interactive analyses live) — deliberately **not started yet**, per Michał: finish
-the static version first, figure out the web version as a separate step afterwards.
+`export_geojson.py` re-projects `hex_delay` + `hex_net_opportunities` (both resolutions) to
+EPSG:4326 and writes them straight into the sibling `mapy-analizy` repo's
+`opoznienia-dostepnosc/data/` — same manual re-export pattern as that repo's other analyses.
+It also exports two reference overlays used only on the web page, not in the metric itself:
+`boundary.geojson` (the dissolved city outline, resolution-independent) and
+`siatka_<res>.geojson` (hex_id + geometry only, no attributes) — an outline-only grid that
+stays visible even over hexagons the choropleth filters out as null, mirroring the
+`boundary`/`siatka` layers added directly to `delay_lodz.gpkg` / `delay_lodz_500m.gpkg` for
+Michał's own print atlas. See `mapy-analizy/opoznienia-dostepnosc/README.md` for the page
+itself; re-run `export_geojson.py` and refresh that repo's `data/` whenever the local pipeline
+output changes (manual, no CI).
