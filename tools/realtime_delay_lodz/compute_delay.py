@@ -15,6 +15,10 @@ set to NULL (not 0) wherever the static count was 0, and base0_<category>
 styled/filtered separately in QGIS. City summary stats are computed only over
 non-NULL deltas.
 
+main(gpkg, out_suffix) is parametrized the same way as run_accessibility.py, so a
+different hex resolution's results (e.g. delay_lodz_500m.gpkg /
+out/accessibility_*_500m.gpkg) can be reduced without overwriting the default outputs.
+
 Must run inside the QGIS Python environment. Run prepare_data.py and
 run_accessibility.py first.
 """
@@ -38,8 +42,8 @@ CATEGORIES = ("school", "pharmacy", "university", "mall")
 ACC_FIELD = "acc_srv_{}_p50_c30"
 
 
-def load_acc(case_id):
-    path = OUT / f"accessibility_{case_id}.gpkg"
+def load_acc(case_id, out_suffix=""):
+    path = OUT / f"accessibility_{case_id}{out_suffix}.gpkg"
     lyr = QgsVectorLayer(str(path), case_id, "ogr")
     if not lyr.isValid():
         raise RuntimeError(f"Could not load {path} -- did run_accessibility.py run?")
@@ -49,14 +53,14 @@ def load_acc(case_id):
     return out
 
 
-def load_pop():
-    lyr = QgsVectorLayer(f"{GPKG}|layername=hex_grid", "hex_grid", "ogr")
+def load_pop(gpkg):
+    lyr = QgsVectorLayer(f"{gpkg}|layername=hex_grid", "hex_grid", "ogr")
     if not lyr.isValid():
-        raise RuntimeError(f"Could not load hex_grid from {GPKG}")
+        raise RuntimeError(f"Could not load hex_grid from {gpkg}")
     return {f["hex_id"]: (f["pop_total"] or 0.0) for f in lyr.getFeatures()}, lyr
 
 
-def write_hex_delay(hex_grid_lyr, pop, static, realized):
+def write_hex_delay(hex_grid_lyr, pop, static, realized, gpkg):
     hex_ids = sorted(pop)
     missing = [h for h in hex_ids if h not in static or h not in realized]
     if missing:
@@ -93,19 +97,19 @@ def write_hex_delay(hex_grid_lyr, pop, static, realized):
         mem.dataProvider().addFeature(feat)
         rows_for_csv.append(row)
 
-    if GPKG.exists():
+    if gpkg.exists():
         opts = QgsVectorFileWriter.SaveVectorOptions()
         opts.driverName = "GPKG"
         opts.layerName = "hex_delay"
         opts.actionOnExistingFile = QgsVectorFileWriter.CreateOrOverwriteLayer
-        err = QgsVectorFileWriter.writeAsVectorFormatV3(mem, str(GPKG), mem.transformContext(), opts)
+        err = QgsVectorFileWriter.writeAsVectorFormatV3(mem, str(gpkg), mem.transformContext(), opts)
         if err[0] != QgsVectorFileWriter.NoError:
             raise RuntimeError(f"Failed to write hex_delay: {err}")
-    print(f"[ok] wrote layer hex_delay ({len(hex_ids)} hexagons) to {GPKG}")
+    print(f"[ok] wrote layer hex_delay ({len(hex_ids)} hexagons) to {gpkg}")
     return rows_for_csv
 
 
-def write_city_summary(rows):
+def write_city_summary(rows, out_suffix=""):
     OUT.mkdir(exist_ok=True)
     summary = {}
     for cat in CATEGORIES:
@@ -129,7 +133,7 @@ def write_city_summary(rows):
               f"({n}/{len(rows)} hexagons comparable, {base0_n} excluded -- "
               "static already reached 0 points of this category)")
 
-    out_csv = OUT / "city_delay_summary.csv"
+    out_csv = OUT / f"city_delay_summary{out_suffix}.csv"
     with open(out_csv, "w", newline="", encoding="utf-8") as fh:
         w = csv.writer(fh)
         w.writerow(["category", "mean_delta_pop_weighted", "hexagons_with_value", "hexagons_zero_baseline"])
@@ -138,12 +142,12 @@ def write_city_summary(rows):
     print(f"[ok] wrote {out_csv}")
 
 
-def main():
-    static = load_acc("static")
-    realized = load_acc("realized_p50")
-    pop, hex_grid_lyr = load_pop()
-    rows = write_hex_delay(hex_grid_lyr, pop, static, realized)
-    write_city_summary(rows)
+def main(gpkg=GPKG, out_suffix=""):
+    static = load_acc("static", out_suffix)
+    realized = load_acc("realized_p50", out_suffix)
+    pop, hex_grid_lyr = load_pop(gpkg)
+    rows = write_hex_delay(hex_grid_lyr, pop, static, realized, gpkg)
+    write_city_summary(rows, out_suffix)
     print("[done] compute_delay.py finished.")
 
 

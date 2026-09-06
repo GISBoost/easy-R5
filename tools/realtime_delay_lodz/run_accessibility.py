@@ -4,6 +4,12 @@ P50 network, same origins/destinations/date/window. Resumable via a
 what we'd run again -- same pattern as modal_complementarity_lodz's
 run_modal_cases.py).
 
+main(gpkg, out_suffix) is parametrized so the same two runs can be repeated
+against a different-resolution gpkg (e.g. prepare_data.py's
+delay_lodz_500m.gpkg) without overwriting the default outputs -- e.g.
+main(gpkg=HERE / "delay_lodz_500m.gpkg", out_suffix="_500m"). The two R5
+networks are hex-size independent and are always reused as-is.
+
 Must run inside the QGIS Python environment. Run prepare_data.py first.
 """
 
@@ -42,7 +48,7 @@ def _network_dat(cache_dir: Path) -> str:
     return str(dat)
 
 
-def case_params(case_id, network_dat, origins, destinations):
+def case_params(case_id, network_dat, origins, destinations, out_suffix=""):
     return {
         "NETWORK": network_dat,
         "ORIGINS": origins,
@@ -56,42 +62,42 @@ def case_params(case_id, network_dat, origins, destinations):
         # DECAY=STEP, MAX_WALK_TIME=blank -- all the algorithm's own defaults,
         # matching exactly what this analysis needs (07:00-09:00 window, step
         # count of reachable POI within the cutoff).
-        "OUTPUT_CSV": str(OUT / f"accessibility_{case_id}.csv"),
-        "OUTPUT_LAYER": str(OUT / f"accessibility_{case_id}.gpkg"),
+        "OUTPUT_CSV": str(OUT / f"accessibility_{case_id}{out_suffix}.csv"),
+        "OUTPUT_LAYER": str(OUT / f"accessibility_{case_id}{out_suffix}.gpkg"),
     }
 
 
-def already_done(case_id, params) -> bool:
-    sidecar = OUT / f"accessibility_{case_id}.params.json"
+def already_done(case_id, params, out_suffix="") -> bool:
+    sidecar = OUT / f"accessibility_{case_id}{out_suffix}.params.json"
     csv_path = Path(params["OUTPUT_CSV"])
     if not (sidecar.exists() and csv_path.exists()):
         return False
     return json.loads(sidecar.read_text(encoding="utf-8")) == params
 
 
-def run_case(case_id, cache_dir):
+def run_case(case_id, cache_dir, gpkg, out_suffix=""):
     OUT.mkdir(exist_ok=True)
     network_dat = _network_dat(cache_dir)
-    origins = f"{GPKG}|layername=hex_centroids"
-    destinations = f"{GPKG}|layername=poi_targets"
-    params = case_params(case_id, network_dat, origins, destinations)
+    origins = f"{gpkg}|layername=hex_centroids"
+    destinations = f"{gpkg}|layername=poi_targets"
+    params = case_params(case_id, network_dat, origins, destinations, out_suffix)
 
-    if already_done(case_id, params):
-        print(f"[skip] {case_id}: already done with identical params.")
+    if already_done(case_id, params, out_suffix):
+        print(f"[skip] {case_id}{out_suffix}: already done with identical params.")
         return
 
-    print(f"[run] {case_id}: {params}")
+    print(f"[run] {case_id}{out_suffix}: {params}")
     processing.run("easyr5:runaccessibility", params)
-    sidecar = OUT / f"accessibility_{case_id}.params.json"
+    sidecar = OUT / f"accessibility_{case_id}{out_suffix}.params.json"
     sidecar.write_text(json.dumps(params, indent=2), encoding="utf-8")
-    print(f"[ok] {case_id} done -> {params['OUTPUT_CSV']}")
+    print(f"[ok] {case_id}{out_suffix} done -> {params['OUTPUT_CSV']}")
 
 
-def main():
-    if not GPKG.exists():
-        raise RuntimeError(f"{GPKG} missing -- run prepare_data.py first.")
+def main(gpkg=GPKG, out_suffix=""):
+    if not gpkg.exists():
+        raise RuntimeError(f"{gpkg} missing -- run prepare_data.py first.")
     for case_id, cache_dir in CASES.items():
-        run_case(case_id, cache_dir)
+        run_case(case_id, cache_dir, gpkg, out_suffix)
     print("[done] run_accessibility.py finished.")
 
 

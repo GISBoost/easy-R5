@@ -22,8 +22,14 @@ Reads (read-only, from prior sessions' downloads -- never modified):
 
 Writes (all gitignored):
   gtfs_static/, gtfs_realized_p50/ -- copied GTFS zips, one variant per folder
-  network_static/, network_realized_p50/ -- R5 network caches
-  delay_lodz.gpkg -- layers hex_grid, hex_centroids, poi_targets
+  network_static/, network_realized_p50/ -- R5 network caches (hex-size independent,
+    shared across every call to main() regardless of hex_spacing_m)
+  <out_gpkg> (default delay_lodz.gpkg) -- layers hex_grid, hex_centroids, poi_targets
+
+main(hex_spacing_m, out_gpkg) is parametrized so the same pipeline can be run at a
+different hex resolution into a separate file -- e.g.
+main(hex_spacing_m=500, out_gpkg=HERE / "delay_lodz_500m.gpkg") -- without touching
+the network caches or duplicating code.
 """
 
 from __future__ import annotations
@@ -125,7 +131,7 @@ def build_networks():
     return static, realized
 
 
-def build_boundary_and_grid():
+def build_boundary_and_grid(spacing_m=HEX_SPACING_M):
     obwody = QgsVectorLayer(f"{SES / 'lodz.gpkg'}|layername=obwody_spisowe", "obwody_spisowe", "ogr")
     if not obwody.isValid():
         raise RuntimeError("Could not load obwody_spisowe from ses_income_lodz/lodz.gpkg")
@@ -140,7 +146,7 @@ def build_boundary_and_grid():
     grid = _run("native:creategrid", {
         "TYPE": 4,  # Hexagon (Polygon)
         "EXTENT": boundary.extent(),
-        "HSPACING": HEX_SPACING_M, "VSPACING": HEX_SPACING_M,
+        "HSPACING": spacing_m, "VSPACING": spacing_m,
         "HOVERLAY": 0, "VOVERLAY": 0,
         "CRS": obwody.crs(),
         "OUTPUT": QgsProcessing.TEMPORARY_OUTPUT,
@@ -159,7 +165,7 @@ def build_boundary_and_grid():
     hex_grid_bare = _run("native:retainfields", {
         "INPUT": with_id, "FIELDS": ["hex_id"], "OUTPUT": QgsProcessing.TEMPORARY_OUTPUT,
     })
-    print(f"[ok] hex_grid_bare (hexagon, {HEX_SPACING_M} m): {hex_grid_bare.featureCount()} features")
+    print(f"[ok] hex_grid_bare (hexagon, {spacing_m} m): {hex_grid_bare.featureCount()} features")
     return obwody, hex_grid_bare
 
 
@@ -291,9 +297,9 @@ def build_poi_layer():
     return mem
 
 
-def write_gpkg(hex_grid, hex_centroids, poi_targets):
-    if OUT_GPKG.exists():
-        OUT_GPKG.unlink()
+def write_gpkg(hex_grid, hex_centroids, poi_targets, out_gpkg=OUT_GPKG):
+    if out_gpkg.exists():
+        out_gpkg.unlink()
     layers = [
         ("hex_grid", hex_grid),
         ("hex_centroids", hex_centroids),
@@ -308,21 +314,21 @@ def write_gpkg(hex_grid, hex_centroids, poi_targets):
             else QgsVectorFileWriter.CreateOrOverwriteLayer
         )
         err = QgsVectorFileWriter.writeAsVectorFormatV3(
-            layer, str(OUT_GPKG), layer.transformContext(), opts)
+            layer, str(out_gpkg), layer.transformContext(), opts)
         if err[0] != QgsVectorFileWriter.NoError:
             raise RuntimeError(f"Failed to write layer {name}: {err}")
-    print(f"[ok] wrote {OUT_GPKG} with layers: {[n for n, _ in layers]}")
+    print(f"[ok] wrote {out_gpkg} with layers: {[n for n, _ in layers]}")
 
 
-def main():
+def main(hex_spacing_m=HEX_SPACING_M, out_gpkg=OUT_GPKG):
     build_networks()
-    obwody, hex_grid_bare = build_boundary_and_grid()
+    obwody, hex_grid_bare = build_boundary_and_grid(hex_spacing_m)
     hex_pop = overlay_population(obwody, hex_grid_bare)
     hex_centroids = _run("native:centroids", {
         "INPUT": hex_pop, "ALL_PARTS": False, "OUTPUT": QgsProcessing.TEMPORARY_OUTPUT,
     })
     poi_targets = build_poi_layer()
-    write_gpkg(hex_pop, hex_centroids, poi_targets)
+    write_gpkg(hex_pop, hex_centroids, poi_targets, out_gpkg)
     print("[done] prepare_data.py finished.")
 
 

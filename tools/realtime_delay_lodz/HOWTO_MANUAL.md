@@ -200,3 +200,12 @@ symbologii — nie potrzeba czterech kopii warstwy). Zapisz projekt.
 
 To jest dokładnie ta sama analiza i te same liczby co w skryptowej wersji (`README.md`)
 — tylko krok po kroku w GUI, bez Pythona i bez MCP.
+
+## Inna rozdzielczość siatki (np. 500 m zamiast 250 m)
+
+Sieci R5 (Krok 1) i `poi_targets` (Krok 4) **nie zależą od rozmiaru heksagonu** — nie
+trzeba ich przebudowywać. Zmienia się tylko Krok 2 (`HSPACING = VSPACING = 500` zamiast
+`250`) i nazwy plików wyjściowych w Krokach 6-7, żeby nie nadpisać wyniku dla 250 m
+(np. `acc_static_500m.gpkg`, `hex_delay_500` jako osobna warstwa/plik). Zobacz
+`README.md`'s sekcję "250 m vs 500 m" — wynik dla szkół i aptek **zmienia znak** między
+rozdzielczościami (MAUP), więc warto mieć obie, nie tylko jedną.
