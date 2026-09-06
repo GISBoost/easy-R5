@@ -14,9 +14,10 @@ QGIS with no R, no conda and no Docker.
 Sibling project: [**easy-OTP**](https://github.com/GISBoost/easy-OTP), the same idea on
 OpenTripPlanner 1.5.
 
-<!-- Hero image slot: still open. The modal-complementarity result below was the first
-     candidate but was parked (see tools/modal_complementarity_lodz/README.md) in favour of
-     tools/realtime_delay_lodz/ — no image generated for that one yet either. -->
+![Lost opportunities — delays vs. accessibility in Łódź](tools/realtime_delay_lodz/out/boards/hero.jpg)
+
+**Current flagship result:** [`tools/realtime_delay_lodz/`](tools/realtime_delay_lodz/README.md) —
+real GTFS-RT delays vs. service reachability, static vs. realized-P50 GTFS for the same day.
 
 **Early experiment, kept as a dogfooding example (not the flagship result):** four
 `Run accessibility` passes on one network — walk / tram+walk / bus+walk / full network,
