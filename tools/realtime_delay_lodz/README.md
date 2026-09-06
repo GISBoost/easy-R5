@@ -1,5 +1,7 @@
 # realtime_delay_lodz — where GTFS-RT delays hurt reachability the most
 
+![Lost opportunities -- delays vs. accessibility in Lodz](out/boards/hero.jpg)
+
 **Question:** where in the city do real-world transit delays most degrade public-transport
 reachability? Answered by comparing accessibility computed on the *static* GTFS schedule
 against the *realized P50* schedule (the median of what vehicles actually did), for the
@@ -266,3 +268,9 @@ punish "the centre" uniformly, they punish a specific ring a bit further out —
 transfer-dependent trips are common but the network has less slack than in the very core.
 Worth digging into which routes/hexagons drive that ring before quoting it as an explanation,
 not just a measurement. Outputs: `out/charts/distance_vs_net_delta_{250,500}m.{png,csv,json}`.
+
+## Print boards
+
+Full B2 print-layout renders (hero map + two zoomed-in insets + the 4 per-category
+maps + a side chart), Polish and English, built in QGIS from `delay_lodz.qgz`:
+see [`out/boards/`](out/boards/) for both.

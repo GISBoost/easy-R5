@@ -4,5 +4,18 @@ network_static/
 network_realized_p50/
 *.gpkg
 *.qgz
-out/
 __pycache__/
+
+# out/ is mostly working data (accessibility gpkg/csv/params.json) -- not
+# versioned, per CLAUDE.md's "CSV wynikow" rule. Two exceptions carved out
+# below: the print-board renders (out/boards/) and a hand-picked few example
+# chart PNGs (out/charts/) worth showing on GitHub without regenerating them.
+out/*
+!out/boards/
+!out/charts/
+out/charts/*
+!out/charts/distance_vs_net_delta_250m.png
+!out/charts/loss_gain_profile_250m.png
+!out/charts/reach_radius_net_250m.png
+!out/charts/reach_radius_school_250m.png
+!out/charts/README.md
