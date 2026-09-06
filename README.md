@@ -14,16 +14,20 @@ QGIS with no R, no conda and no Docker.
 Sibling project: [**easy-OTP**](https://github.com/GISBoost/easy-OTP), the same idea on
 OpenTripPlanner 1.5.
 
-<!-- P1 hero image pending — tools/modal_complementarity_lodz/README.md's F4 section explains
-     why (a QGIS 3.40.5 rendering bug, not yet fixed). Drop the generated
-     docs/img/flagship-lodz-tram-share-en.png in and this block is ready. -->
+<!-- Hero image slot: still open. The modal-complementarity result below was the first
+     candidate but was parked (see tools/modal_complementarity_lodz/README.md) in favour of
+     tools/realtime_delay_lodz/ — no image generated for that one yet either. -->
 
-**How much of Łódź depends on its trams?** Four `Run accessibility` passes on one network —
-walk / tram+walk / bus+walk / full network, varying only `TRANSIT_SUBMODES` — answer it:
-27.5% of the city's 30-minute reach disappears without the tram, 21.7% without the bus, and
-13.6% exists only because of the tram↔bus transfer (317 s total routing time, real R5 7.6).
-This is a dependency measure, not a policy forecast — the model doesn't reroute buses or add
-replacement service. [How we measured this →](docs/notes/flagship-lodz-modal-results.md) ·
+**Early experiment, kept as a dogfooding example (not the flagship result):** four
+`Run accessibility` passes on one network — walk / tram+walk / bus+walk / full network,
+varying only `TRANSIT_SUBMODES` — asked how much of Łódź depends on its trams, and it
+worked end-to-end (27.5% of the city's 30-minute reach disappears without the tram, 21.7%
+without the bus, 13.6% only via the tram↔bus transfer; real R5 7.6). We moved away from
+leading with this once literature review showed "counterfactual mode removal" is a fairly
+standard method by 2025-2026 standards — current direction is
+[`tools/realtime_delay_lodz/`](tools/realtime_delay_lodz/README.md) (real GTFS-RT delays
+vs. service reachability). This one stays as a proof that `TRANSIT_SUBMODES` dogfoods
+correctly, and a candidate to revisit later. [How we measured it →](docs/notes/flagship-lodz-modal-results.md) ·
 [reproduce it →](tools/modal_complementarity_lodz/README.md)
 
 | | easy-OTP | Easy-R5 |

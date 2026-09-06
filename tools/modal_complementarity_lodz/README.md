@@ -1,4 +1,15 @@
-# tools/modal_complementarity_lodz — F2/F3/F4: the flagship modal-complementarity analysis
+# tools/modal_complementarity_lodz — F2/F3/F4: modal-complementarity experiment
+
+**Status: parked, not the flagship.** This was the first attempt at a headline result for
+Easy-R5 — end-to-end, technically correct (I1-I3 invariants pass, ρ_POI = 0.9886 vs. Gdańsk),
+and a real proof that `TRANSIT_SUBMODES` (F1) dogfoods correctly on the plugin's own
+`RunAccessibility`. But holding it up against 2025-2026 literature (`docs/notes/
+flagship-analysis-decision.md`) showed "counterfactual mode removal" is a fairly standard
+method now, not distinctive enough to lead with — so we moved on to
+[`tools/realtime_delay_lodz/`](../realtime_delay_lodz/README.md) (real GTFS-RT delays vs.
+service reachability) instead. Left in place as a working example of dogfooding the plugin's
+own algorithms for a real analysis, and as a candidate to revisit later (e.g. as a secondary
+angle once the delay analysis has a home) — not deleted, just not the thing we're leading with.
 
 **Standalone data-prep tooling**, not part of the plugin. Builds the ONE R5 network and the
 ONE origins/destinations layer set that all four accessibility runs of

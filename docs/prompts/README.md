@@ -24,12 +24,22 @@ disagree, the PRD wins and the prompt is the bug.
 
 ---
 
-## F — analiza flagowa (Łódź, komplementarność modalna)
+## F — eksperyment z komplementarnością modalną (Łódź) — **sparkowane, nie flagowe**
 
 Osobna seria, niezależna od kamieni v0.1. Implementuje
 [`../prd/PR_easy-R5_flagship-lodz-modal.md`](../prd/PR_easy-R5_flagship-lodz-modal.md) (v1: tram
 + bus, dwa tryby); uzasadnienie wyboru kierunku i lista odłożonych pomysłów są w
 [`../notes/flagship-analysis-candidates.md`](../notes/flagship-analysis-candidates.md).
+
+**Status (2026-09-06): to był pierwszy szukany kierunek na flagową analizę, nie ten
+docelowy.** F1–F5 (poniżej) zaimplementowane i zweryfikowane technicznie — dobry przykład
+dogfoodingu `TRANSIT_SUBMODES` (F1, jedyny kamień dotykający `easy_r5/`) na realnej
+analizie. Ale zderzenie z literaturą 2025-2026 (`../notes/flagship-analysis-decision.md`)
+pokazało, że "counterfactual mode removal" to już dość standardowa metoda — niewystarczająco
+odkrywcza na hero image. Przenieśliśmy się na
+[`tools/realtime_delay_lodz/`](../../tools/realtime_delay_lodz/README.md) (realne opóźnienia
+GTFS-RT vs. dostępność). Seria F zostaje jako ślad tej próby i punkt do ewentualnego powrotu
+(np. jako drugorzędny wątek), nie jako aktywny plan — nie kontynuować bez decyzji Michała.
 
 > **Kolej (ŁKA) jest sparkowana.** Audyt feedu ŁKA (`../notes/lka-gtfs-audit.md`) znalazł zły
 > statyczny feed pod kluczem `lka` i brak kompatybilnego źródła RT (tylko TripUpdates,
