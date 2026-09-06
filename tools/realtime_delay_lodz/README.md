@@ -47,6 +47,9 @@ Verified directly (zipfile inspection) before building anything: both GTFS zips 
 `trip_id` set** — the realized feed is a rewritten timetable for the same trips, not a
 different set of runs. This is the hard prerequisite for the comparison to mean anything.
 
+Want to reproduce this by hand, in the Processing Toolbox, with no Python and no MCP —
+just the plugin's own algorithms? See [`HOWTO_MANUAL.md`](HOWTO_MANUAL.md).
+
 ## Pipeline (`mcp__qgis__execute_code`, in order)
 
 1. **`prepare_data.py`** — builds `network_static/` and `network_realized_p50/` (same
