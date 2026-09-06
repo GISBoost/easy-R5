@@ -181,12 +181,20 @@ zerować.
    ```
    CASE WHEN "acc_srv_school_p50_c30" = 0 THEN 1 ELSE 0 END
    ```
-4. **Join attributes by field value** (drugi join — żeby wrócić do poligonów zamiast
+4. I nowe pole `base_<kategoria>` (Double) — **to jest odpowiedź na pytanie "jaki jest
+   bazowy dostęp do usług w zwykłym GTFS"**, po prostu kopia wartości statycznej,
+   czytelna wprost, bez rozszyfrowywania flagi:
+   ```
+   "acc_srv_school_p50_c30"
+   ```
+   (`base0_<kategoria>` to tylko "czy `base_<kategoria>` = 0?" jako flaga 0/1 — jeśli coś
+   niejasne, patrz najpierw na `base_<kategoria>`, nie na `base0_<kategoria>`.)
+5. **Join attributes by field value** (drugi join — żeby wrócić do poligonów zamiast
    punktowych origins i doczepić populację): `INPUT = hex_pop` (poligony, ma
    `pop_total`), `FIELD = hex_id`, `INPUT_2 = acc_joined`, `FIELD_2 = hex_id` →
    `hex_delay_raw`.
-5. **Retain fields**: zostaw tylko `hex_id`, `pop_total`, cztery `delta_*`, cztery
-   `base0_*` → `hex_delay`.
+6. **Retain fields**: zostaw tylko `hex_id`, `pop_total`, cztery `delta_*`, cztery
+   `base0_*`, cztery `base_*` → `hex_delay`.
 
 Sanity check (Field Calculator → statystyki albo *Properties → Fields* na `delta_school`
 z filtrem `base0_school = 0`): rozkład nie może być samymi zerami/NULL-ami. U nas:

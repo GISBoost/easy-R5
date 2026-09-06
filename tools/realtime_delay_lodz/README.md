@@ -33,6 +33,16 @@ outskirts, which is mostly all-zero for schools/pharmacies/universities/malls at
 min cutoff. `delta_<category>` is `NULL` wherever the static count was 0, and
 `base0_<category>` (1/0) flags those hexagons explicitly in the layer.
 
+**`base_<category>`** is the plain-language version of the same thing: the actual
+*baseline* — how many points of that category are reachable within 30 min under the
+regular, unmodified static GTFS schedule (i.e. exactly `acc_srv_<category>_p50_c30`
+from the static `RunAccessibility` run, copied onto `hex_delay`). `base0_<category>` is
+nothing more than "is `base_<category>` equal to 0?" as a 0/1 flag — if `base_school = 0`
+for a hexagon, there simply are no schools reachable in 30 min under the *normal*
+timetable there, delays or not, which is why `delta_school` is `NULL` rather than a
+number for that hexagon. Read `base_<category>` first if `base0_<category>` alone isn't
+clear enough.
+
 ## Legend: manual, zero-isolated classes — not automatic equal-interval/quantile
 
 `delta` is a small integer with a genuinely meaningful zero, and the distribution is

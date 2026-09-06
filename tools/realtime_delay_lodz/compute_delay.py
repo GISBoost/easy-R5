@@ -2,7 +2,10 @@
 population-weighted city summary. Reads the two RunAccessibility OUTPUT_LAYER
 gpkgs from run_accessibility.py, writes:
   - layer hex_delay in delay_lodz.gpkg: hex_id, pop_total, delta_<category>,
-    base0_<category>
+    base0_<category>, base_<category> (the actual static count -- how many
+    points of that category are reachable in 30 min under the *regular*,
+    unmodified GTFS schedule; base0_<category> is just "is base_<category>
+    zero?" as a 0/1 flag)
   - out/city_delay_summary.csv: population-weighted mean delta per category
   - layer hex_net_opportunities: hex_id, pop_total, net_delta (sum of
     delta_<category> over whichever categories were comparable for that hex),
@@ -78,6 +81,7 @@ def write_hex_delay(hex_grid_lyr, pop, static, realized, gpkg):
     for cat in CATEGORIES:
         fields.append(QgsField(f"delta_{cat}", QVariant.Double))
         fields.append(QgsField(f"base0_{cat}", QVariant.Int))
+        fields.append(QgsField(f"base_{cat}", QVariant.Double))
 
     mem = QgsVectorLayer(f"Polygon?crs={hex_grid_lyr.crs().authid() or hex_grid_lyr.crs().toWkt()}",
                           "hex_delay", "memory")
@@ -98,6 +102,7 @@ def write_hex_delay(hex_grid_lyr, pop, static, realized, gpkg):
             delta = None if (base0 or r is None) else float(r) - float(s)
             feat[f"delta_{cat}"] = delta
             feat[f"base0_{cat}"] = 1 if base0 else 0
+            feat[f"base_{cat}"] = None if s is None else float(s)
             row[f"delta_{cat}"] = delta
             row[f"base0_{cat}"] = base0
         mem.dataProvider().addFeature(feat)
