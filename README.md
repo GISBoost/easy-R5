@@ -17,19 +17,13 @@ OpenTripPlanner 1.5.
 ![Lost opportunities — delays vs. accessibility in Łódź](tools/realtime_delay_lodz/out/boards/hero.jpg)
 
 **Current flagship result:** [`tools/realtime_delay_lodz/`](tools/realtime_delay_lodz/README.md) —
-real GTFS-RT delays vs. service reachability, static vs. realized-P50 GTFS for the same day.
-
-**Early experiment, kept as a dogfooding example (not the flagship result):** four
-`Run accessibility` passes on one network — walk / tram+walk / bus+walk / full network,
-varying only `TRANSIT_SUBMODES` — asked how much of Łódź depends on its trams, and it
-worked end-to-end (27.5% of the city's 30-minute reach disappears without the tram, 21.7%
-without the bus, 13.6% only via the tram↔bus transfer; real R5 7.6). We moved away from
-leading with this once literature review showed "counterfactual mode removal" is a fairly
-standard method by 2025-2026 standards — current direction is
-[`tools/realtime_delay_lodz/`](tools/realtime_delay_lodz/README.md) (real GTFS-RT delays
-vs. service reachability). This one stays as a proof that `TRANSIT_SUBMODES` dogfoods
-correctly, and a candidate to revisit later. [How we measured it →](docs/notes/flagship-lodz-modal-results.md) ·
-[reproduce it →](tools/modal_complementarity_lodz/README.md)
+accessibility computed on Łódź's *static* GTFS schedule compared against the *realized P50*
+schedule (the median of what vehicles actually did), same day, same network otherwise. The
+board above shows the net change in reachable schools, pharmacies, universities and shopping
+malls within a 30-minute trip once those real-world delays are applied — red hexagons lose
+access, blue gain it. The two zoomed insets contrast the dense city centre, where overlapping
+routes absorb a late vehicle, against a ring roughly 2 km further out, where access depends on
+one specific transfer — miss it, and the wait is a full headway, not a few extra seconds.
 
 | | easy-OTP | Easy-R5 |
 |---|---|---|
@@ -121,6 +115,20 @@ Easy-R5 ships no hex-grid algorithm. To reproduce `gdansk_hex_origins.csv`'s lay
    (`@row_number` or a stable code) and export `id,lon,lat` after reprojecting to EPSG:4326.
 
 (See `tools/accessibility_cities/HOWTO_MANUAL.md` step 4.)
+
+## Earlier experiment: modal complementarity
+
+**Kept as a dogfooding example, not the flagship result:** four `Run accessibility` passes on
+one network — walk / tram+walk / bus+walk / full network, varying only `TRANSIT_SUBMODES` —
+asked how much of Łódź depends on its trams, and it worked end-to-end (27.5% of the city's
+30-minute reach disappears without the tram, 21.7% without the bus, 13.6% only via the
+tram↔bus transfer; real R5 7.6). We moved away from leading with this once literature review
+showed "counterfactual mode removal" is a fairly standard method by 2025-2026 standards —
+current direction is [`tools/realtime_delay_lodz/`](tools/realtime_delay_lodz/README.md) (real
+GTFS-RT delays vs. service reachability). This one stays as a proof that `TRANSIT_SUBMODES`
+dogfoods correctly, and a candidate to revisit later.
+[How we measured it →](docs/notes/flagship-lodz-modal-results.md) ·
+[reproduce it →](tools/modal_complementarity_lodz/README.md)
 
 ## Repository layout
 
