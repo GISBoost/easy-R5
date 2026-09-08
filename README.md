@@ -14,6 +14,10 @@ QGIS with no R, no conda and no Docker.
 Sibling project: [**easy-OTP**](https://github.com/GISBoost/easy-OTP), the same idea on
 OpenTripPlanner 1.5.
 
+**How it works:** [*How QGIS talks to R5*](https://gisboost.github.io/easy-R5/) — Easy-R5 runs
+the R5 jar as a child process through one small Java file, not through r5r (needs R) or r5py
+(16 pip packages).
+
 ![Lost opportunities — delays vs. accessibility in Łódź](tools/realtime_delay_lodz/out/boards/hero.jpg)
 
 **Current flagship result:** [`tools/realtime_delay_lodz/`](tools/realtime_delay_lodz/README.md) —

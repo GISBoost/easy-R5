@@ -29,5 +29,8 @@ departure-time window, computed inside QGIS with no R, no conda and no Docker.
 GPL-3.0-or-later (see `LICENSE`). R5 itself is MIT (© Conveyal LLC) and is
 downloaded at setup, not bundled.
 
+How the plugin talks to the R5 engine — a child process, not r5r or r5py:
+https://gisboost.github.io/easy-R5/
+
 Full documentation, ADRs and the validation notes:
 https://github.com/GISBoost/easy-R5
