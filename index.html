@@ -1,0 +1,603 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>Jak QGIS rozmawia z R5 — GISBoost</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Notatka architektoniczna Easy-R5: dlaczego wtyczka QGIS woła silnik R5 jako proces potomny, a nie przez r5r ani r5py.">
+<link rel="icon" href="favicon.svg">
+<link rel="alternate" hreflang="pl" href="https://gisboost.github.io/easy-R5/">
+<link rel="alternate" hreflang="en" href="https://gisboost.github.io/easy-R5/en/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="GISBoost">
+<meta property="og:title" content="Jak QGIS rozmawia z R5 | GISBoost">
+<meta property="og:description" content="Dlaczego Easy-R5 woła silnik R5 jako proces potomny, a nie przez r5r ani r5py.">
+<meta property="og:url" content="https://gisboost.github.io/easy-R5/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="brand" href="https://gisboost.github.io/">
+    <span class="mark">GISBoost</span>
+    <span class="sub">/ architektura Easy-R5</span>
+  </a>
+  <nav class="topnav">
+    <a href="#przeplyw">Przepływ</a>
+    <a href="#nazwa">Nazewnictwo</a>
+    <a href="#alternatywy">Alternatywy</a>
+    <a href="#kontrakt">Kontrakt</a>
+    <a href="#koszty">Koszty</a>
+    <a class="lang-toggle" href="en/" hreflang="en" aria-label="Switch to English">EN</a>
+    <button class="theme-toggle" id="theme" type="button" aria-label="Przełącz motyw">motyw</button>
+  </nav>
+</header>
+
+<main>
+  <section class="hero read" id="gora">
+    <p class="eyebrow">Easy-R5 · notatka architektoniczna</p>
+    <h1>Jak QGIS rozmawia z R5</h1>
+    <p class="lead">
+      R5 to biblioteka Javy — bez CLI do macierzy czasów przejazdu i bez trybu
+      serwerowego, który by je liczył. Każde istniejące wiązanie ładuje więc JVM
+      <strong>do wnętrza własnego procesu</strong> i woła klasy R5 bezpośrednio:
+      r5r przez rJava, r5py przez JPype. Easy-R5 nie może pójść tą drogą — r5r
+      wymaga R, r5py ciągnie 16 pakietów&nbsp;pip. Zamiast tego wtyczka traktuje
+      R5 jak każdy inny podproces Processing: uruchamia oficjalny jar przez
+      <strong>jeden mały plik Javy</strong>, przekazuje zadanie w&nbsp;JSON-ie
+      i czyta wynik z&nbsp;CSV oraz protokołu na&nbsp;stdout.
+    </p>
+
+    <dl class="facts">
+      <div><dt>1</dt><dd>plik <code>.java</code> — cała powierzchnia Javy w projekcie</dd></div>
+      <div><dt>0</dt><dd>pakietów <code>pip</code> w <code>easy_r5/</code></dd></div>
+      <div><dt>3</dt><dd>komendy runnera: <code>build</code> · <code>matrix</code> · <code>info</code></dd></div>
+      <div><dt>1:43</dt><dd>macierz 1389 × 956 (Gdańsk, P50) — zweryfikowane vs R5 7.6</dd></div>
+    </dl>
+  </section>
+
+  <section id="przeplyw" class="wide">
+    <div class="read" style="margin-inline:0">
+      <p class="eyebrow">Przepływ danych</p>
+      <h2>Dwa procesy, granica i kontrakt</h2>
+      <p>
+        Python przygotowuje wszystko, czego R5 nie policzy sam: reprojektuje
+        warstwy punktowe do CSV, składa <code>job.json</code>, rozwiązuje ścieżki
+        do JDK i jara, dobiera <code>-Xmx</code> do RAM-u. <code>runner.py</code>
+        uruchamia proces potomny i&nbsp;od tej chwili tylko czyta jego stdout —
+        linia <code>PROGRESS&nbsp;d/t</code> napędza pasek postępu,
+        <code>feedback.isCanceled()</code> między liniami wywołuje
+        <code>kill(pid)</code>, <code>DONE</code> kończy przebieg. Java robi
+        <strong>wyłącznie routing</strong>. Dostępność skumulowana, kontury
+        izochron, statystyka strefowa, klasyfikacja i&nbsp;style liczą się
+        z&nbsp;powrotem w&nbsp;Pythonie/QGIS.
+      </p>
+    </div>
+
+    <figure id="d1">
+      <div class="figframe">
+        <svg class="diagram" viewBox="0 0 1100 662" role="img"
+             aria-label="Diagram przepływu: proces QGIS (Python) składa job.json i przez runner.py uruchamia proces potomny JVM z jednym plikiem EasyR5Runner.java, który woła klasy com.conveyal.r5 z jara r5-v7.6-all.jar; wynik wraca przez stdout i plik CSV, granicę stanowi pipe i pliki tymczasowe.">
+          <defs>
+            <marker id="d1a" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--ink-faint)"></path>
+            </marker>
+            <marker id="d1f" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--amber)"></path>
+            </marker>
+          </defs>
+
+          <rect class="zone-py" x="24" y="30" width="1052" height="266" rx="14"></rect>
+          <text class="m" x="46" y="56" font-size="10.5" letter-spacing="1" fill="var(--blue)">PROCES 1 · INTERPRETER QGIS-A (PyQGIS)</text>
+
+          <g>
+            <rect class="node" x="48" y="88" width="188" height="52" rx="8"></rect>
+            <text class="lbl" x="142" y="110" text-anchor="middle">Processing</text>
+            <text class="sub m" x="142" y="126" text-anchor="middle">RunTravelTimeMatrix</text>
+
+            <rect class="node" x="266" y="88" width="196" height="52" rx="8"></rect>
+            <text class="lbl m" x="364" y="108" text-anchor="middle">job_spec.py</text>
+            <text class="sub" x="364" y="126" text-anchor="middle">percentyle ≤5 · tryby · daty</text>
+
+            <rect class="node" x="492" y="88" width="210" height="52" rx="8"></rect>
+            <text class="lbl m" x="597" y="108" text-anchor="middle">points.py · network_cache</text>
+            <text class="sub" x="597" y="126" text-anchor="middle">CSV 4326 · sha256 + wersja R5</text>
+
+            <line class="wire" x1="238" y1="114" x2="264" y2="114" marker-end="url(#d1a)"></line>
+            <line class="wire" x1="464" y1="114" x2="490" y2="114" marker-end="url(#d1a)"></line>
+            <line class="wire" x1="704" y1="114" x2="864" y2="150" marker-end="url(#d1a)"></line>
+          </g>
+
+          <rect class="pivot" x="872" y="70" width="182" height="200" rx="10"></rect>
+          <text class="lbl m" x="963" y="98" text-anchor="middle">runner.py</text>
+          <text class="sub" x="963" y="122" text-anchor="middle">buduje komendę</text>
+          <text class="sub" x="963" y="140" text-anchor="middle">spawn procesu</text>
+          <text class="sub" x="963" y="158" text-anchor="middle">parser stdout → postęp</text>
+          <text class="sub" x="963" y="176" text-anchor="middle">mapuje kody ERROR</text>
+          <text class="sub" x="963" y="194" text-anchor="middle">kill(pid) = anuluj</text>
+          <text class="sub" x="963" y="212" text-anchor="middle">sprząta w finally</text>
+
+          <g>
+            <rect class="node" x="492" y="216" width="210" height="50" rx="8"></rect>
+            <text class="lbl m" x="597" y="236" text-anchor="middle">matrix.py</text>
+            <text class="sub" x="597" y="253" text-anchor="middle">scala CSV z batchy</text>
+
+            <rect class="node" x="266" y="216" width="196" height="50" rx="8"></rect>
+            <text class="lbl" x="364" y="235" text-anchor="middle">warstwa QGIS</text>
+            <text class="sub" x="364" y="253" text-anchor="middle">+ pola metody: r5_version…</text>
+
+            <line class="wire" x1="870" y1="241" x2="704" y2="241" marker-end="url(#d1a)"></line>
+            <line class="wire" x1="490" y1="241" x2="464" y2="241" marker-end="url(#d1a)"></line>
+          </g>
+
+          <line class="dash" x1="24" y1="316" x2="1076" y2="316"></line>
+          <line class="dash" x1="24" y1="384" x2="1076" y2="384"></line>
+
+          <rect class="tagbox" x="432" y="302" width="236" height="28" rx="14"></rect>
+          <text class="m" x="550" y="320" text-anchor="middle" font-size="11" letter-spacing="0.08em" fill="var(--ink-muted)">GRANICA PROCESU</text>
+
+          <rect class="callout" x="44" y="338" width="640" height="40" rx="8"></rect>
+          <text class="m sub-flow" x="60" y="354">↓  java -Xmx8g -cp r5-v7.6-all.jar  EasyR5Runner.java  job.json</text>
+          <text class="m" x="60" y="370" font-size="9.5" fill="var(--ink-muted)">↑  stdout: PROGRESS · DONE · ERROR      +   matrix_000.csv</text>
+
+          <line class="flow" x1="948" y1="270" x2="948" y2="442" marker-end="url(#d1f)"></line>
+          <line class="flow" x1="978" y1="442" x2="978" y2="270" marker-end="url(#d1f)"></line>
+
+          <rect class="zone-r5" x="24" y="392" width="1052" height="248" rx="14"></rect>
+          <text class="m" x="46" y="418" font-size="10.5" letter-spacing="1" fill="var(--green)">PROCES 2 · JVM TEMURIN 21 · OSOBNY PID · WŁASNY HEAP -Xmx · OOM UBIJA TYLKO TO</text>
+
+          <rect class="node" x="866" y="446" width="188" height="66" rx="8" stroke="var(--green)"></rect>
+          <text class="lbl m" x="960" y="470" text-anchor="middle">EasyR5Runner.java</text>
+          <text class="sub" x="960" y="487" text-anchor="middle">jeden plik · JEP 330</text>
+          <text class="sub" x="960" y="503" text-anchor="middle">single-file source launcher</text>
+
+          <rect class="node" x="700" y="444" width="96" height="24" rx="12"></rect>
+          <text class="m" x="748" y="460" text-anchor="middle" font-size="11">build</text>
+          <rect class="node" x="700" y="474" width="96" height="24" rx="12" stroke="var(--amber)"></rect>
+          <text class="m" x="748" y="490" text-anchor="middle" font-size="11" fill="var(--amber-ink)">matrix</text>
+          <rect class="node" x="700" y="504" width="96" height="24" rx="12"></rect>
+          <text class="m" x="748" y="520" text-anchor="middle" font-size="11">info</text>
+
+          <rect class="node" x="440" y="430" width="212" height="112" rx="8" stroke="var(--green)"></rect>
+          <text class="lbl m" x="546" y="450" text-anchor="middle" fill="var(--green-ink)">com.conveyal.r5.*</text>
+          <text class="sub m" x="546" y="472" text-anchor="middle">TransportNetwork</text>
+          <text class="sub m" x="546" y="490" text-anchor="middle">RegionalTask</text>
+          <text class="sub m" x="546" y="508" text-anchor="middle">TravelTimeComputer</text>
+          <text class="sub m" x="546" y="526" text-anchor="middle">OneOriginResult</text>
+
+          <rect class="node" x="64" y="446" width="188" height="66" rx="8" stroke="var(--green)"></rect>
+          <text class="lbl m" x="158" y="470" text-anchor="middle">r5-v7.6-all.jar</text>
+          <text class="sub" x="158" y="487" text-anchor="middle">oficjalny Conveyala</text>
+          <text class="sub" x="158" y="503" text-anchor="middle" fill="var(--green-ink)">niezmodyfikowany</text>
+
+          <line class="wire" x1="864" y1="479" x2="798" y2="479" marker-end="url(#d1a)"></line>
+          <line class="wire" x1="698" y1="486" x2="654" y2="486" marker-end="url(#d1a)"></line>
+          <line class="wire" x1="438" y1="486" x2="254" y2="486" marker-end="url(#d1a)"></line>
+
+          <text class="m" x="64" y="562" font-size="9.5" fill="var(--ink-muted)">pętla po origins:  1 origin = 1 × TravelTimeComputer  ·  ~16–40 ms/origin  ·  network.dat wczytany raz (~1,2 s)</text>
+          <text class="m" x="64" y="580" font-size="9.5" fill="var(--ink-muted)">FreeFormPointSet budowany raz na proces  ·  pierwszy origin ~900 ms (linkowanie + EgressCostTable)</text>
+          <text class="m" x="64" y="602" font-size="9.5" fill="var(--green-ink)">recordAccessibility = false  →  dostępność liczy Python z macierzy (natywna ścieżka R5 tylko w Conveyal Analysis)</text>
+        </svg>
+      </div>
+      <div class="legend">
+        <span><span class="swatch" style="background:var(--blue)"></span>proces QGIS / Python</span>
+        <span><span class="swatch" style="background:var(--green)"></span>proces JVM / R5</span>
+        <span><span class="swatch" style="background:var(--amber)"></span>kontrakt: JSON → CSV + stdout</span>
+      </div>
+      <figcaption>
+        <strong>runner.py jest zawiasem.</strong> Wchodzi w niego wynik przygotowania
+        (górny tor), on uruchamia proces potomny, a po stronie Javy pojedynczy plik
+        <code>EasyR5Runner.java</code> woła klasy R5 i pisze CSV. Wynik wraca tym
+        samym korytarzem (stdout + plik) i płynie dolnym torem do warstwy QGIS.
+        Poniżej granicy nie ma ani linijki Pythona; powyżej — ani jednej JVM.
+      </figcaption>
+    </figure>
+
+    <div class="read" style="margin-inline:0">
+      <ol class="spine">
+        <li><code>job_spec.py</code> waliduje parametry (percentyle ≤&nbsp;5 rosnąco, tryby, zakres dat, wyprowadza <code>max_walk_time</code>) → <code>job.json</code> w katalogu tymczasowym.</li>
+        <li><code>points.py</code> przerzuca warstwy QGIS do <code>origins.csv</code> / <code>destinations.csv</code> w EPSG:4326, ze stabilnymi <code>id</code>.</li>
+        <li><code>network_cache.py</code> znajduje <code>network.dat</code> po kluczu <code>sha256(osm) + sha256(gtfs…) + wersja&nbsp;R5</code>; niezgodna wersja = przebudowa.</li>
+        <li><code>java_env.py</code> bierze ścieżki JDK i jara z QSettings (weryfikacja SHA-256), wykrywa RAM, dobiera <code>-Xmx = min(0,6 · RAM, 12&nbsp;GB)</code>.</li>
+        <li><code>runner.py</code> składa komendę, uruchamia proces potomny, czyta stdout linia po linii: <code>PROGRESS</code> → pasek, <code>ERROR&nbsp;&lt;kod&gt;</code> → komunikat PL/EN, <code>DONE</code> → koniec.</li>
+        <li><code>EasyR5Runner.java</code> czyta <code>job.json</code>, buduje <code>RegionalTask</code>, w&nbsp;pętli po <code>origin_range</code> woła <code>TravelTimeComputer</code>, pisze wiersze CSV, streamuje postęp.</li>
+        <li><code>matrix.py</code> scala CSV z batchy → <code>QgsVectorLayer</code> z&nbsp;kompletem pól metody (<code>r5_version</code>, <code>run_date</code>, <code>departure_time</code>, <code>percentile</code>, <code>modes</code>).</li>
+      </ol>
+
+      <div class="note">
+        <span class="h">Domenowa siatka bezpieczeństwa</span>
+        Po przebiegu runner raportuje <code>RESULT transit_used_pairs=&lt;n&gt;</code> —
+        liczbę par OD szybszych niż dojście pieszo. Zero oznacza, że R5 policzył
+        <em>same trasy piesze</em> (najczęściej: data bez aktywnych kursów GTFS,
+        którą R5 przyjmuje bez błędu). Python przerywa wtedy z komunikatem. Ten
+        dokładny błąd raz trafił na produkcję w&nbsp;<code>tools/</code>
+        (GZM, sierpień&nbsp;2026) — stąd dwa niezależne mechanizmy: twarda
+        walidacja daty <em>przed</em> startem i&nbsp;ten detektor <em>po</em>.
+      </div>
+    </div>
+  </section>
+
+  <section id="nazwa" class="read">
+    <p class="eyebrow">Nazewnictwo</p>
+    <h2>Adapter? Wrapper? Jak to nazwać</h2>
+    <p>
+      To nie jest „wrapper” ani „binding” w&nbsp;sensie bibliotecznym. r5r i&nbsp;r5py
+      <em>owijają</em> API R5 klasa po klasie i&nbsp;wystawiają je w&nbsp;innym języku,
+      w&nbsp;tym samym procesie. Tu nie ma owijania API — jest własny, wąski
+      <strong>kontrakt zadaniowy</strong> (trzy komendy), a&nbsp;R5 żyje po drugiej
+      stronie granicy procesu i&nbsp;nigdy nie dotyka interpretera QGIS-a. Rozbicie na
+      warstwy i&nbsp;precyzyjne słowa:
+    </p>
+
+    <dl class="names">
+      <div>
+        <dt><b>out-of-process binding</b>wiązanie przez proces potomny</dt>
+        <dd>Cały mechanizm. W&nbsp;opozycji do <em>in-process</em> (r5r = rJava,
+          r5py = JPype), gdzie JVM ładuje się do wnętrza hosta. Tu JVM to osobny PID.</dd>
+      </div>
+      <div>
+        <dt><b>cienki adapter CLI</b>EasyR5Runner.java</dt>
+        <dd>R5 nie ma CLI do macierzy ani dostępności — ten jeden plik <em>jest</em>
+          tym CLI. Adaptuje bibliotekę Javy do interfejsu linii komend
+          o&nbsp;stabilnym kontrakcie. Zakres: <code>build</code>, <code>matrix</code>,
+          <code>info</code> (później <code>itinerary</code>).</dd>
+      </div>
+      <div>
+        <dt><b>sterownik procesu</b>easy_r5/core/runner.py</dt>
+        <dd>Buduje linię komend, uruchamia dziecko, parsuje protokół stdout, robi
+          pasek postępu i&nbsp;anulowanie (<code>kill(pid)</code>), mapuje kody
+          <code>ERROR</code> na komunikaty, sprząta w&nbsp;<code>finally</code>.</dd>
+      </div>
+      <div>
+        <dt><b>runner</b>nazwa w kodzie i w rozmowie</dt>
+        <dd>Tak jak w&nbsp;easy-OTP. Konkretniej: <em>job runner</em>, nie serwer —
+          w&nbsp;przeciwieństwie do OTP, które easy-OTP odpala jako serwer HTTP.
+          Nie „adapter”, nie „wrapper”, nie „bridge”.</dd>
+      </div>
+    </dl>
+
+    <div class="teza">
+      <p class="k">W skrócie</p>
+      <p>
+        Easy-R5 nie „owija” R5 jak r5r czy r5py — <b>uruchamia oficjalny jar jako
+        proces potomny</b>, sterowany jednym małym plikiem Javy, który dostaje
+        zadanie w&nbsp;JSON-ie i&nbsp;oddaje wynik w&nbsp;CSV plus protokół postępu
+        na&nbsp;stdout.
+      </p>
+    </div>
+
+    <p style="margin-top:1.6rem">
+      To ten sam wzorzec, którym QGIS Processing woła GDAL (<code>ogr2ogr</code>,
+      <code>gdal_contour</code>), SAGA i&nbsp;GRASS — podproces z&nbsp;wejściem
+      i&nbsp;wyjściem plikowym, nie biblioteka in-process. Nie jest egzotyczny;
+      jest natywny dla QGIS-a.
+    </p>
+  </section>
+
+  <section id="alternatywy" class="wide">
+    <div class="read" style="margin-inline:0">
+      <p class="eyebrow">Alternatywy</p>
+      <h2>Dlaczego nie r5r i nie r5py</h2>
+      <p>
+        Punkt wyjścia to twarde ograniczenie odziedziczone po easy-OTP: wtyczka
+        musi działać na <strong>czystej instalacji QGIS</strong> — żadnego
+        <code>pip install</code>, R, condy, Dockera. Pobieranie <em>binariów</em>
+        przy setupie (JDK, jar) jest dozwolone — precedens <code>DownloadJre</code>.
+        Instalowanie <em>pakietów Pythona</em> do interpretera QGIS-a — nie.
+      </p>
+    </div>
+
+    <figure id="d2">
+      <div class="figframe">
+        <svg class="diagram" viewBox="0 0 1080 452" role="img"
+             aria-label="Porównanie: po lewej r5r i r5py trzymają JVM wewnątrz procesu hosta, więc awaria pamięci R5 kładzie cały QGIS; po prawej Easy-R5 trzyma JVM jako osobny proces potomny połączony przez stdout i pliki, więc awaria ginie razem z podprocesem.">
+          <defs>
+            <marker id="d2a" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--amber)"></path>
+            </marker>
+          </defs>
+
+          <line class="dash" x1="540" y1="20" x2="540" y2="330"></line>
+
+          <text class="m" x="40" y="30" font-size="10.5" letter-spacing="0.06em" fill="var(--ink-muted)">r5r / r5py — JVM W PROCESIE HOSTA (rJava / JPype)</text>
+
+          <rect x="40" y="46" width="452" height="250" rx="12" fill="color-mix(in srgb, var(--blue) 5%, var(--paper))" stroke="var(--blue)" stroke-width="1.5"></rect>
+          <text class="m" x="58" y="68" font-size="10.5" fill="var(--ink-muted)">proces R / Python  ·  wątek GUI</text>
+
+          <rect x="92" y="88" width="344" height="176" rx="10" fill="color-mix(in srgb, var(--green) 6%, var(--paper))" stroke="var(--green)" stroke-width="1.5"></rect>
+          <text class="m" x="110" y="110" font-size="10.5" fill="var(--ink-muted)">JVM in-process  ·  heap zamrożony na starcie sesji</text>
+
+          <rect x="150" y="134" width="228" height="104" rx="8" class="crash-fill"></rect>
+          <text class="lbl m" x="264" y="180" text-anchor="middle" fill="var(--ink)">R5</text>
+          <text class="m" x="264" y="200" text-anchor="middle" font-size="10" fill="var(--red)">OutOfMemoryError</text>
+
+          <path class="crash" d="M150 150 L96 118 L60 96"></path>
+          <path class="crash" d="M378 150 L432 120 L470 92"></path>
+          <path class="crash" d="M264 238 L250 286 L236 322"></path>
+
+          <text class="m bad" x="40" y="358" font-size="10.5">✗  OOM R5  →  pad całego QGIS-a</text>
+          <text class="m bad" x="40" y="380" font-size="10.5">✗  -Xmx ustalony raz, przy pierwszym starcie JVM</text>
+          <text class="m bad" x="40" y="402" font-size="10.5">✗  anulowanie = przerwać Javę z wątku GUI</text>
+          <text class="m bad" x="40" y="424" font-size="10.5">✗  bootstrap kompilowanego wheela (jpype1) pod ABI QGIS-a</text>
+
+          <text class="m" x="576" y="30" font-size="10.5" letter-spacing="0.06em" fill="var(--ink-muted)">EASY-R5 — JVM JAKO PROCES POTOMNY</text>
+
+          <rect x="576" y="46" width="196" height="250" rx="12" fill="color-mix(in srgb, var(--blue) 5%, var(--paper))" stroke="var(--blue)" stroke-width="1.5"></rect>
+          <text class="m" x="592" y="68" font-size="10.5" fill="var(--ink-muted)">proces QGIS</text>
+          <text class="m" x="592" y="84" font-size="10.5" fill="var(--ink-muted)">runner.py</text>
+          <rect x="600" y="150" width="148" height="60" rx="8" class="node" stroke="var(--blue)"></rect>
+          <text class="m" x="674" y="185" text-anchor="middle" font-size="11">czyta stdout</text>
+
+          <rect x="844" y="92" width="200" height="204" rx="10" fill="color-mix(in srgb, var(--green) 6%, var(--paper))" stroke="var(--green)" stroke-width="1.5"></rect>
+          <text class="m" x="862" y="114" font-size="10.5" fill="var(--ink-muted)">JVM potomny  ·  -Xmx per run</text>
+
+          <rect x="872" y="140" width="140" height="104" rx="8" class="crash-fill"></rect>
+          <text class="lbl m" x="942" y="186" text-anchor="middle" fill="var(--ink)">R5</text>
+          <text class="m" x="942" y="206" text-anchor="middle" font-size="10" fill="var(--red)">OutOfMemoryError</text>
+
+          <path class="crash" d="M872 156 L854 140"></path>
+          <path class="crash" d="M1012 156 L1030 140"></path>
+          <path class="crash" d="M942 244 L942 272"></path>
+
+          <line x1="748" y1="172" x2="844" y2="172" stroke="var(--amber)" stroke-width="2.5" marker-end="url(#d2a)"></line>
+          <line x1="844" y1="196" x2="748" y2="196" stroke="var(--amber)" stroke-width="2.5" marker-end="url(#d2a)"></line>
+          <text class="m sub-flow" x="758" y="160" font-size="9">job.json ↓</text>
+          <text class="m sub-flow" x="758" y="216" font-size="9">stdout + CSV ↑</text>
+
+          <text class="m ok" x="576" y="358" font-size="10.5">✓  OOM R5  →  ginie tylko podproces, QGIS żyje</text>
+          <text class="m ok" x="576" y="380" font-size="10.5">✓  -Xmx per run, ustawiany w komendzie</text>
+          <text class="m ok" x="576" y="402" font-size="10.5">✓  anulowanie = kill(pid), natychmiast i czysto</text>
+          <text class="m ok" x="576" y="424" font-size="10.5">✓  zero zależności Pythona do zbootstrapowania</text>
+        </svg>
+      </div>
+      <figcaption>
+        <strong>Różnica, o którą toczy się decyzja: gdzie stoi JVM.</strong>
+        In-process (r5r, r5py) współdzieli pamięć i&nbsp;cykl życia z&nbsp;QGIS-em —
+        a&nbsp;pipeline r5r w&nbsp;<code>tools/</code> naprawdę padał na 12&nbsp;GB
+        sterty przy Warszawie. Proces potomny izoluje awarię, heap i&nbsp;anulowanie.
+      </figcaption>
+    </figure>
+
+    <div class="tablewrap">
+      <table>
+        <caption>Cztery kandydatury oceniane w&nbsp;ADR-0001 / <code>docs/notes/bindings-comparison.md</code>.</caption>
+        <thead>
+          <tr>
+            <th scope="col">Kryterium</th>
+            <th scope="col">r5r</th>
+            <th scope="col">r5py</th>
+            <th scope="col">JPype-only</th>
+            <th scope="col" class="col-us">jar + runner (nasz)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">Działa na czystym QGIS</th>
+            <td><span class="no">✗</span> wymaga R</td>
+            <td><span class="no">✗</span> 16 pakietów pip</td>
+            <td><span class="partial">~</span> 1 dep kompilowany</td>
+            <td class="col-us"><span class="yes">✓</span></td>
+          </tr>
+          <tr>
+            <th scope="row">Java do utrzymania</th>
+            <td class="partial">brak</td>
+            <td class="partial">brak</td>
+            <td class="partial">brak</td>
+            <td class="col-us">~1 plik</td>
+          </tr>
+          <tr>
+            <th scope="row">Crash JVM kładzie QGIS</th>
+            <td class="partial">—</td>
+            <td class="partial">—</td>
+            <td><span class="no">✗</span> tak</td>
+            <td class="col-us"><span class="yes">✓</span> nie</td>
+          </tr>
+          <tr>
+            <th scope="row">Heap per run</th>
+            <td class="partial">—</td>
+            <td class="partial">—</td>
+            <td><span class="no">✗</span></td>
+            <td class="col-us"><span class="yes">✓</span></td>
+          </tr>
+          <tr>
+            <th scope="row">Anulowanie = kill procesu</th>
+            <td class="partial">—</td>
+            <td class="partial">—</td>
+            <td><span class="no">✗</span></td>
+            <td class="col-us"><span class="yes">✓</span></td>
+          </tr>
+          <tr>
+            <th scope="row">Potrzebny JDK (nie JRE)</th>
+            <td>JDK 21</td>
+            <td>JDK 21</td>
+            <td>JDK/JRE 21</td>
+            <td class="col-us">JDK 21 <span class="partial">(lub prekompilacja)</span></td>
+          </tr>
+          <tr>
+            <th scope="row">Zmiana API R5 psuje…</th>
+            <td class="partial">upstream</td>
+            <td class="partial">upstream</td>
+            <td>nas</td>
+            <td class="col-us">nas</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="read" style="margin-inline:0; margin-top:2rem">
+      <h3>r5r — odpada natychmiast</h3>
+      <p>
+        Wymaga R&nbsp;+&nbsp;<code>rJava</code>. <code>CLAUDE.md</code>: „ZERO R,
+        ZERO GRASS”. R5 żyje w&nbsp;R przez in-process JVM przez własny jar
+        <code>r5r_core</code> (~250&nbsp;KB Javy w&nbsp;kształcie ramek danych R:
+        <code>RDataFrame</code>, build przeciw <code>JRI.jar</code>) — nieużywalny
+        bez R nawet przy kompilacji. Zostaje jako <strong>referencja
+        zachowania</strong>: wszystkie skrypty w&nbsp;<code>tools/</code> go
+        używają, więc definiuje, jaki wynik ma wychodzić (M4 odtwarza
+        <code>gdansk_service_accessibility.csv</code> co&nbsp;do&nbsp;wiersza).
+      </p>
+
+      <h3>r5py — odpada jako zależność runtime</h3>
+      <p>
+        16 pakietów pip, w&nbsp;tym <strong>kompilowane</strong>:
+        <code>jpype1</code>, <code>rasterio</code>, <code>simplification</code>,
+        <code>scikit-learn</code>, plus <code>geopandas</code>. To drzewo
+        w&nbsp;kształcie condy, nie „jeden wąski wyjątek” jak <code>openpyxl</code>.
+        API r5py opiera się też mocno na semantyce GeoPandas, której wtyczka QGIS
+        nie potrzebuje. Zostaje jako <strong>najlepszy wzorzec „jak wołać klasy
+        R5”</strong> — jego <code>src/r5py/r5/*.py</code> to faktyczna
+        dokumentacja kolejności wywołań. Czytać, nie shippować.
+      </p>
+
+      <h3>JPype-only — plan B, udokumentowany, nie wybrany</h3>
+      <p>
+        <code>pip install jpype1</code> jako <em>jedyny</em> wyjątek, potem wołać
+        <code>com.conveyal.r5.*</code> z&nbsp;Pythona samemu. Zero Javy do
+        napisania, jedna zależność. Odrzucone jako domyślne, bo
+        <code>jpype1</code> to kompilowany wheel, który musi trafić w&nbsp;dokładne
+        ABI Pythona QGIS-a (3.9 w&nbsp;3.22&nbsp;LTR, 3.12 w&nbsp;nowszych)
+        i&nbsp;platformę — dużo bardziej kruche niż pure-Pythonowy trik
+        z&nbsp;<code>openpyxl</code>. I&nbsp;bo JVM w&nbsp;procesie QGIS-a znaczy:
+        OOM kładzie QGIS, heap zamrożony na sesję, brak czystego anulowania.
+      </p>
+
+      <h3>Serwer debug R5 — odpada</h3>
+      <p>
+        <code>PointToPointRouterServer</code> to jedyny „gotowy” serwer w&nbsp;jarze,
+        ale robi routing punkt-do-punktu do debugowania — bez endpointu macierzy
+        i&nbsp;dostępności. Oddaje dokładnie tę zdolność, po którą bierzemy R5.
+      </p>
+    </div>
+  </section>
+
+  <section id="kontrakt" class="read">
+    <p class="eyebrow">Kontrakt runnera</p>
+    <h2>Co przechodzi przez granicę</h2>
+    <p>
+      Jedna linia = jedna wiadomość, UTF-8, <code>\n</code>. Python mapuje kody
+      <code>ERROR</code> na komunikaty dla użytkownika — żaden stack trace Javy
+      nie trafia do GUI.
+    </p>
+
+    <div class="term"><span class="cap">stdout — protokół</span>
+<span class="k">INFO</span>      &lt;tekst&gt;                    <span class="c"># feedback.pushInfo</span>
+<span class="k">PROGRESS</span>  &lt;done&gt; &lt;total&gt;             <span class="c"># pasek postępu, ≥ co 1 s</span>
+<span class="k">WARN</span>      &lt;kod&gt; &lt;tekst&gt;              <span class="c"># np. NO_POINTS_LINKED</span>
+<span class="k">ERROR</span>     &lt;kod&gt; &lt;tekst&gt;              <span class="c"># kod wyjścia 1</span>
+<span class="k">RESULT</span>    &lt;klucz&gt;=&lt;wartość&gt;          <span class="c"># pojedynczy fakt (command=info)</span>
+<span class="k">DONE</span>      &lt;ścieżka&gt; &lt;wiersze&gt;        <span class="c"># ostatnia linia, kod wyjścia 0</span>
+
+<span class="c"># kody: NETWORK_VERSION_MISMATCH · NETWORK_READ_FAILED · OUT_OF_MEMORY</span>
+<span class="c">#       NO_POINTS_LINKED · DATE_NO_SERVICE · BAD_JOB_SPEC · IO_ERROR</span>
+    </div>
+
+    <div class="term"><span class="cap">job.json — command: matrix (skrót)</span>
+{
+  <span class="s">"command"</span>: <span class="s">"matrix"</span>,
+  <span class="s">"network"</span>: <span class="s">".../network.dat"</span>,
+  <span class="s">"origins"</span>: <span class="s">".../origins.csv"</span>,
+  <span class="s">"destinations"</span>: <span class="s">".../destinations.csv"</span>,
+  <span class="s">"origin_range"</span>: [0, 500],
+  <span class="s">"date"</span>: <span class="s">"2026-08-25"</span>,
+  <span class="s">"departure_time"</span>: <span class="s">"07:00"</span>,
+  <span class="s">"time_window_minutes"</span>: 120,
+  <span class="s">"percentiles"</span>: [50],
+  <span class="s">"max_trip_duration_minutes"</span>: 90,
+  <span class="s">"max_walk_time_minutes"</span>: 90,      <span class="c">// nigdy null — Python wyprowadza</span>
+  <span class="s">"transit_modes"</span>: [<span class="s">"TRAM"</span>, <span class="s">"RAIL"</span>, <span class="s">"BUS"</span>, <span class="s">"FERRY"</span>],
+  <span class="s">"out_csv"</span>: <span class="s">".../matrix_000.csv"</span>
+}
+
+<span class="c"># CSV out (format długi, nagłówki jak r5r):</span>
+<span class="c"># from_id,to_id,travel_time_p50</span>
+<span class="c"># Integer.MAX_VALUE nigdy nie trafia do pliku → NULL w warstwie</span>
+    </div>
+
+    <p style="margin-top:1.5rem">
+      <code>EasyR5Runner.java</code> <strong>musi zostać jednym plikiem</strong> —
+      single-file source launcher (JEP&nbsp;330) w&nbsp;Javie 21 kompiluje jedną
+      jednostkę kompilacji; multi-file source programs to dopiero Java&nbsp;22+.
+      Klasy pakietowo-prywatne w&nbsp;tym samym pliku są OK. Mapowanie na
+      <code>RegionalTask</code> jest sprawdzone w&nbsp;spike'u i&nbsp;nie zmienia
+      się bez powodu.
+    </p>
+  </section>
+
+  <section id="koszty" class="read">
+    <p class="eyebrow">Koszty</p>
+    <h2>Co za to płacimy i&nbsp;warunek odwrócenia</h2>
+    <ul class="tight">
+      <li>
+        <strong>Utrzymujemy trochę Javy</strong> przeciw API, które upstream
+        jawnie odmawia stabilizować. Mitygacja: pin wersji R5 (ADR-0002),
+        minimalna powierzchnia runnera, <code>command=info</code> jako smoke test
+        po każdym podbiciu.
+      </li>
+      <li>
+        <strong>Potrzebny JDK</strong> (~180&nbsp;MB), nie JRE (~45&nbsp;MB) —
+        chyba że shippujemy skompilowaną klasę, co przywraca krok buildu.
+      </li>
+      <li>
+        <strong>Jeden plik = jedna jednostka kompilacji</strong> do Javy 21.
+        Runner musi zostać jednym plikiem; jak przekroczy — osobne repo MIT
+        z&nbsp;jarem, jak <code>easy-GTFS-RT</code>.
+      </li>
+      <li>
+        <strong>Bierzemy easy-OTP-owy wzorzec, nie kod semantyki OTP.</strong>
+        Zarządzanie procesem, pasek postępu, anulowanie, <code>DownloadJre</code> →
+        skopiowane. Semantyka OTP — nie.
+      </li>
+    </ul>
+
+    <div class="note rev">
+      <span class="h">Warunek odwrócenia · ADR-0001</span>
+      Plan&nbsp;B (JPype) zostaje udokumentowany. Przełącz na niego tylko jeśli
+      runner <b>nie zmieści się w&nbsp;jednym pliku</b> <em>oraz</em> prawdziwy
+      build okaże się gorszy niż JVM in-process. Nic poza warstwą transportową
+      <code>easy_r5/core/</code> nie zależy od tego, którego z&nbsp;dwóch użyto.
+    </div>
+  </section>
+
+  <footer class="read">
+    <h3>Źródło prawdy</h3>
+    <ul>
+      <li><a href="https://github.com/GISBoost/easy-R5/blob/main/docs/adr/0001-r5-binding.md"><code>docs/adr/0001-r5-binding.md</code></a> — decyzja i&nbsp;alternatywy</li>
+      <li><a href="https://github.com/GISBoost/easy-R5/blob/main/docs/notes/bindings-comparison.md"><code>docs/notes/bindings-comparison.md</code></a> — dowody, cztery kandydatury</li>
+      <li><code>docs/notes/spike-r5-probe-2026-09-02.md</code> — pomiary na sieci Gdańska</li>
+      <li><code>docs/prd/PR_easy-R5_v01.md</code> §3 — kontrakt runnera i&nbsp;protokół stdout</li>
+      <li><a href="https://github.com/GISBoost/easy-R5/blob/main/CLAUDE.md"><code>CLAUDE.md</code></a> — twarde ograniczenia (ZERO pip / R / GRASS, pin wersji)</li>
+    </ul>
+    <p class="gen">
+      Część <a href="https://gisboost.github.io/">portalu GISBoost</a> ·
+      <a href="https://github.com/GISBoost/easy-R5">repozytorium Easy-R5</a>.
+      Notatka na podstawie stanu repo z 2026-09-08.
+    </p>
+  </footer>
+</main>
+
+<script>
+  (function () {
+    var root = document.documentElement;
+    var btn = document.getElementById('theme');
+    function stored() { try { return localStorage.getItem('r5arch-theme'); } catch (e) { return null; } }
+    var s = stored();
+    if (s === 'light' || s === 'dark') root.setAttribute('data-theme', s);
+    function current() {
+      return root.getAttribute('data-theme') ||
+        (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    }
+    function label() { btn.textContent = current() === 'dark' ? 'jasny' : 'ciemny'; }
+    label();
+    btn.addEventListener('click', function () {
+      var next = current() === 'dark' ? 'light' : 'dark';
+      root.setAttribute('data-theme', next);
+      try { localStorage.setItem('r5arch-theme', next); } catch (e) {}
+      label();
+    });
+  })();
+</script>
+</body>
+</html>
