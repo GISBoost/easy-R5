@@ -134,6 +134,43 @@ dogfoods correctly, and a candidate to revisit later.
 [How we measured it →](docs/notes/flagship-lodz-modal-results.md) ·
 [reproduce it →](tools/modal_complementarity_lodz/README.md)
 
+## How it works
+
+Easy-R5 runs the R5 engine as a **child process**, not as an in-process library —
+which is what r5r and r5py do, and both need dependencies a stock QGIS cannot
+install (R, or 16 pip packages). Python builds a job and reads the result; the
+child process does the routing and nothing else:
+
+```
+  ┌─ QGIS · Python / PyQGIS
+  │
+  │   a Processing algorithm collects the parameters
+  │   core/runner.py   builds job.json, spawns the child process,
+  │                    reads its stdout, kills it on cancel
+  │   matrix.py / accessibility.py / isochrones (contoured in QGIS)
+  │        →  styled QGIS layer  (+ r5_version, run_date, … fields)
+  │
+  └───────────────┐   job.json ↓    stdout: PROGRESS / DONE / ERROR  + CSV ↑
+                  │   a pipe + temp files — no JVM inside QGIS
+  ┌───────────────┘
+  │   child process · JVM (Temurin 21)
+  │
+  │   EasyR5Runner.java   one .java file, the only Java we maintain:
+  │        reads job.json  →  builds a RegionalTask
+  │        loops over origins  →  com.conveyal.r5.TravelTimeComputer
+  │        writes matrix_000.csv,  streams progress lines
+  │   r5-v7.6-all.jar   the official Conveyal build, unmodified
+  │
+  └─ separate PID · its own -Xmx heap · an R5 OOM ≠ a QGIS crash
+
+  Java does routing only. Grids, contouring, zonal statistics,
+  classification, styling and reports are all Python / QGIS.
+```
+
+Rough sketch — the full reasoning (why a subprocess, why one `.java` file, why
+not r5r or r5py) is in
+[**How QGIS talks to R5**](https://gisboost.github.io/easy-R5/).
+
 ## Repository layout
 
 | Path | What it is |
