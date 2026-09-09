@@ -28,6 +28,13 @@ osobny temat, kiedy będzie na to czas — PRD v2-rail zostaje w repo jako **Par
 usunięty (patrz `docs/prd/PR_easy-R5_flagship-lodz-modal_v2-rail.md`, nagłówek). Kamienie F2b i
 F6 (`docs/prompts/`) są nieaktywne razem z nim.
 
+**Aktualizacja 2026-09-09:** konwerter TripUpdates→realized jednak powstał
+(`easy-OTP/tools/family_b_realized/`, opakowuje `gtfsrt_realizer.py` z RT-3), zweryfikowany
+na dobie 2026-09-08, i wystartowało codzienne zbieranie feedu (telefon TX-10 + backup GH
+Actions). **F6-dla-kolei nie jest już zablokowane kodem** — zostaje tylko ~15–20 dni roboczych
+zbierania danych. PRD v2-rail dalej **Parked jako analiza**, ale nie z powodu braku warstwy RT.
+Szczegóły: [`realized-gtfs-lka-tripupdates.md`](realized-gtfs-lka-tripupdates.md).
+
 ## Co jest aktywne teraz
 
 Dwa tryby (tramwaj, autobus), metodyka i pytanie badawcze **z PRD v1 bez zmian** — patrz

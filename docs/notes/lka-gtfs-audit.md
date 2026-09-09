@@ -4,6 +4,11 @@ Wykonane w tej sesji, poza `easy_r5/` (zwykłe `curl`/Python, nie dotyka wtyczki
 Odpowiada na sześć pytań z `docs/prd/PR_easy-R5_flagship-lodz-modal_v2-rail.md` §3.3.
 Nadpisuje ustalenie „feed niezweryfikowany" w `docs/notes/flagship-analysis-decision.md`.
 
+> **Częściowo nieaktualne (2026-09-09):** „nowy blocker" niżej — brak warstwy P50/P85 dla
+> kolei — **jest rozwiązany**. Powstał konwerter TripUpdates→realized
+> (`easy-OTP/tools/family_b_realized/`) i wystartowało codzienne zbieranie. Zostaje tylko
+> czas na uzbieranie danych. Patrz [`realized-gtfs-lka-tripupdates.md`](realized-gtfs-lka-tripupdates.md).
+
 ## Wynik w jednym zdaniu
 
 **Klucz `lka` w `easy-GTFS-RT` / `gtfs-dashboard` (`cdn.zbiorkom.live/gtfs/lodz-lka.zip`) to nie
