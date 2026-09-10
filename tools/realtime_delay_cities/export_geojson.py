@@ -7,10 +7,11 @@ Also re-exports Łódź from ../realtime_delay_lodz/delay_lodz*.gpkg so the
 manifest and data/ folder stay one coherent set.
 
 Writes into <easy>/mapy-analizy/opoznienia-dostepnosc/data/:
-  hex_<city>_<res>.geojson      choropleth (delta_<cat>, base_<cat>, net_delta, net_delta_n)
-  siatka_<city>_<res>.geojson   hex_id + geometry only (full grid outline)
-  boundary_<city>.geojson       city outline (resolution-independent)
-  manifest.json                 { cities: [ {key, label, date, bounds, resolutions[]} ] }
+  hex_<city>_<res>.geojson       choropleth (delta_<cat>, base_<cat>, net_delta, net_delta_n)
+  siatka_<city>_<res>.geojson    hex_id + geometry only (full grid outline)
+  boundary_<city>_<res>.geojson  stepped city outline -- the 250 m and 500 m grids
+                                 dissolve to different staircases, so one per res
+  manifest.json                  { cities: [ {key, label, date, bounds, resolutions[]} ] }
 
 Run inside the QGIS Python env, e.g. mcp__qgis__execute_code.
 """
@@ -114,9 +115,9 @@ def export_city(key: str, res_gpkgs: dict):
         _write(_reproject(_layer(gpkg, "siatka")), MAPY_DATA / f"siatka_{key}_{res}.geojson")
         entry["resolutions"].append({"key": str(res), "label": f"{res} m",
                                      "featureCount": merged.featureCount()})
+        b = _reproject(_layer(gpkg, "boundary"))
+        _write(b, MAPY_DATA / f"boundary_{key}_{res}.geojson")
         if res == min(res_gpkgs):
-            b = _reproject(_layer(gpkg, "boundary"))
-            _write(b, MAPY_DATA / f"boundary_{key}.geojson")
             e = b.extent()
             bounds = [[e.yMinimum(), e.xMinimum()], [e.yMaximum(), e.xMaximum()]]
     entry["bounds"] = bounds

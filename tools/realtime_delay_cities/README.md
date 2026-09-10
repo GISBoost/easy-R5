@@ -119,11 +119,15 @@ py export_report_data.py   # -> mapy-analizy/badanie-opoznienia/report_data.json
   **dissolve of the hex grid** (a stepped outline that hugs the hexes, like
   Łódź), replacing the smooth dissolved `obwody_spisowe`. A ±1 m buffer
   round-trip closes the sub-metre seams a plain dissolve of a 250 m grid leaves
-  open. `prepare_data` now does the same for fresh runs; this is the retrofit.
+  open (`native:dissolve` alone fragments into 50–73 parts — neighbouring
+  `creategrid` hex edges are not bit-identical). Run once per resolution: the
+  250 m and 500 m grids dissolve to different staircases. `prepare_data` now
+  does the same for fresh runs; this is the retrofit.
 - **`build_project.py`** — `delay_cities.qgz`, one group per city.
-- **`export_geojson.py`** — per-city GeoJSON + a 6-city `manifest.json` into
-  the sibling `mapy-analizy/opoznienia-dostepnosc` page (which gains a city
-  switcher on top of its resolution tabs / category panel).
+- **`export_geojson.py`** — per-city / per-resolution GeoJSON (hex choropleth,
+  `siatka`, stepped `boundary`) + a 6-city `manifest.json` into the sibling
+  `mapy-analizy/opoznienia-dostepnosc` page (which gains a city switcher on top
+  of its resolution tabs / category panel). Run after `rebuild_boundary`.
 - **`export_report_data.py`** — rolls `out/*.csv` into one small
   `report_data.json` for `mapy-analizy/badanie-opoznienia/` — the public
   write-up page (own tab in the mapy-analizy top bar) that turns FINDINGS.md

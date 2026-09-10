@@ -36,11 +36,15 @@ LABEL2KEY = {
 # Historical measurement, not re-derivable -- kept here so the report can show it.
 COMPUTE = {
     "szczecin": {"wall": "8m 44s", "seconds": 524},
-    "gdansk": {"wall": "13m 03s", "seconds": 783, "note": "networks were cache-warm"},
+    "gdansk": {"wall": "13m 03s", "seconds": 783,
+               "note": {"pl": "sieci były w cache", "en": "networks were cache-warm"}},
     "poznan": {"wall": "15m 59s", "seconds": 959},
-    "krakow": {"wall": "21m 12s", "seconds": 1272, "note": "most origins + densest network"},
-    "warszawa": {"wall": "23m 00s", "seconds": 1380, "note": "500 MB network.dat, 500 m only"},
-    "lodz": {"wall": "~12m", "seconds": 720, "note": "the original pilot run"},
+    "krakow": {"wall": "21m 12s", "seconds": 1272,
+               "note": {"pl": "najwięcej źródeł, najgęstsza sieć", "en": "most origins + densest network"}},
+    "warszawa": {"wall": "23m 00s", "seconds": 1380,
+                 "note": {"pl": "network.dat 500 MB, tylko 500 m", "en": "500 MB network.dat, 500 m only"}},
+    "lodz": {"wall": "~12m", "seconds": 720,
+             "note": {"pl": "pierwotny przebieg pilotażowy", "en": "the original pilot run"}},
 }
 
 DATE = {"lodz": "2026-08-21"}
