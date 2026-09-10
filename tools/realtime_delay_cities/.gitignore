@@ -1,0 +1,22 @@
+work/
+*.gpkg
+*.qgz
+__pycache__/
+
+# out/ is working data (accessibility gpkg/csv/params.json, per-city summaries)
+# -- not versioned per CLAUDE.md's "CSV wynikow" rule. Carve-outs: the roll-up
+# tables, the hypothesis verdict, and the transfer-ring chart PNGs.
+out/*
+!out/cross_city_delay.csv
+!out/cross_city_net.csv
+!out/run_stats.csv
+!out/run_stats.json
+!out/hex_breakdown.csv
+!out/gtfs_shift_by_traction.csv
+!out/HYPOTHESIS.md
+# probe_poznan_*.csv (full O-D matrix, ~50 MB each) stay unversioned; the
+# summary numbers live in FINDINGS.md
+!out/charts/
+out/charts/*
+!out/charts/transfer_ring_*.png
+!out/charts/README.md
