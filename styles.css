@@ -1,6 +1,40 @@
 /* GISBoost — architektura Easy-R5. Shared by index.html (PL) and en/index.html (EN).
-   Tokens + .topbar/.brand/.topnav-link now come from the shared gisboost-1.css
-   (linked before this file) — this stylesheet keeps only what's specific to this page. */
+   Brand tokens (bg/surface/border/ink/chrome/accent) + .topbar/.brand/.topnav-link come
+   from the shared gisboost-1.css (linked before this file). The tokens below are this
+   page's own content semantics — diagram zone colors, warning/error notes, terminal
+   syntax highlighting — not part of the cross-site brand, so they stay local. */
+
+:root {
+  --paper: var(--bg);
+  --paper-raised: var(--surface);
+  --line: var(--border);
+  --line-soft: var(--border);
+  --ink-faint: var(--ink-muted);
+  --blue: var(--accent);
+  --blue-ink: var(--accent-ink);
+  --blue-soft: var(--accent-soft);
+  --green: #2e7d32;
+  --green-ink: #1b5e20;
+  --green-soft: #e6f2e6;
+  --amber: #a6650a;
+  --amber-ink: #874f05;
+  --amber-soft: #f8ecd8;
+  --red: #b3261e;
+  --red-ink: #8f1c16;
+  --red-soft: #f8e4e2;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --green: #66bb6a; --green-ink: #9ccc9f; --green-soft: #24331f;
+    --amber: #e0ab52; --amber-ink: #ecc07d; --amber-soft: #362c1a;
+    --red: #ef9a9a; --red-ink: #f2b1b1; --red-soft: #3a2222;
+  }
+}
+:root[data-theme="dark"] {
+  --green: #66bb6a; --green-ink: #9ccc9f; --green-soft: #24331f;
+  --amber: #e0ab52; --amber-ink: #ecc07d; --amber-soft: #362c1a;
+  --red: #ef9a9a; --red-ink: #f2b1b1; --red-soft: #3a2222;
+}
 
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
