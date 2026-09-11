@@ -1,88 +1,6 @@
 /* GISBoost — architektura Easy-R5. Shared by index.html (PL) and en/index.html (EN).
-   Design system: gtfs-dashboard + mapy-analizy (Archivo + IBM Plex, green/blue/amber). */
-
-:root {
-  color-scheme: light;
-  --paper: #ffffff;
-  --paper-raised: #eef3f0;
-  --paper-raised-2: #e4ece6;
-  --ink: #16241c;
-  --ink-muted: #4d5c53;
-  --ink-faint: #7c8a82;
-  --line: #d7e2dc;
-  --line-soft: #e6ede9;
-  --green: #2e7d32;
-  --green-ink: #1b5e20;
-  --green-soft: #e6f2e6;
-  --blue: #0277bd;
-  --blue-ink: #01598c;
-  --blue-soft: #e1f3fb;
-  --amber: #a6650a;
-  --amber-ink: #874f05;
-  --amber-soft: #f8ecd8;
-  --slate: #45586a;
-  --red: #b3261e;
-  --red-ink: #8f1c16;
-  --red-soft: #f8e4e2;
-  --focus: #0277bd;
-  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --display: "Archivo", "IBM Plex Sans", system-ui, sans-serif;
-  --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, Menlo, monospace;
-  --read: 46rem;
-  --wide: 70rem;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    color-scheme: dark;
-    --paper: #1b1f24;
-    --paper-raised: #242a30;
-    --paper-raised-2: #2c333a;
-    --ink: #e7ebe8;
-    --ink-muted: #9aa8a1;
-    --ink-faint: #75837b;
-    --line: #3a434b;
-    --line-soft: #2c333a;
-    --green: #66bb6a;
-    --green-ink: #9ccc9f;
-    --green-soft: #24331f;
-    --blue: #4fc3f7;
-    --blue-ink: #8ad3f8;
-    --blue-soft: #17303b;
-    --amber: #e0ab52;
-    --amber-ink: #ecc07d;
-    --amber-soft: #362c1a;
-    --slate: #a9b8c5;
-    --red: #ef9a9a;
-    --red-ink: #f2b1b1;
-    --red-soft: #3a2222;
-    --focus: #4fc3f7;
-  }
-}
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --paper: #1b1f24;
-  --paper-raised: #242a30;
-  --paper-raised-2: #2c333a;
-  --ink: #e7ebe8;
-  --ink-muted: #9aa8a1;
-  --ink-faint: #75837b;
-  --line: #3a434b;
-  --line-soft: #2c333a;
-  --green: #66bb6a;
-  --green-ink: #9ccc9f;
-  --green-soft: #24331f;
-  --blue: #4fc3f7;
-  --blue-ink: #8ad3f8;
-  --blue-soft: #17303b;
-  --amber: #e0ab52;
-  --amber-ink: #ecc07d;
-  --amber-soft: #362c1a;
-  --slate: #a9b8c5;
-  --red: #ef9a9a;
-  --red-ink: #f2b1b1;
-  --red-soft: #3a2222;
-  --focus: #4fc3f7;
-}
+   Tokens + .topbar/.brand/.topnav-link now come from the shared gisboost-1.css
+   (linked before this file) — this stylesheet keeps only what's specific to this page. */
 
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
@@ -111,35 +29,13 @@ code {
 }
 
 /* ---- top bar ---- */
-.topbar {
-  position: sticky; top: 0; z-index: 10;
-  display: flex; align-items: baseline; justify-content: space-between; gap: 1rem;
-  padding: 0.8rem clamp(1rem, 4vw, 2rem);
-  background: var(--paper);
-  border-bottom: 1px solid var(--line);
-}
-.brand { display: flex; align-items: baseline; gap: 0.5rem; text-decoration: none; white-space: nowrap; }
-.brand .mark {
-  font-family: var(--display); font-weight: 800; font-size: 1.12rem;
-  letter-spacing: -0.01em; color: var(--green);
-}
-.brand .sub { font-size: 0.85rem; color: var(--ink-muted); }
-.brand:hover .sub { color: var(--blue); }
-.topnav { display: flex; align-items: baseline; gap: 0.25rem; flex-wrap: wrap; }
-.topnav a {
-  font-size: 0.82rem; color: var(--ink-muted); text-decoration: none;
-  padding: 0.3rem 0.5rem; border-radius: 5px;
-}
-.topnav a:hover { color: var(--ink); background: var(--paper-raised); }
-.lang-toggle, .theme-toggle {
+/* .topbar / .brand / .topnav / .topnav-link come from the shared stylesheet.
+   Only the language/theme toggles need page-specific tuning: they sit on the
+   shared dark chrome bar but aren't part of the cross-site topbar contract. */
+.topbar .theme-toggle {
   font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.04em; text-transform: uppercase;
-  color: var(--ink-muted); background: none; border: 1px solid var(--line);
-  border-radius: 5px; padding: 0.32rem 0.62rem; cursor: pointer; margin-left: 0.3rem;
-  text-decoration: none; display: inline-block;
-  transition: color 0.12s, border-color 0.12s;
 }
-.lang-toggle:hover, .theme-toggle:hover { color: var(--ink); border-color: var(--ink-faint); }
-@media (max-width: 700px) { .topnav a[href^="#"] { display: none; } }
+@media (max-width: 700px) { .topnav .topnav-link[href^="#"] { display: none; } }
 
 /* ---- layout ---- */
 main { padding: 0 clamp(1rem, 4vw, 2rem) 4.5rem; }
