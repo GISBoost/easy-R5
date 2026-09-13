@@ -39,6 +39,34 @@ def stable_ids(values, n):
     return ids
 
 
+def _check_fields_present(fields, names, label):
+    """Raise ``ValueError`` naming any of ``names`` missing from ``fields``.
+
+    Guards against a QGIS gotcha that produced a real, silent data-corruption
+    bug (easy-R5 issue #5): a ``QgsVectorLayer`` already open in the project
+    caches its field list at load time. If the same GeoPackage table is later
+    altered on disk (e.g. a script adds columns), that cached layer's
+    ``fields()`` still reports the old, narrower schema — but ``getFeatures()``
+    still returns raw attribute rows shaped like the *current*, wider table.
+    ``lookupField()`` on the stale schema then returns either -1 for a genuinely
+    new column, or the *wrong* index for one that used to be adjacent to it —
+    silently reading a neighbouring column's value instead. Failing loudly here
+    turns that into an immediate, correct error instead of a quietly wrong
+    accessibility result.
+    """
+    missing = [n for n in names if fields.lookupField(n) < 0]
+    if missing:
+        raise ValueError(
+            "{} layer has no field(s) named {} — but they were requested. If "
+            "this layer's schema changed on disk after it was loaded into QGIS "
+            "(e.g. columns added by another script), the project may be holding "
+            "a stale cached field list: remove the layer and re-add it (or "
+            "restart QGIS), then try again.".format(
+                label, ", ".join(repr(n) for n in missing)
+            )
+        )
+
+
 def write_points_csv(source, context, feedback, id_field, out_path, *, label="points",
                      extra_fields=None):
     """Write ``source`` as ``id,lon,lat`` in EPSG:4326. Returns (ids, skipped).
@@ -48,7 +76,9 @@ def write_points_csv(source, context, feedback, id_field, out_path, *, label="po
 
     ``extra_fields`` appends those attribute columns after ``lat`` (numeric,
     missing/blank -> 0) — RunAccessibility passes the opportunity fields so the
-    destinations CSV carries them the way r5r's does.
+    destinations CSV carries them the way r5r's does. ``id_field`` and every
+    name in ``extra_fields`` must exist on ``source`` — see
+    ``_check_fields_present`` for why a missing field is fatal, not a silent 0.
     """
     from qgis.core import (
         QgsCoordinateReferenceSystem,
@@ -77,11 +107,14 @@ def write_points_csv(source, context, feedback, id_field, out_path, *, label="po
     )
 
     extra_fields = list(extra_fields or [])
+    _check_fields_present(source.fields(), extra_fields, label)
     extra_idx = [source.fields().lookupField(f) for f in extra_fields]
 
     raw_ids = []
     rows = []
     skipped = 0
+    if id_field:
+        _check_fields_present(source.fields(), [id_field], label)
     field_idx = source.fields().lookupField(id_field) if id_field else -1
     for feat in source.getFeatures():
         geom = feat.geometry()
