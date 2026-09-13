@@ -36,6 +36,10 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.stream.Stream;
 
 /**
@@ -181,6 +185,22 @@ public class EasyR5Runner {
      *       feeds <code>RESULT transit_used_pairs</code> — the independent
      *       walk-only detector (PRD 5.8).</li>
      * </ul>
+     *
+     * <p>Origins route in parallel (easy-R5 issue #4): each origin builds its
+     * own {@code RegionalTask}/{@code TravelTimeComputer}, so the only state
+     * shared across threads is the read-only {@code TransportNetwork} and its
+     * {@code LinkageCache} — a thread-safe Guava cache whose {@code LinkedPointSet}
+     * / {@code EgressCostTable} are lazily built behind {@code synchronized}
+     * accessors (verified against R5 7.6 source: {@code LinkedPointSet.getEgressCostTable()}
+     * and {@code EgressCostTable.destructivelyTransposeForPropagationAsNeeded()}
+     * are both {@code synchronized} and idempotent). This is the same sharing
+     * pattern Conveyal's own regional-analysis workers rely on to parallelize
+     * across all cores. Results are still written out sequentially, in origin
+     * order, so the CSV's row order and content are unaffected — only the
+     * routing itself runs concurrently. One tradeoff: peak memory now scales
+     * with the number of concurrently-routing origins, not just network size
+     * (CLAUDE.md's RAM gotcha) — worth a configurable thread cap if that ever
+     * bites in practice.
      */
     private static void doMatrix(JsonNode job) throws Exception {
         long setupStartNanos = System.nanoTime();
@@ -256,6 +276,9 @@ public class EasyR5Runner {
                 String.format("%.3f", (System.nanoTime() - setupStartNanos) / 1e9));
         long routingStartNanos = System.nanoTime();
 
+        int nThreads = Math.max(1, Math.min(total, Runtime.getRuntime().availableProcessors()));
+        Emit.info("Routing " + total + " origin(s) on " + nThreads + " thread(s).");
+        ExecutorService pool = Executors.newFixedThreadPool(nThreads);
         try (BufferedWriter w = Files.newBufferedWriter(Path.of(outCsv), StandardCharsets.UTF_8)) {
             StringBuilder header = new StringBuilder("from_id,to_id");
             for (int p : percentiles) {
@@ -264,48 +287,33 @@ public class EasyR5Runner {
             w.write(header.toString());
             w.write('\n');
 
+            List<Future<OriginResult>> futures = new ArrayList<>(total);
             for (Pt origin : slice) {
-                RegionalTask task = baseTask(network, origin, job, percentiles, transitModes);
-                task.destinationPointSets = new PointSet[]{pointSet};
-                int[][] transit = new TravelTimeComputer(task, network).computeTravelTimes().travelTimes.getValues();
+                futures.add(pool.submit(() -> routeOneOrigin(
+                        origin, network, job, percentiles, transitModes, transitRun,
+                        medianIdx, pointSet, dests, maxTripMinutes, writeUnreachable)));
+            }
 
-                int[] walkMedian = null;
-                if (transitRun) {
-                    RegionalTask walkTask = baseTask(network, origin, job, percentiles,
-                            EnumSet.noneOf(TransitModes.class));
-                    walkTask.destinationPointSets = new PointSet[]{pointSet};
-                    int[][] walk = new TravelTimeComputer(walkTask, network)
-                            .computeTravelTimes().travelTimes.getValues();
-                    walkMedian = walk[medianIdx];
+            // Consumed in submission (= origin) order, not completion order, so
+            // the CSV's row order is identical to the old sequential loop even
+            // though the routing above ran concurrently.
+            for (Future<OriginResult> future : futures) {
+                OriginResult r;
+                try {
+                    r = future.get();
+                } catch (ExecutionException e) {
+                    Throwable cause = e.getCause();
+                    if (cause instanceof RuntimeException) {
+                        throw (RuntimeException) cause;
+                    }
+                    if (cause instanceof Error) {
+                        throw (Error) cause;
+                    }
+                    throw new RuntimeException(cause);
                 }
-
-                for (int d = 0; d < dests.size(); d++) {
-                    boolean anyReached = false;
-                    StringBuilder cells = new StringBuilder();
-                    for (int p = 0; p < percentiles.length; p++) {
-                        int tt = transit[p][d];
-                        cells.append(',');
-                        if (tt < Integer.MAX_VALUE && tt <= maxTripMinutes) {
-                            cells.append(tt);
-                            anyReached = true;
-                        }
-                    }
-                    if (anyReached || writeUnreachable) {
-                        w.write(origin.id);
-                        w.write(',');
-                        w.write(dests.get(d).id);
-                        w.write(cells.toString());
-                        w.write('\n');
-                        rowsWritten++;
-                    }
-                    if (transitRun && walkMedian != null) {
-                        int t = transit[medianIdx][d];
-                        int wk = walkMedian[d];
-                        if (t < Integer.MAX_VALUE && (wk >= Integer.MAX_VALUE || t < wk)) {
-                            transitUsedPairs++;
-                        }
-                    }
-                }
+                w.write(r.csv);
+                rowsWritten += r.rowsWritten;
+                transitUsedPairs += r.transitUsedPairs;
 
                 done++;
                 long now = System.currentTimeMillis();
@@ -314,6 +322,8 @@ public class EasyR5Runner {
                     lastProgress = now;
                 }
             }
+        } finally {
+            pool.shutdownNow();
         }
 
         Emit.result("routing_seconds",
@@ -321,6 +331,59 @@ public class EasyR5Runner {
         Emit.result("transit_used_pairs", Long.toString(transitUsedPairs));
         Emit.result("origins_done", Integer.toString(total));
         Emit.done(outCsv, rowsWritten);
+    }
+
+    /** One origin's routing + row-building, run on a worker thread — see doMatrix's javadoc
+     * for why this is safe to call concurrently against the same TransportNetwork/PointSet. */
+    private static OriginResult routeOneOrigin(Pt origin, TransportNetwork network, JsonNode job,
+            int[] percentiles, EnumSet<TransitModes> transitModes, boolean transitRun,
+            int medianIdx, PointSet pointSet, List<Pt> dests, int maxTripMinutes,
+            boolean writeUnreachable) {
+        RegionalTask task = baseTask(network, origin, job, percentiles, transitModes);
+        task.destinationPointSets = new PointSet[]{pointSet};
+        int[][] transit = new TravelTimeComputer(task, network).computeTravelTimes().travelTimes.getValues();
+
+        int[] walkMedian = null;
+        if (transitRun) {
+            RegionalTask walkTask = baseTask(network, origin, job, percentiles,
+                    EnumSet.noneOf(TransitModes.class));
+            walkTask.destinationPointSets = new PointSet[]{pointSet};
+            int[][] walk = new TravelTimeComputer(walkTask, network)
+                    .computeTravelTimes().travelTimes.getValues();
+            walkMedian = walk[medianIdx];
+        }
+
+        StringBuilder out = new StringBuilder();
+        long rowsWritten = 0;
+        long transitUsedPairs = 0;
+        for (int d = 0; d < dests.size(); d++) {
+            boolean anyReached = false;
+            StringBuilder cells = new StringBuilder();
+            for (int p = 0; p < percentiles.length; p++) {
+                int tt = transit[p][d];
+                cells.append(',');
+                if (tt < Integer.MAX_VALUE && tt <= maxTripMinutes) {
+                    cells.append(tt);
+                    anyReached = true;
+                }
+            }
+            if (anyReached || writeUnreachable) {
+                out.append(origin.id).append(',').append(dests.get(d).id).append(cells).append('\n');
+                rowsWritten++;
+            }
+            if (transitRun && walkMedian != null) {
+                int t = transit[medianIdx][d];
+                int wk = walkMedian[d];
+                if (t < Integer.MAX_VALUE && (wk >= Integer.MAX_VALUE || t < wk)) {
+                    transitUsedPairs++;
+                }
+            }
+        }
+        return new OriginResult(out.toString(), rowsWritten, transitUsedPairs);
+    }
+
+    /** One origin's CSV chunk plus its row/transit-use counts, handed back from a worker thread. */
+    record OriginResult(String csv, long rowsWritten, long transitUsedPairs) {
     }
 
     /** RegionalTask per Probe.java baseTask(), parametrised from the job. */
