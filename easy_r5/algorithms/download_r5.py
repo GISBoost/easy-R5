@@ -87,7 +87,7 @@ class DownloadR5(QgsProcessingAlgorithm):
             QgsProcessingParameterFile(
                 self.TARGET_FOLDER,
                 self.tr("Destination folder for the JDK and R5 jar"),
-                behavior=QgsProcessingParameterFile.Folder,
+                behavior=QgsProcessingParameterFile.Behavior.Folder,
                 defaultValue=str(Path.home() / "easy-r5"),
             )
         )
@@ -107,7 +107,7 @@ class DownloadR5(QgsProcessingAlgorithm):
             options=[self.tr(s) for s in self._PLATFORM_OPTIONS],
             defaultValue=0,
         )
-        plat.setFlags(plat.flags() | QgsProcessingParameterDefinition.FlagAdvanced)
+        plat.setFlags(plat.flags() | QgsProcessingParameterDefinition.Flag.FlagAdvanced)
         self.addParameter(plat)
 
         self.addOutput(QgsProcessingOutputString(self.JDK_PATH, self.tr("JDK java binary path")))

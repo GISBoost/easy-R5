@@ -85,7 +85,7 @@ class RunAccessibility(MatrixBase, QgsProcessingAlgorithm):
             QgsProcessingParameterField(
                 self.OPPORTUNITY_FIELDS, self.tr("Opportunity fields on the destination layer"),
                 parentLayerParameterName=self.DESTINATIONS,
-                type=QgsProcessingParameterField.Numeric, allowMultiple=True,
+                type=QgsProcessingParameterField.DataType.Numeric, allowMultiple=True,
             )
         )
         self.addParameter(
@@ -223,5 +223,5 @@ class RunAccessibility(MatrixBase, QgsProcessingAlgorithm):
                 + [per_origin.get(n, 0) for n in acc_field_names]
                 + meta_values
             )
-            sink.addFeature(out, QgsFeatureSink.FastInsert)
+            sink.addFeature(out, QgsFeatureSink.Flag.FastInsert)
         return sink_id

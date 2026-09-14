@@ -66,14 +66,14 @@ class PopulationOverlay(QgsProcessingAlgorithm):
             QgsProcessingParameterVectorLayer(
                 self.HEX_GRID,
                 self.tr("Hex grid"),
-                types=[QgsProcessing.TypeVectorPolygon],
+                types=[QgsProcessing.SourceType.TypeVectorPolygon],
             )
         )
         self.addParameter(
             QgsProcessingParameterVectorLayer(
                 self.POPULATION_LAYER,
                 self.tr("Population layer"),
-                types=[QgsProcessing.TypeVectorPolygon],
+                types=[QgsProcessing.SourceType.TypeVectorPolygon],
             )
         )
         self.addParameter(
@@ -81,7 +81,7 @@ class PopulationOverlay(QgsProcessingAlgorithm):
                 self.POPULATION_FIELD,
                 self.tr("Population field"),
                 parentLayerParameterName=self.POPULATION_LAYER,
-                type=QgsProcessingParameterField.Numeric,
+                type=QgsProcessingParameterField.DataType.Numeric,
                 defaultValue="pop20_29",
             )
         )
@@ -89,7 +89,7 @@ class PopulationOverlay(QgsProcessingAlgorithm):
             QgsProcessingParameterFeatureSink(
                 self.OUTPUT,
                 self.tr("Output (hex grid with population count)"),
-                type=QgsProcessing.TypeVectorPolygon,
+                type=QgsProcessing.SourceType.TypeVectorPolygon,
             )
         )
 
@@ -114,7 +114,7 @@ class PopulationOverlay(QgsProcessingAlgorithm):
                 "(e.g. EPSG:2180, EPSG:3857). Got: {}.".format(hex_crs.authid())
             ))
 
-        if pop_layer.geometryType() != QgsWkbTypes.PolygonGeometry:
+        if pop_layer.geometryType() != QgsWkbTypes.GeometryType.PolygonGeometry:
             raise QgsProcessingException(self.tr(
                 "Population layer must be polygonal, got '{}'.".format(
                     QgsWkbTypes.geometryDisplayString(pop_layer.geometryType())
@@ -319,6 +319,6 @@ class PopulationOverlay(QgsProcessingAlgorithm):
             result_layer.fields(), result_layer.wkbType(), result_layer.sourceCrs(),
         )
         for feat in result_layer.getFeatures():
-            sink.addFeature(feat, QgsFeatureSink.FastInsert)
+            sink.addFeature(feat, QgsFeatureSink.Flag.FastInsert)
 
         return {self.OUTPUT: dest_id}

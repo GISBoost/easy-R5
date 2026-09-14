@@ -82,18 +82,18 @@ class DownloadRealizedGtfs(QgsProcessingAlgorithm):
             options=[self.tr(x) for x in gtfs_dashboard.VARIANT_LABELS], defaultValue=0))
         self.addParameter(QgsProcessingParameterFile(
             self.TARGET_FOLDER, self.tr("Download into folder"),
-            behavior=QgsProcessingParameterFile.Folder,
+            behavior=QgsProcessingParameterFile.Behavior.Folder,
             defaultValue=settings.get("transit_data_folder", "") or None))
 
         murl = QgsProcessingParameterString(
             self.MANIFEST_URL, self.tr("Manifest URL (blank = default)"), optional=True)
-        murl.setFlags(murl.flags() | QgsProcessingParameterDefinition.FlagAdvanced)
+        murl.setFlags(murl.flags() | QgsProcessingParameterDefinition.Flag.FlagAdvanced)
         self.addParameter(murl)
 
         force = QgsProcessingParameterBoolean(
             self.FORCE_REDOWNLOAD, self.tr("Re-download even if already present"),
             defaultValue=False)
-        force.setFlags(force.flags() | QgsProcessingParameterDefinition.FlagAdvanced)
+        force.setFlags(force.flags() | QgsProcessingParameterDefinition.Flag.FlagAdvanced)
         self.addParameter(force)
 
         self.addOutput(QgsProcessingOutputString(

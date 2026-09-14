@@ -86,7 +86,7 @@ class PreparePopulationLayer(QgsProcessingAlgorithm):
             QgsProcessingParameterFile(
                 self.EXCEL_FILE,
                 self.tr("GUS NSP 2021 Excel file"),
-                behavior=QgsProcessingParameterFile.File,
+                behavior=QgsProcessingParameterFile.Behavior.File,
                 fileFilter=self.tr("Excel files (*.xlsx)"),
             )
         )
@@ -109,7 +109,7 @@ class PreparePopulationLayer(QgsProcessingAlgorithm):
             QgsProcessingParameterVectorLayer(
                 self.GEOMETRY_LAYER,
                 self.tr("Census tract geometry layer"),
-                types=[QgsProcessing.TypeVectorPolygon],
+                types=[QgsProcessing.SourceType.TypeVectorPolygon],
             )
         )
         self.addParameter(
@@ -131,7 +131,7 @@ class PreparePopulationLayer(QgsProcessingAlgorithm):
             QgsProcessingParameterFeatureSink(
                 self.OUTPUT,
                 self.tr("Output layer"),
-                type=QgsProcessing.TypeVectorPolygon,
+                type=QgsProcessing.SourceType.TypeVectorPolygon,
             )
         )
 
@@ -440,7 +440,7 @@ class PreparePopulationLayer(QgsProcessingAlgorithm):
                 unmatched_geom += 1
 
             out_feat.setAttributes(attrs)
-            sink.addFeature(out_feat, QgsFeatureSink.FastInsert)
+            sink.addFeature(out_feat, QgsFeatureSink.Flag.FastInsert)
 
             if feat_idx % 100 == 0:
                 feedback.setProgress(50 + int(45 * feat_idx / n_geom))

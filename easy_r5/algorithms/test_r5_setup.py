@@ -72,23 +72,23 @@ class TestR5Setup(QgsProcessingAlgorithm):
         jdk_param = QgsProcessingParameterFile(
             self.JDK_PATH,
             self.tr("Java 21 binary (only if not using the saved path)"),
-            behavior=QgsProcessingParameterFile.File,
+            behavior=QgsProcessingParameterFile.Behavior.File,
         )
         jdk_param.setFlags(
             jdk_param.flags()
-            | QgsProcessingParameterDefinition.FlagOptional
-            | QgsProcessingParameterDefinition.FlagAdvanced
+            | QgsProcessingParameterDefinition.Flag.FlagOptional
+            | QgsProcessingParameterDefinition.Flag.FlagAdvanced
         )
         self.addParameter(jdk_param)
 
         net_param = QgsProcessingParameterFile(
             self.NETWORK_DAT,
             self.tr("network.dat to probe with command=info (optional)"),
-            behavior=QgsProcessingParameterFile.File,
+            behavior=QgsProcessingParameterFile.Behavior.File,
             extension="dat",
         )
         net_param.setFlags(
-            net_param.flags() | QgsProcessingParameterDefinition.FlagOptional
+            net_param.flags() | QgsProcessingParameterDefinition.Flag.FlagOptional
         )
         self.addParameter(net_param)
 

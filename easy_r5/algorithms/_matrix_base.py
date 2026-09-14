@@ -124,14 +124,14 @@ class MatrixBase:
     # --- parameter wiring -------------------------------------------------
 
     def _advanced(self, param):
-        param.setFlags(param.flags() | QgsProcessingParameterDefinition.FlagAdvanced)
+        param.setFlags(param.flags() | QgsProcessingParameterDefinition.Flag.FlagAdvanced)
         self.addParameter(param)
 
     def _add_matrix_params(self, percentile_help, with_destinations=True):
         self.addParameter(
             QgsProcessingParameterFile(
                 self.NETWORK, _tr("R5 network (network.dat)"),
-                behavior=QgsProcessingParameterFile.File, extension="dat",
+                behavior=QgsProcessingParameterFile.Behavior.File, extension="dat",
             )
         )
         self.addParameter(
@@ -141,7 +141,7 @@ class MatrixBase:
             self.ORIGIN_ID_FIELD, _tr("Origin id field (blank = feature id)"),
             parentLayerParameterName=self.ORIGINS, optional=True,
         )
-        oid.setFlags(oid.flags() | QgsProcessingParameterDefinition.FlagOptional)
+        oid.setFlags(oid.flags() | QgsProcessingParameterDefinition.Flag.FlagOptional)
         self.addParameter(oid)
         if with_destinations:
             self.addParameter(
@@ -152,13 +152,13 @@ class MatrixBase:
                 self.DEST_ID_FIELD, _tr("Destination id field (blank = feature id)"),
                 parentLayerParameterName=self.DESTINATIONS, optional=True,
             )
-            did.setFlags(did.flags() | QgsProcessingParameterDefinition.FlagOptional)
+            did.setFlags(did.flags() | QgsProcessingParameterDefinition.Flag.FlagOptional)
             self.addParameter(did)
 
         dt = QgsProcessingParameterString(
             self.DATE, _tr("Date (yyyy-MM-dd; required for transit)"), optional=True
         )
-        dt.setFlags(dt.flags() | QgsProcessingParameterDefinition.FlagOptional)
+        dt.setFlags(dt.flags() | QgsProcessingParameterDefinition.Flag.FlagOptional)
         self.addParameter(dt)
         self.addParameter(
             QgsProcessingParameterString(
@@ -168,7 +168,7 @@ class MatrixBase:
         self.addParameter(
             QgsProcessingParameterNumber(
                 self.TIME_WINDOW, _tr("Departure window (minutes)"),
-                type=QgsProcessingParameterNumber.Integer, defaultValue=120, minValue=1,
+                type=QgsProcessingParameterNumber.Type.Integer, defaultValue=120, minValue=1,
             )
         )
         self.addParameter(
@@ -177,19 +177,19 @@ class MatrixBase:
         self.addParameter(
             QgsProcessingParameterNumber(
                 self.MAX_TRIP_DURATION, _tr("Max trip duration (minutes)"),
-                type=QgsProcessingParameterNumber.Integer, defaultValue=90, minValue=1,
+                type=QgsProcessingParameterNumber.Type.Integer, defaultValue=90, minValue=1,
             )
         )
         self.addParameter(
             QgsProcessingParameterNumber(
                 self.WALK_SPEED, _tr("Walk speed (km/h)"),
-                type=QgsProcessingParameterNumber.Double, defaultValue=3.6, minValue=0.1,
+                type=QgsProcessingParameterNumber.Type.Double, defaultValue=3.6, minValue=0.1,
             )
         )
         self.addParameter(
             QgsProcessingParameterNumber(
                 self.MAX_RIDES, _tr("Max transit rides (transfers + 1)"),
-                type=QgsProcessingParameterNumber.Integer, defaultValue=3, minValue=1,
+                type=QgsProcessingParameterNumber.Type.Integer, defaultValue=3, minValue=1,
             )
         )
         self.addParameter(
@@ -206,19 +206,19 @@ class MatrixBase:
         self._advanced(
             QgsProcessingParameterNumber(
                 self.MAX_WALK_TIME, _tr("Max walk time (minutes; blank = lossless default)"),
-                type=QgsProcessingParameterNumber.Integer, optional=True, minValue=1,
+                type=QgsProcessingParameterNumber.Type.Integer, optional=True, minValue=1,
             )
         )
         self._advanced(
             QgsProcessingParameterNumber(
                 self.MONTE_CARLO_DRAWS, _tr("Monte Carlo draws per minute"),
-                type=QgsProcessingParameterNumber.Integer, defaultValue=5, minValue=1,
+                type=QgsProcessingParameterNumber.Type.Integer, defaultValue=5, minValue=1,
             )
         )
         self._advanced(
             QgsProcessingParameterNumber(
                 self.BATCH_SIZE, _tr("Origins per batch process"),
-                type=QgsProcessingParameterNumber.Integer, defaultValue=500,
+                type=QgsProcessingParameterNumber.Type.Integer, defaultValue=500,
                 minValue=100, maxValue=5000,
             )
         )
@@ -237,7 +237,7 @@ class MatrixBase:
         self._advanced(
             QgsProcessingParameterNumber(
                 self.JAVA_HEAP_GB, _tr("Java heap (GB; blank = auto)"),
-                type=QgsProcessingParameterNumber.Integer, optional=True, minValue=1,
+                type=QgsProcessingParameterNumber.Type.Integer, optional=True, minValue=1,
             )
         )
 

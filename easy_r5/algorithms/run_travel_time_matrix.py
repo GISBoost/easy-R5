@@ -85,7 +85,7 @@ class RunTravelTimeMatrix(MatrixBase, QgsProcessingAlgorithm):
             self.OUTPUT_LAYER, self.tr("Output OD lines (optional)"),
             optional=True, createByDefault=False,
         )
-        od.setFlags(od.flags() | QgsProcessingParameterDefinition.FlagOptional)
+        od.setFlags(od.flags() | QgsProcessingParameterDefinition.Flag.FlagOptional)
         self.addParameter(od)
 
     def processAlgorithm(self, parameters, context, feedback):  # noqa: N802
@@ -125,7 +125,7 @@ class RunTravelTimeMatrix(MatrixBase, QgsProcessingAlgorithm):
 
         sink, sink_id = self.parameterAsSink(
             parameters, self.OUTPUT_LAYER, context,
-            matrix.od_line_fields(), QgsWkbTypes.LineString, origins_crs,
+            matrix.od_line_fields(), QgsWkbTypes.Type.LineString, origins_crs,
         )
         if sink is None:
             return None

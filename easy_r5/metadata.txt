@@ -32,6 +32,11 @@ deprecated=False
 hasProcessingProvider=yes
 hasTranslations=yes
 changelog=0.2.1
+    * fix(qt6): every enum access across algorithms/ + gui/ fully qualified
+      (e.g. QgsFeatureSink.Flag.FastInsert, not QgsFeatureSink.FastInsert) —
+      the short form is a PyQt5-only convenience that PyQt6 drops, and QGIS
+      3.40 can be built against either. 53 call sites, no logic change,
+      identical behaviour under Qt5.
     * fix(matrix): points — a destination/origin layer whose schema changed on
       disk after being loaded into QGIS (e.g. columns added by another
       script/algorithm run) could leave the project holding a stale cached

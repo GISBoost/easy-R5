@@ -106,13 +106,13 @@ class GenerateIsochrones(MatrixBase, QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterNumber(
                 self.GRID_SPACING, self.tr("Grid spacing (metres)"),
-                type=QgsProcessingParameterNumber.Integer, defaultValue=250, minValue=25,
+                type=QgsProcessingParameterNumber.Type.Integer, defaultValue=250, minValue=25,
             )
         )
         self.addParameter(
             QgsProcessingParameterFeatureSink(
                 self.OUTPUT_LAYER, self.tr("Output isochrones"),
-                type=QgsProcessing.TypeVectorPolygon,
+                type=QgsProcessing.SourceType.TypeVectorPolygon,
             )
         )
 
@@ -164,7 +164,7 @@ class GenerateIsochrones(MatrixBase, QgsProcessingAlgorithm):
             # output in the origin layer's CRS, like RunAccessibility
             sink, sink_id = self.parameterAsSink(
                 parameters, self.OUTPUT_LAYER, context, self._out_fields(),
-                QgsWkbTypes.MultiPolygon, origins_crs,
+                QgsWkbTypes.Type.MultiPolygon, origins_crs,
             )
             if sink is None:
                 raise QgsProcessingException(self.tr("Could not create the output layer."))
@@ -357,7 +357,7 @@ class GenerateIsochrones(MatrixBase, QgsProcessingAlgorithm):
                 out = QgsFeature(self._out_fields())
                 out.setGeometry(geom)
                 out.setAttributes([str(origin_id), c] + meta_values)
-                sink.addFeature(out, QgsFeatureSink.FastInsert)
+                sink.addFeature(out, QgsFeatureSink.Flag.FastInsert)
                 written += 1
             except Exception as exc:  # noqa: BLE001
                 feedback.pushWarning(

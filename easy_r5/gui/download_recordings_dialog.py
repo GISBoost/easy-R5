@@ -80,7 +80,7 @@ class DownloadRecordingsDialog(QDialog):
         form.addRow(_tr("Variant:"), self._variant)
 
         self._folder = QgsFileWidget()
-        self._folder.setStorageMode(QgsFileWidget.GetDirectory)
+        self._folder.setStorageMode(QgsFileWidget.StorageMode.GetDirectory)
         self._folder.setFilePath(settings.get("transit_data_folder", ""))
         form.addRow(_tr("Download into:"), self._folder)
         v.addLayout(form)
@@ -125,7 +125,7 @@ class DownloadRecordingsDialog(QDialog):
     def _load_manifest(self):
         self._retry.hide()
         self._status.setText(_tr("Connecting to the server…"))
-        QApplication.setOverrideCursor(Qt.WaitCursor)
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         QApplication.processEvents()
         try:
             cache_str = settings.get("cache_folder", "")
@@ -217,7 +217,7 @@ class DownloadRecordingsDialog(QDialog):
             "TARGET_FOLDER": folder,
         }
         pd = QProgressDialog(_tr("Downloading…"), _tr("Cancel"), 0, 100, self)
-        pd.setWindowModality(Qt.WindowModal)
+        pd.setWindowModality(Qt.WindowModality.WindowModal)
         pd.setMinimumDuration(0)
         feedback = _ProgressFeedback(pd)
         self._btn_download.setEnabled(False)
@@ -237,8 +237,8 @@ class DownloadRecordingsDialog(QDialog):
         box.setText(_tr(
             "Saved to:\n{}\n\nThis folder is now the default 'Folder of GTFS "
             "feeds' in 'Build R5 network'.").format(out))
-        open_btn = box.addButton(_tr("Open folder"), QMessageBox.ActionRole)
-        box.addButton(QMessageBox.Close)
+        open_btn = box.addButton(_tr("Open folder"), QMessageBox.ButtonRole.ActionRole)
+        box.addButton(QMessageBox.StandardButton.Close)
         box.exec()
         if box.clickedButton() is open_btn:
             QDesktopServices.openUrl(QUrl.fromLocalFile(out))

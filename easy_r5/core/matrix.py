@@ -138,7 +138,7 @@ def build_od_lines(csv_path, origin_xy, dest_xy, meta, sink, to_crs=None):
                 [row["from_id"], row["to_id"], float(tt) if tt else None]
                 + [meta.get(key) for key in _META_FIELDS]
             )
-            sink.addFeature(feat, QgsFeatureSink.FastInsert)
+            sink.addFeature(feat, QgsFeatureSink.Flag.FastInsert)
             added += 1
     return added
 

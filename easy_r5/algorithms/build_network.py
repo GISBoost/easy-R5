@@ -79,7 +79,7 @@ class BuildNetwork(QgsProcessingAlgorithm):
             QgsProcessingParameterFile(
                 self.OSM_PBF,
                 self.tr("OSM extract (.osm.pbf)"),
-                behavior=QgsProcessingParameterFile.File,
+                behavior=QgsProcessingParameterFile.Behavior.File,
                 extension="pbf",
             )
         )
@@ -87,7 +87,7 @@ class BuildNetwork(QgsProcessingAlgorithm):
             QgsProcessingParameterFile(
                 self.GTFS_FOLDER,
                 self.tr("Folder of GTFS feeds (every .zip inside is used)"),
-                behavior=QgsProcessingParameterFile.Folder,
+                behavior=QgsProcessingParameterFile.Behavior.Folder,
                 # 'Download transit recordings…' saves its last output here
                 defaultValue=settings.get("last_gtfs_folder", "") or None,
             )
@@ -95,16 +95,16 @@ class BuildNetwork(QgsProcessingAlgorithm):
         cache = QgsProcessingParameterFile(
             self.CACHE_FOLDER,
             self.tr("Network cache folder (blank = plugin default)"),
-            behavior=QgsProcessingParameterFile.Folder,
+            behavior=QgsProcessingParameterFile.Behavior.Folder,
         )
-        cache.setFlags(cache.flags() | QgsProcessingParameterDefinition.FlagOptional)
+        cache.setFlags(cache.flags() | QgsProcessingParameterDefinition.Flag.FlagOptional)
         self.addParameter(cache)
 
         force = QgsProcessingParameterBoolean(
             self.FORCE_REBUILD, self.tr("Force rebuild (ignore the cache)"),
             defaultValue=False,
         )
-        force.setFlags(force.flags() | QgsProcessingParameterDefinition.FlagAdvanced)
+        force.setFlags(force.flags() | QgsProcessingParameterDefinition.Flag.FlagAdvanced)
         self.addParameter(force)
 
         self.addOutput(QgsProcessingOutputString(self.NETWORK_DAT, self.tr("network.dat path")))

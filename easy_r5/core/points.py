@@ -86,7 +86,7 @@ def write_points_csv(source, context, feedback, id_field, out_path, *, label="po
         QgsWkbTypes,
     )
 
-    if QgsWkbTypes.geometryType(source.wkbType()) != QgsWkbTypes.PointGeometry:
+    if QgsWkbTypes.geometryType(source.wkbType()) != QgsWkbTypes.GeometryType.PointGeometry:
         raise ValueError(
             "{} layer must be a point layer (got {}).".format(
                 label, QgsWkbTypes.displayString(source.wkbType())
