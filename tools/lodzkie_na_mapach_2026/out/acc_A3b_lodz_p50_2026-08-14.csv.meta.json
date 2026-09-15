@@ -1,0 +1,11 @@
+{
+  "r5_version": "7.6",
+  "network_hash": "735859e0a10ba5cb",
+  "run_date": "2026-08-14",
+  "departure_time": "07:00",
+  "time_window": 120,
+  "percentile": "50",
+  "modes": "TRANSIT + WALK",
+  "transit_submodes": "ALL",
+  "decay": "STEP"
+}

@@ -75,6 +75,37 @@ NETWORK_SPEC = {
         "lodz.zip": RAW / "lodz_realized_2026-09-09_p50.zip",
         "lka_train.zip": RAW / "2026-09-10" / "lka_train.zip",
     },
+    # Vacation-vs-school-term robustness check (Michal, 2026-09-14): is the
+    # uniform negative delta a September/return-to-school artifact, or a
+    # standing Lodz characteristic? Static feed confirmed byte-identical
+    # (sha256 e2269d6b...) across all 4 August weekdays below -- edition
+    # "11484_11486_11488_11489", feed_start_date 20260810, DISTINCT from
+    # September's "11499_11500" edition (feed_start_date 20260901, the actual
+    # school-year timetable). 2026-08-12 checked and EXCLUDED: it is an
+    # earlier, different edition ("11484_11486", published 08-12 morning,
+    # superseded same week) -- mixing it with 08-13/14/17/18 would confound
+    # the comparison with an unrelated mid-vacation timetable amendment, not
+    # the wakacje-vs-rok-szkolny effect being tested.
+    "net_lodz_static_2026-08": {
+        "lodz.zip": RAW / "lodz_static_gtfs_2026-08-13.zip",
+        "lka_train.zip": RAW / "2026-09-10" / "lka_train.zip",
+    },
+    "net_lodz_p50_2026-08-13": {
+        "lodz.zip": RAW / "lodz_realized_2026-08-13_p50.zip",
+        "lka_train.zip": RAW / "2026-09-10" / "lka_train.zip",
+    },
+    "net_lodz_p50_2026-08-14": {
+        "lodz.zip": RAW / "lodz_realized_2026-08-14_p50.zip",
+        "lka_train.zip": RAW / "2026-09-10" / "lka_train.zip",
+    },
+    "net_lodz_p50_2026-08-17": {
+        "lodz.zip": RAW / "lodz_realized_2026-08-17_p50.zip",
+        "lka_train.zip": RAW / "2026-09-10" / "lka_train.zip",
+    },
+    "net_lodz_p50_2026-08-18": {
+        "lodz.zip": RAW / "lodz_realized_2026-08-18_p50.zip",
+        "lka_train.zip": RAW / "2026-09-10" / "lka_train.zip",
+    },
 }
 
 

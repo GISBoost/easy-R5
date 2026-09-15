@@ -112,6 +112,256 @@ def compute_delta_layer(static_csv, realized_csv, hex_layer_name, survivors, out
     return out
 
 
+def compute_level_layer(csv_path, hex_layer_name, survivors, out_gpkg, out_name):
+    """Level-only counterpart to compute_delta_layer, for a static-GTFS-only
+    pass with no realized side to compare against (voivodeship, 2026-09-14 --
+    Michal: this round only takes static GTFS into account, RT swap deferred).
+    Writes level_<cat>_c<cutoff> (+ level_total_c<cutoff>), no delta/base0/
+    net_delta_n bookkeeping since there is nothing to compare."""
+    import processing
+    from qgis.core import QgsVectorLayer, QgsVectorFileWriter, QgsField
+    from qgis.PyQt.QtCore import QVariant
+
+    wide = load_wide(csv_path, survivors, CUTOFFS)
+
+    hex_layer = QgsVectorLayer(f"{GPKG}|layername={hex_layer_name}", hex_layer_name, "ogr")
+    out = processing.run("native:fixgeometries", {"INPUT": hex_layer, "OUTPUT": "memory:"})["OUTPUT"]
+
+    fields_to_add = [QgsField(f"level_{cat}_c{c}", QVariant.Double, len=12, prec=2)
+                      for cat in survivors + ["total"] for c in CUTOFFS]
+    out.dataProvider().addAttributes(fields_to_add)
+    out.updateFields()
+
+    out.startEditing()
+    idx = {f.name(): out.fields().indexOf(f.name()) for f in fields_to_add}
+    missing_hex = []
+    for f in out.getFeatures():
+        hid = str(f["hex_id"])
+        vals = wide.get(hid)
+        if vals is None:
+            missing_hex.append(hid)
+            continue
+        for c in CUTOFFS:
+            total = 0.0
+            for cat in survivors:
+                v = vals.get((f"srv_{cat}", c), 0) or 0
+                out.changeAttributeValue(f.id(), idx[f"level_{cat}_c{c}"], v)
+                total += v
+            out.changeAttributeValue(f.id(), idx[f"level_total_c{c}"], total)
+    out.commitChanges()
+
+    if missing_hex:
+        print(f"  WARNING: {len(missing_hex)} hexagons in {hex_layer_name} missing from "
+              f"accessibility results -- check run coverage")
+
+    opts = QgsVectorFileWriter.SaveVectorOptions()
+    opts.driverName = "GPKG"
+    opts.layerName = out_name
+    opts.actionOnExistingFile = QgsVectorFileWriter.CreateOrOverwriteLayer
+    QgsVectorFileWriter.writeAsVectorFormatV3(out, str(GPKG), out.transformContext(), opts)
+    print(f"  wrote {out_name} ({out.featureCount()} hexagons, {len(missing_hex)} missing)")
+    return out
+
+
+def population_weighted_level_summary(hex_layer, survivors, pop_field="pop_total"):
+    rows = []
+    for cat in survivors + ["total"]:
+        for c in CUTOFFS:
+            ws, wt, n = 0.0, 0.0, 0
+            for f in hex_layer.getFeatures():
+                pop = f[pop_field] or 0
+                v = f[f"level_{cat}_c{c}"]
+                if v is None:
+                    continue
+                ws += pop * v
+                wt += pop
+                n += 1
+            mean = ws / wt if wt else None
+            rows.append({"category": cat, "cutoff": c, "mean_level_pop_weighted": mean, "hexagons": n})
+    return rows
+
+
+def compute_threshold_sensitivity_layer(csv_path, hex_layer_name, survivors, out_gpkg, out_name,
+                                          cutoffs=(30, 60)):
+    """'Delta' redefined (Michal, 2026-09-14): with no RT comparison at
+    voivodeship scale, this measures how much accessibility GROWS when the
+    cutoff doubles (30 -> 60 min) instead of static-vs-realized. Per hex per
+    category (+ total): level_<cat>_c30, level_<cat>_c60, growth_<cat>
+    (c60-c30), ratio_<cat> (c60/c30, None if c30==0 -- can't compute a ratio
+    from zero, and "infinite growth" is not a useful map value). A ratio near
+    2.0 means accessibility scales roughly linearly with time budget in that
+    area; well above 2.0 means the extra 30 min unlocks a disproportionate
+    amount (e.g. reaching a denser hub); well below means diminishing
+    returns (most reachable POI were already within 30 min)."""
+    import processing
+    from qgis.core import QgsVectorLayer, QgsVectorFileWriter, QgsField
+    from qgis.PyQt.QtCore import QVariant
+
+    wide = load_wide(csv_path, survivors, list(cutoffs))
+
+    hex_layer = QgsVectorLayer(f"{GPKG}|layername={hex_layer_name}", hex_layer_name, "ogr")
+    out = processing.run("native:fixgeometries", {"INPUT": hex_layer, "OUTPUT": "memory:"})["OUTPUT"]
+
+    c_lo, c_hi = cutoffs
+    cats = survivors + ["total"]
+    fields_to_add = []
+    for cat in cats:
+        fields_to_add += [
+            QgsField(f"level_{cat}_c{c_lo}", QVariant.Double, len=12, prec=2),
+            QgsField(f"level_{cat}_c{c_hi}", QVariant.Double, len=12, prec=2),
+            QgsField(f"growth_{cat}", QVariant.Double, len=12, prec=2),
+            QgsField(f"ratio_{cat}", QVariant.Double, len=12, prec=3),
+        ]
+    out.dataProvider().addAttributes(fields_to_add)
+    out.updateFields()
+
+    out.startEditing()
+    idx = {f.name(): out.fields().indexOf(f.name()) for f in fields_to_add}
+    missing_hex = []
+    for f in out.getFeatures():
+        hid = str(f["hex_id"])
+        vals = wide.get(hid)
+        if vals is None:
+            missing_hex.append(hid)
+            continue
+        for cat in cats:
+            if cat == "total":
+                lo = sum(vals.get((f"srv_{c}", c_lo), 0) or 0 for c in survivors)
+                hi = sum(vals.get((f"srv_{c}", c_hi), 0) or 0 for c in survivors)
+            else:
+                lo = vals.get((f"srv_{cat}", c_lo), 0) or 0
+                hi = vals.get((f"srv_{cat}", c_hi), 0) or 0
+            out.changeAttributeValue(f.id(), idx[f"level_{cat}_c{c_lo}"], lo)
+            out.changeAttributeValue(f.id(), idx[f"level_{cat}_c{c_hi}"], hi)
+            out.changeAttributeValue(f.id(), idx[f"growth_{cat}"], hi - lo)
+            out.changeAttributeValue(f.id(), idx[f"ratio_{cat}"], (hi / lo) if lo else None)
+    out.commitChanges()
+
+    if missing_hex:
+        print(f"  WARNING: {len(missing_hex)} hexagons in {hex_layer_name} missing from "
+              f"accessibility results -- check run coverage")
+
+    opts = QgsVectorFileWriter.SaveVectorOptions()
+    opts.driverName = "GPKG"
+    opts.layerName = out_name
+    opts.actionOnExistingFile = QgsVectorFileWriter.CreateOrOverwriteLayer
+    QgsVectorFileWriter.writeAsVectorFormatV3(out, str(GPKG), out.transformContext(), opts)
+    print(f"  wrote {out_name} ({out.featureCount()} hexagons, {len(missing_hex)} missing)")
+    return out
+
+
+def _null_to_none(v):
+    """PyQGIS feature[field] can return an invalid QVariant instead of
+    Python None for a NULL numeric field (seen here for ratio_<cat>, which
+    is legitimately NULL whenever c30==0) -- normalize both to None."""
+    if v is None:
+        return None
+    if hasattr(v, "isNull") and v.isNull():
+        return None
+    return v
+
+
+def population_weighted_threshold_summary(hex_layer, survivors, pop_field="pop_total"):
+    """Pop-weighted mean ratio (c60/c30, only hexagons with c30>0 -- matches
+    the 'can't compute a ratio from zero' rule above) and mean growth
+    (c60-c30, all hexagons with data), per category + total. This is the
+    number that answers Michal's question directly: does accessibility
+    roughly double when the time budget doubles?"""
+    rows = []
+    for cat in survivors + ["total"]:
+        ws_ratio = wt_ratio = 0.0
+        n_ratio = 0
+        ws_growth = wt_growth = 0.0
+        n_growth = 0
+        n_emerged = 0       # c30 == 0, c60 > 0 -- "unlocked" by the wider budget
+        n_still_zero = 0    # c30 == 0 AND c60 == 0 -- genuinely unreachable either way
+        pop_lo_sum = pop_hi_sum = 0.0  # for the ratio-of-sums (outlier-robust) statistic
+        for f in hex_layer.getFeatures():
+            pop = f[pop_field] or 0
+            ratio = _null_to_none(f[f"ratio_{cat}"])
+            growth = _null_to_none(f[f"growth_{cat}"])
+            lo = _null_to_none(f[f"level_{cat}_c30"])
+            hi = _null_to_none(f[f"level_{cat}_c60"])
+            if ratio is not None:
+                ws_ratio += pop * ratio
+                wt_ratio += pop
+                n_ratio += 1
+            elif lo == 0:
+                if hi and hi > 0:
+                    n_emerged += 1
+                else:
+                    n_still_zero += 1
+            if growth is not None:
+                ws_growth += pop * growth
+                wt_growth += pop
+                n_growth += 1
+            if lo is not None and hi is not None:
+                pop_lo_sum += pop * lo
+                pop_hi_sum += pop * hi
+        rows.append({
+            "category": cat,
+            # mean of per-hex ratios (only hexes with c30>0) -- sensitive to
+            # hexes with a tiny denominator (c30=1 -> c60=9 counts as much as
+            # c30=100 -> c60=200), so also report...
+            "mean_ratio_c60_c30_pop_weighted": (ws_ratio / wt_ratio) if wt_ratio else None,
+            # ...ratio of population-weighted SUMS -- one aggregate number,
+            # not an average of per-hex ratios, much less swayed by a few
+            # near-zero-denominator hexes. This is the more honest answer to
+            # "does it roughly double overall".
+            "ratio_of_pop_weighted_sums": (pop_hi_sum / pop_lo_sum) if pop_lo_sum else None,
+            "mean_growth_c60_c30_pop_weighted": (ws_growth / wt_growth) if wt_growth else None,
+            "hexagons_with_c30_access": n_ratio,
+            "hexagons_emerged_c30_zero_c60_positive": n_emerged,
+            "hexagons_still_zero_at_c60": n_still_zero,
+        })
+    return rows
+
+
+def main_woj_threshold_sensitivity():
+    from qgis.core import QgsVectorLayer
+    dest = QgsVectorLayer(f"{GPKG}|layername=poi_targets_woj", "d", "ogr")
+    survivors = [f.name()[4:] for f in dest.fields() if f.name().startswith("srv_")]
+
+    layer = compute_threshold_sensitivity_layer(
+        C.OUT / "acc_A1_woj_static_thresholds.csv", "hex_woj_pop", survivors, GPKG,
+        "hex_woj_thresholds",
+    )
+    summary = population_weighted_threshold_summary(layer, survivors)
+    import csv
+    with open(C.OUT / "woj_threshold_summary.csv", "w", newline="", encoding="utf-8") as fh:
+        w = csv.DictWriter(fh, fieldnames=list(summary[0].keys()))
+        w.writeheader()
+        w.writerows(summary)
+    print("wrote out/woj_threshold_summary.csv")
+    for r in summary:
+        print(f"  {r['category']:20s} ratio={r['mean_ratio_c60_c30_pop_weighted']}"
+              f"  growth={r['mean_growth_c60_c30_pop_weighted']}")
+    return layer, summary
+
+
+def main_woj_level():
+    """Voivodeship, static-GTFS-only pass (2026-09-14): level from A1 alone,
+    no A2/RT delta this round (Michal's explicit scope decision). Writes
+    hex_woj_level (does not touch hex_woj_delta, which is stale from before
+    the large-park fix and out of scope here -- see HANDOFF.md open Q#4)."""
+    from qgis.core import QgsVectorLayer
+    dest = QgsVectorLayer(f"{GPKG}|layername=poi_targets_woj", "d", "ogr")
+    survivors = [f.name()[4:] for f in dest.fields() if f.name().startswith("srv_")]
+    print(f"categories: {survivors}")
+
+    level = compute_level_layer(
+        C.OUT / "acc_A1_woj_static.csv", "hex_woj_pop", survivors, GPKG, "hex_woj_level",
+    )
+    summary = population_weighted_level_summary(level, survivors)
+    import csv
+    with open(C.OUT / "woj_level_summary.csv", "w", newline="", encoding="utf-8") as fh:
+        w = csv.DictWriter(fh, fieldnames=list(summary[0].keys()))
+        w.writeheader()
+        w.writerows(summary)
+    print("wrote out/woj_level_summary.csv")
+    return {"level": level, "summary": summary}
+
+
 def population_weighted_summary(hex_layer, survivors, pop_field="pop_total"):
     """Sigma(pop * delta) / Sigma(pop), comparable hexagons only, per
     category per cutoff -- same formula throughout tools/realtime_delay_*."""
@@ -380,6 +630,101 @@ def compute_multiday_lodz_delta(survivors, out_gpkg, out_name="hex_lodz_delta_mu
         w.writerows(summary_rows)
     print("  wrote out/lodz_delta_summary_multiday.csv")
     return out, summary_rows
+
+
+# Vacation-vs-school-term check (Michal, 2026-09-14): same question as the
+# Sept multiday robustness check ("is the uniform negative delta real?"),
+# asked the other way ("is it a September/return-to-school thing, or does
+# Lodz do this in August too?"). Unlike Sept, one fixed static baseline does
+# NOT cover every day here -- 2026-08-13/14 (Wed/Thu) run service_id
+# "11484_11", 2026-08-17/18 (Mon/Tue) run "11489_11" (confirmed distinct via
+# validate_gtfs.active_service_ids) -- so each day is paired with its own
+# correct static CSV below, not one shared file.
+VACATION_DAY_STATIC = {
+    "2026-08-13": "acc_A3a_lodz_static_2026-08-13.csv",
+    "2026-08-14": "acc_A3a_lodz_static_2026-08-13.csv",  # same service_id as 08-13
+    "2026-08-17": "acc_A3a_lodz_static_2026-08-17.csv",
+    "2026-08-18": "acc_A3a_lodz_static_2026-08-17.csv",  # same service_id as 08-17
+}
+VACATION_DAY_REALIZED = {
+    "2026-08-13": "acc_A3b_lodz_p50_2026-08-13.csv",
+    "2026-08-14": "acc_A3b_lodz_p50_2026-08-14.csv",
+    "2026-08-17": "acc_A3b_lodz_p50_2026-08-17.csv",
+    "2026-08-18": "acc_A3b_lodz_p50_2026-08-18.csv",
+}
+
+
+def compute_vacation_vs_term_delta(survivors, cutoff=30):
+    """Same rule as compute_multiday_lodz_delta (delta = NULL if static
+    baseline is 0/NULL, mean population-weighted per category), applied to
+    4 independent August weekdays instead of 3 September ones. Each day
+    loads its OWN static CSV (see VACATION_DAY_STATIC) -- deliberately not
+    reusing compute_multiday_lodz_delta, which hardcodes one shared static
+    side. Writes out/lodz_delta_summary_vacation.csv, same shape as the
+    Sept multiday summary so the two are directly comparable."""
+    import csv as csv_mod
+    from qgis.core import QgsVectorLayer
+
+    static_wide = {
+        day: load_wide(C.OUT / fname, survivors, [cutoff])
+        for day, fname in VACATION_DAY_STATIC.items()
+    }
+    realized_wide = {
+        day: load_wide(C.OUT / fname, survivors, [cutoff])
+        for day, fname in VACATION_DAY_REALIZED.items()
+    }
+
+    def value(wide, hid, cat):
+        vals = wide.get(hid)
+        if not vals:
+            return None
+        if cat == "total":
+            return sum(vals.get((f"srv_{c}", cutoff), 0) or 0 for c in survivors)
+        return vals.get((f"srv_{cat}", cutoff))
+
+    pop_lyr = QgsVectorLayer(f"{GPKG}|layername=hex_lodz_pop", "h", "ogr")
+    pop = {str(f["hex_id"]): (f["pop_total"] or 0) for f in pop_lyr.getFeatures()}
+    hex_ids = list(pop)
+
+    days = list(VACATION_DAY_STATIC)
+    cats = survivors + ["total"]
+    summary_rows = []
+    for cat in cats:
+        per_day_means = {}
+        for day in days:
+            s_wide = static_wide[day]
+            r_wide = realized_wide[day]
+            ws = wt = 0.0
+            n_comp = n_zero = 0
+            for hid in hex_ids:
+                p = pop[hid]
+                s = value(s_wide, hid, cat)
+                if s is None or s == 0.0:
+                    n_zero += 1
+                    continue
+                r = value(r_wide, hid, cat)
+                if r is None:
+                    continue
+                ws += p * (r - s)
+                wt += p
+                n_comp += 1
+            mean = ws / wt if wt else None
+            per_day_means[day] = mean
+            summary_rows.append({"category": cat, "cutoff": cutoff, "day": day,
+                                  "mean_delta_pop_weighted": mean,
+                                  "hexagons_comparable": n_comp, "hexagons_zero_baseline": n_zero})
+        valid = [v for v in per_day_means.values() if v is not None]
+        avg4 = sum(valid) / len(valid) if valid else None
+        summary_rows.append({"category": cat, "cutoff": cutoff, "day": "avg_4day",
+                              "mean_delta_pop_weighted": avg4,
+                              "hexagons_comparable": "", "hexagons_zero_baseline": ""})
+
+    with open(C.OUT / "lodz_delta_summary_vacation.csv", "w", newline="", encoding="utf-8") as fh:
+        w = csv_mod.DictWriter(fh, fieldnames=list(summary_rows[0].keys()))
+        w.writeheader()
+        w.writerows(summary_rows)
+    print("  wrote out/lodz_delta_summary_vacation.csv")
+    return summary_rows
 
 
 def main():

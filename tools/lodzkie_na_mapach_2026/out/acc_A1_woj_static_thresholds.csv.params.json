@@ -20,9 +20,9 @@
     "srv_poczta",
     "srv_urzad_gminy"
   ],
-  "CUTOFFS": "30",
+  "CUTOFFS": "30,60",
   "DECAY": 0,
-  "OUTPUT_CSV": "C:\\Users\\Michal\\Desktop\\easy\\easy-R5\\tools\\lodzkie_na_mapach_2026\\out\\acc_A1_woj_static.csv",
-  "OUTPUT_LAYER": "C:\\Users\\Michal\\Desktop\\easy\\easy-R5\\tools\\lodzkie_na_mapach_2026\\out\\acc_A1_woj_static.gpkg",
+  "OUTPUT_CSV": "C:\\Users\\Michal\\Desktop\\easy\\easy-R5\\tools\\lodzkie_na_mapach_2026\\out\\acc_A1_woj_static_thresholds.csv",
+  "OUTPUT_LAYER": "C:\\Users\\Michal\\Desktop\\easy\\easy-R5\\tools\\lodzkie_na_mapach_2026\\out\\acc_A1_woj_static_thresholds.gpkg",
   "ALLOW_NO_SERVICE": true
 }

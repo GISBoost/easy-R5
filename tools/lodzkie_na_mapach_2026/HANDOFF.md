@@ -71,8 +71,8 @@ commity `25d9825`, `e09189d`, oba tickety zamknięte). Pełny log, dokładny opi
 | E4 — POI | ✅ zrobione, zweryfikowane | `prepare_poi.py` |
 | E5 — sieci R5 | ✅ zrobione (4 sieci) | `assemble_networks.py` + `build_networks.py` |
 | E6 — kalibracja | ✅ zrobione | `calibrate.py` |
-| E7 — 4 przebiegi dostępności | ✅ zrobione (Łódź: 21 kategorii finalne 2026-09-13) | `run_accessibility.py`; A1/A2 wojewódzkie nadal na starych, jednopunktowych parkach (pkt 4 niżej) |
-| E8 — delty, maska RT | ✅ zrobione (Łódź: 21 kategorii + 3-dniowy robustness finalne 2026-09-13) | `compute_metrics.py` |
+| E7 — 4 przebiegi dostępności | ✅ zrobione (Łódź: 21 kategorii finalne 2026-09-13; A1 wojewódzki przeliczony 2026-09-14 z poprawionymi parkami) | `run_accessibility.py`; **A2 (podmiana feedu Łodzi na RT) świadomie NIE przeliczony** -- Michał 2026-09-14: ta tura bierze pod uwagę tylko statyczny GTFS dla województwa, delta zostaje do ewentualnej kolejnej tury |
+| E8 — delty, maska RT | ✅ zrobione (Łódź: 21 kategorii + 3-dniowy robustness finalne 2026-09-13; poziom wojewódzki przeliczony 2026-09-14) | `compute_metrics.py`; nowa `compute_level_layer()`/`main_woj_level()` -- poziom bez delty, patrz sekcja 6.6a |
 | E9 — kartografia | 🟡 częściowo | style gotowe dla 10-kategoriowego układu (`style_layers.py`, projekt `lodzkie_2026.qgz`) -- **do sprawdzenia po rozszerzeniu Łodzi do 21 kategorii** (nazwy pól się nie zmieniły, ale liczba kategorii/zakres `total` tak); **plansze drukowe (layouty) NIE zrobione** |
 | E10 — pakiet zgłoszeniowy | ❌ nie zaczęte | zip z GPKG + QGZ + wydrukami + załącznik 1; poprawka literówki w metodologii |
 
@@ -420,6 +420,125 @@ w `config.py`). Sanity check sum per kategoria/cutoff dla A1 — patrz `poi_cove
 i logi w tym pliku sekcja 6.3; wszystkie kategorie mają rozsądny, nie-zdegenerowany
 rozkład (8-24% heksagonów z >0 dostępności w 30 min, rosnące przy 45 min).
 
+### 6.6a E7/E8 — 2026-09-14: A1 wojewódzki przeliczony, tylko statyczny GTFS
+
+Michał: "teraz przechodzimy do powtórzenia analizy dla całego województwa, bierzemy pod
+uwagę tylko statyczny gtfs" -- potwierdzone pytaniem wprost: **ta tura liczy tylko poziom
+(A1), nie deltę A2-A1**. `A2_woj_lodzrt` (podmiana feedu Łodzi na P50) świadomie nie
+przeliczona; `hex_woj_delta`/`Delta_wojewodztwo` **zostają nietknięte i nadal są stare**
+(sprzed poprawki dużych parków, `CUTOFFS="30,45"`) -- nie pokazywać jako aktualne.
+
+Co zrobione:
+1. `run_accessibility.run_one("A1_woj_static", ...)` -- rerun wymuszony automatycznie,
+   bo `CUTOFFS` w configu zmienił się z `"30,45"` na `"30"` (decyzja Michała z
+   2026-09-13), więc `already_done()` nie dopasował starych params.json niezależnie od
+   zmiany POI. **Ważna obserwacja przy okazji: `already_done()` porównuje tylko słownik
+   parametrów (w tym URI warstwy), nie hash zawartości pliku/tabeli -- gdyby CUTOFFS się
+   nie zmienił, sama poprawka parków (ta sama nazwa warstwy `poi_targets_woj`, więcej
+   wierszy) NIE zostałaby wykryta jako powód do rerunu.** To nie jest naprawione (nie w
+   zakresie tej tury), tylko odnotowane -- przy każdej zmianie zawartości warstwy bez
+   zmiany innych parametrów trzeba ręcznie skasować `.params.json` albo wymusić rerun.
+2. Zweryfikowane PRZED użyciem: `poi_targets_woj` na dysku = 11859 obiektów/10 pól `srv_*`
+   (zgodne z opisem poprawki parków, sekcja 6.3), `hex_woj_centroids` = 16864, sieć
+   `net_woj_static` niezmieniona (hash `095fcc7c871945a1`, nie wymaga rebuildu -- POI to
+   destynacje, nie wejście do budowy sieci). Zero procesów `java.exe` w tle przed startem.
+3. Przebieg: 206,9 s (10 kategorii x 16864 originów x 1 cutoff = 168640 wierszy CSV,
+   dokładnie tyle ile oczekiwane). Sanity check sum per kategoria: 6,7-23,4% heksagonów
+   niezerowych na 30 min -- ten sam rząd wielkości co kalibracja E6 (8,2% na próbce
+   powiatu pabianickiego), nie zdegenerowane (nie wszystko-zero, nie wszystko-max).
+4. **Nowa funkcja `compute_metrics.compute_level_layer()`/`main_woj_level()`** (poziom
+   bez delty -- nie ma z czym porównywać, skoro nie liczymy A2) -> nowa warstwa
+   `hex_woj_level` (pola `level_<kategoria>_c30` + `level_total_c30`, 16864 heksagonów,
+   0 brakujących) + `out/woj_level_summary.csv` (średnia ważona populacją per kategoria).
+   `total` ważony populacją = **151,6** POI osiągalnych w 30 min (nieważony: średnia 6,08,
+   maks. 1295 -- w centrum Łodzi). `hex_woj_delta`/`Delta_wojewodztwo` NIE nadpisane.
+5. `style_layers.py`'s poziom wojewódzki przestylowany na `hex_woj_level`/`level_total_c30`
+   (był: `hex_woj_delta`/`base_total_c30`, źle bo ta warstwa jest stara). Warstwa projektu
+   `Poziom_wojewodztwo` przepięta (`setDataSource`) na `hex_woj_level`, widoczna domyślnie
+   razem z `Granica_wojewodztwo` (reszta grupy `Wojewodztwo` zostaje OFF, jak dotychczas).
+6. Wizualna weryfikacja (`render_map`, cały zasięg województwa): wyraźny hotspot w Łodzi
+   (ciemnoniebieski, >120 POI/30min), mniejsze skupiska dokładnie przy pozostałych
+   miastach powiatowych z GTFS (Sieradz, Piotrków Trybunalski, Kutno, Bełchatów, Tomaszów
+   Maz., Skierniewice itd.), reszta województwa blado-żółta (0-5) -- zgodne z oczekiwaniem
+   z E1 (większość gmin ma słaby lub żaden GTFS). Zdrowy rozsądek geograficzny: PASS.
+7. Projekt zapisany (`save_project`).
+
+**Nie zrobione w tej turze (świadomie, poza zakresem):** A2/delta wojewódzka, RT maska
+wojewódzka (już istnieje z poprzedniej tury, niezmieniona, nadal ważna -- nie zależy od
+POI), plansze drukowe, pakiet zgłoszeniowy.
+
+### 6.6b E7/E8 — 2026-09-14: "delta" wojewódzka przedefiniowana jako wzrost 30→60 min
+
+Michał zauważył, że warstwa `Delta_wojewodztwo` w QGIS pokazywała stare dane (sprzed
+poprawki parków, patrz 6.6a) i zaproponował inne podejście: skoro nie ma RT dla
+województwa, niech "delta" oznacza **wzrost liczby osiągalnych POI, gdy próg czasowy
+podwoi się z 30 na 60 min** — sprawdzenie, czy dostępność rośnie liniowo z budżetem
+czasu, czy nie. Druga poprawka: **poziom 0 nie powinien być kolorowany** — heksagon bez
+żadnego osiągalnego POI ma wyglądać jak biała plama, nie jak najniższy odcień koloru
+(bo to wprowadzało w błąd — "trochę dostępności" i "zero dostępności" wyglądały tak samo).
+
+**Wykonane:**
+1. `run_accessibility.py`: `RUNS` dostał opcjonalny klucz `"cutoffs"` (analogicznie do
+   wcześniejszego `"date"`) i nowy wpis `A1_woj_static_thresholds` — te same
+   sieć/origins/destinations co `A1_woj_static`, ale `CUTOFFS="30,60"` w jednym
+   przebiegu (tańsze niż dwa osobne — R5 i tak przeszukuje do `MAX_TRIP_DURATION`
+   domyślnie 90 min, więc 60 min nie wymaga szerszego przeszukiwania niż to, co już
+   robił przebieg na 30 min; sumowanie kosztuje grosze). Czas: **221,2 s** — praktycznie
+   tyle samo co przebieg tylko-na-30-min (207 s), potwierdza że to nie przeszukiwanie
+   jest droższe, tylko sumowanie, które jest tanie.
+2. `compute_metrics.compute_threshold_sensitivity_layer()` — nowa warstwa
+   `hex_woj_thresholds`: `level_<kat>_c30`, `level_<kat>_c60`, `growth_<kat>` (c60-c30),
+   `ratio_<kat>` (c60/c30, `None` gdy c30=0 — nie da się policzyć ilorazu z zera, ten sam
+   konwencja co reszta projektu).
+3. `population_weighted_threshold_summary()` — **złapany i naprawiony własny bug** przy
+   pierwszym przebiegu: pole `hexagons_still_zero_at_c60` liczyło naprawdę
+   "heksagony z c30=0" (niezależnie od c60!), nie "nadal zero przy 60 min". Naprawione —
+   rozdzielone na `hexagons_emerged_c30_zero_c60_positive` (zero na 30 min, coś na 60 —
+   "odblokowane" szerszym budżetem) i `hexagons_still_zero_at_c60` (zero na obu). Dodany
+   też `ratio_of_pop_weighted_sums` (iloraz sum, nie średnia ilorazów per-heksagon) —
+   znacznie mniej wrażliwy na heksagony z maleńkim mianownikiem (c30=1→c60=9 liczy się
+   tyle samo co c30=100→c60=200 w naiwnej średniej ilorazów, co zawyża wynik).
+
+**Wynik (`out/woj_threshold_summary.csv`), kategoria `total`:**
+
+| Miara | Wartość |
+|---|---:|
+| `ratio_of_pop_weighted_sums` | **5,63×** |
+| `mean_ratio_c60_c30_pop_weighted` (naiwna średnia ilorazów, zawyżona) | 8,68× |
+| `mean_growth_c60_c30_pop_weighted` | +701,9 POI |
+| heksagony z dostępem już na 30 min | 5930 (35,2%) |
+| heksagony "odblokowane" dopiero na 60 min | 7039 (41,7%) |
+| heksagony nadal zero na 60 min | 3895 (23,1%) |
+
+**Odpowiedź na pytanie Michała wprost: NIE, dostępność NIE podwaja się przy podwojeniu
+progu czasowego — rośnie ~5,6× (iloraz sum, miara odporna na wartości odstające) do ~8,7×
+(naiwna średnia per-heksagon).** To silnie nieliniowy efekt, spójny z siecią transitową
+typu hub-and-spoke — krótki budżet czasu ledwo wychodzi poza zasięg pieszy, dłuższy
+odblokowuje całe dodatkowe linie/przesiadki. Prawie 42% heksagonów przechodzi z "zero" do
+"cokolwiek" dopiero między 30 a 60 min — to jest osobna, ważna liczba do mapy/opisu:
+**przy progu 30 min prawie 2/3 województwa (65%: 41,7%+23,1%) nie ma żadnego dostępu do
+żadnej z 10 kategorii POI.**
+
+**Kartografia:** `style_layers.sequential_level_renderer()` dostał parametr `min_value`
+(domyślnie 0,5) — zakresy klas zaczynają się od 0,5, więc heksagon z wartością dokładnie 0
+nie mieści się w żadnym zakresie i QGIS nie rysuje dla niego symbolu (ten sam mechanizm
+"brak symbolu" co przy NULL w warstwach delty). Zweryfikowane wizualnie
+(`render_map`) — widoczna, spora różnica: dużo więcej białych plam niż wcześniej, kiedy
+zero i "1-4 POI" dostawały ten sam blady żółty kolor. Nowa `sequential_growth_renderer()`
+(sekwencyjna pomarańczowo-brązowa rampa, bo `growth_<kat>` z definicji ≥0, nie potrzeba
+izolowanego zera jak przy delcie static-vs-RT) zastosowana do `growth_total`.
+
+**Warstwy projektu zaktualizowane** (bez zmiany nazw, żeby nie psuć czegokolwiek innego
+w projekcie): `Poziom_wojewodztwo` → `hex_woj_level`/`level_total_c30` z nowym
+zero-wykluczającym rendererem; `Delta_wojewodztwo` → przepięta na
+`hex_woj_thresholds`/`growth_total` z nowym rendererem wzrostu. Domyślnie widoczna:
+`Delta_wojewodztwo` (tak jak Michał miał włączone, kiedy zgłosił problem), `Poziom_wojewodztwo`
+wyłączona. Projekt zapisany.
+
+**Nie zrobione / do decyzji:** czy tę samą korektę (0 bez koloru) zastosować też do
+`Poziom_Lodz` (na razie nietknięta — ten sam problem tam prawdopodobnie występuje, ale
+poza zakresem tego polecenia); czy `hex_lodz` też dostanie wersję progową 30/60 min.
+
 ### 6.7 E8 — delty i maska RT (`compute_metrics.py`)
 
 **Formuła delty** (identyczna jak `realtime_delay_lodz`): `delta = realized - static`,
@@ -541,7 +660,9 @@ zostało błędne, każdy heksagon miałby ucięte do maksymalnie 1 przystanku w
 | `poi_targets_woj` | Point | 10 przetrwałych kategorii (próg ≥5-w-≥18/24-powiatów), pola `srv_*`, DESTINATIONS dla R5 |
 | `poi_targets_lodz` | Point | **21 kategorii** (wszystkie kandydackie — decyzja Michała 2026-09-13, Łódź badana innym zestawem niż województwo), pola `srv_*`, DESTINATIONS dla R5 |
 | `calib_origins` | Point | próbka z E6, powiat pabianicki |
-| `hex_{woj,lodz}_delta` | Multi Polygon | E8 wynik — poziom + delta per kategoria + total |
+| `hex_{woj,lodz}_delta` | Multi Polygon | E8 wynik — poziom + delta per kategoria + total (UWAGA: `hex_woj_delta` stary, sprzed poprawki parków — patrz 6.6a) |
+| `hex_woj_level` | Multi Polygon | E8 wynik 2026-09-14 — poziom wojewódzki bez delty (`level_<kat>_c30`, `level_total_c30`), tylko statyczny GTFS, aktualny |
+| `hex_woj_thresholds` | Multi Polygon | E8 wynik 2026-09-14 — "delta" przedefiniowana jako wzrost dostępności 30→60 min (`level_<kat>_c{30,60}`, `growth_<kat>`, `ratio_<kat>`), patrz 6.6b |
 | `hex_lodz_delta_multiday` | Multi Polygon | E8 wynik — 3-dniowy robustness check (śred. delta + rozrzut dzień-do-dnia), tylko Łódź |
 | `hex_{woj,lodz}_rt_mask` | Multi Polygon | E8 wynik — klasa wiarygodności RT |
 | `boundary_woj`, `boundary_lodz` | Polygon | granice do kartografii (odtworzone, patrz 6.8) |
@@ -552,26 +673,37 @@ zostało błędne, każdy heksagon miałby ucięte do maksymalnie 1 przystanku w
 - `out/poi_coverage_powiaty.csv` — E4, per powiat × kategoria
 - `out/calib_matrix.csv` — E6, surowa próbka OD
 - `out/acc_{A1,A2,A3a,A3b}_*.csv` — E7, surowe wyniki R5 (długi format R5: `id,opportunity,percentile,cutoff,accessibility`)
-- `out/{lodz,woj}_delta_summary.csv` — E8, podsumowanie ważone populacją
+- `out/{lodz,woj}_delta_summary.csv` — E8, podsumowanie ważone populacją (woj: stare, patrz 6.6a)
+- `out/woj_level_summary.csv` — E8, poziom wojewódzki bez delty, ważony populacją, aktualny (2026-09-14)
 
 ## 9. Otwarte pytania do interpretacji (NIE rozstrzygnięte w tej sesji — do rozmowy Michała z następnym agentem)
 
 1. **Jednorodny ujemny znak delty** (sekcja 6.7) — **od 2026-09-13 potwierdzony jako
    robustny**: ujemny w każdej z 21 kategorii (nie tylko oryginalnych 10) i stabilny co
    do znaku i rzędu wielkości w 3 niezależnych dniach (wt/śr/czw), nie tylko w
-   2026-09-10 (pełne liczby: `MULTIDAY_LODZ_NOTES.md`). To NIE rozstrzyga za Michała,
-   CZY i JAK ten wniosek ma trafić na mapę/w opisie — wciąż jego decyzja — ale usuwa
-   wątpliwość "czy to szum jednego dnia".
+   2026-09-10 (pełne liczby: `MULTIDAY_LODZ_NOTES.md`).
+   **2026-09-14 — przyczyna wyjaśniona (nie tylko potwierdzona jako nieszumowa):**
+   ta sama analiza policzona dla 4 dni sierpniowych (wakacje) dała efekt ~8,4x mniejszy
+   i dużo mniej jednorodny (73% ujemnych komórek vs 98% we wrześniu, jeden dzień netto
+   dodatni) — potwierdzone niezależnie przez surowe dane opóźnień z `easy-GTFS-RT`
+   (mean_delay 6-10s w sierpniu vs 27s we wrześniu, ~18% vs 38% kursów zmienionych).
+   Wniosek: to nie jest cecha strukturalna Łodzi, tylko efekt związany z powrotem do
+   szkoły/pracy po wakacjach (realnie gorsza punktualność, zmierzona dwoma niezależnymi
+   sposobami). Pełny opis: `MULTIDAY_LODZ_NOTES.md` sekcja "2026-09-14: wakacje vs rok
+   szkolny". CZY i JAK ten wniosek ma trafić na mapę/w opisie — wciąż decyzja Michała.
 2. **Kategorie POI na granicy progu** (biblioteka 15/24, dom kultury 16/24, basen 11/24,
    centrum handlowe 9/24) — realna luka OSM czy realna rzadkość? Wpływa na to, czy
    dodać je z powrotem jako osobną, jawnie oznaczoną warstwę.
 3. **`docs/lodzkie-na-mapach-2026-metodologia.md`** ma nieaktualne zdanie o RT dla
    Kutna/ŁKA — do poprawki przy E10.
-4. **Przebiegi wojewódzkie (A1/A2) mają teraz stare, jednopunktowe parki** — poprawka
-   parków (sekcja 6.3, 2026-09-13) zaktualizowała `poi_all_raw`/`poi_targets_woj` w gpkg,
-   ale NIE przeliczono A1/A2 ani `woj_delta_summary.csv` — do zrobienia, kiedy ktoś
-   wróci do skali wojewódzkiej (odpalić `run_accessibility.main(["A1_woj_static",
-   "A2_woj_lodzrt"])`, potem `compute_metrics`'s woj-część).
+4. **A1 wojewódzki przeliczony 2026-09-14** z poprawionymi parkami (sekcja 6.6a) --
+   `hex_woj_level`/`Poziom_wojewodztwo` są teraz aktualne i to jest źródło prawdy dla
+   poziomu wojewódzkiego. **A2 (podmiana feedu Łodzi na RT) i `hex_woj_delta`/
+   `Delta_wojewodztwo` pozostają nieprzeliczone i stare** (przed poprawką parków,
+   `CUTOFFS="30,45"`) -- to świadoma decyzja zakresu tej tury (Michał: tylko statyczny
+   GTFS), nie zaległość. Jeśli kiedyś wraca się do delty wojewódzkiej: odpalić
+   `run_accessibility.main(["A2_woj_lodzrt"])`, potem dopiero `compute_metrics.main()`'s
+   woj-część (ta wciąż istnieje, nietknięta, obok nowego `main_woj_level()`).
 5. **Zrealizowana ŁKA nie weszła do mapy** (sekcja 6.4) — zbadana 2026-09-13, wszystkie
    5 dostępnych dni (09-08..09-11) fałszywie pokazują 0 aktywnych kursów z powodu granicy
    edycji rozkładu `polish_trains.zip` 2026-09-12; realna naprawa wymaga zmiany w

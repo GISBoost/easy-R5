@@ -238,6 +238,89 @@ Restylowanie `hex_lodz_delta` w `style_layers.py` dla "total" @30min-only
 (schemat pól się nie zmienił nazewniczo, ale liczba kategorii/zakres wartości
 "total" tak -- sprawdzić klasy RdBu przed finalnym wydrukiem).
 
+## 2026-09-14: wakacje vs rok szkolny -- czy jednorodna ujemna delta to Łódź czy wrzesień
+
+Michał, po zobaczeniu jednorodnie ujemnej delty (sekcja wyżej): policzyć to samo w sierpniu
+(wakacje) tą samą metodą, sprawdzić czy efekt wraca do zera. Wykonane, wynik jednoznaczny.
+
+**Dni:** 08-13, 08-14, 08-17, 08-18 (wszystkie robocze, status `ok`, JEDNA edycja
+statycznego rozkładu -- sha256 `e2269d6b...`, `feed_version=11484_11486_11488_11489`,
+`feed_start_date=2026-08-10`, ODRÓŻNIA SIĘ od wrześniowej edycji `11499_11500`
+/`feed_start_date=2026-09-01` -- to jest realna, osobna edycja "rok szkolny", nie ten sam
+rozkład). 08-12 sprawdzony i ODRZUCONY -- wcześniejsza, inna edycja (`11484_11486`),
+mieszanie jej z 08-13..18 zafałszowałoby porównanie o niezwiązaną zmianę śródwakacyjną.
+
+**Dwie bazy statyczne, nie jedna** -- w przeciwieństwie do września: `validate_gtfs.
+active_service_ids()` pokazał, że 08-13/14 (śr/czw) mają `service_id=11484_11` (9366
+aktywnych kursów), a 08-17/18 (pon/wt) mają `11489_11` (9892) -- RÓŻNE kalendarze w tej
+samej edycji. Zbudowane: `net_lodz_static_2026-08` (jedna sieć, dwa przebiegi z różnym
+DATE) + 4 sieci `net_lodz_p50_2026-08-{13,14,17,18}`. `run_accessibility.py` rozszerzony
+o opcjonalny klucz `"date"` w spec (był sztywno `C.ANALYSIS_DATE`). `validate_gtfs.py`
+-- wszystkie 4 pary PASS, zero błędów, rozkłady przesunięć zdrowe (mediana 0s,
+p05 -96..-101s, grossly_early <0,13%) -- ten sam poziom rygoru co zawsze.
+
+**Incydent po drodze:** QGIS padł (proces `qgis-bin.exe` całkowicie zniknął) w trakcie
+5. z 6 przebiegów, zostawiając osierocony `java.exe` (~4,1 GB) -- posprzątany
+(`taskkill`). Po restarcie QGIS przez Michała okazało się, że WSZYSTKIE 6 przebiegów
+faktycznie dokończyło pracę i zapisało poprawne pliki (`.params.json` obecne, liczba
+wierszy zgodna) -- awaria nastąpiła po zapisie wyników, nie w trakcie liczenia. Nic nie
+trzeba było powtarzać. Przyczyna awarii QGIS nieznana (brak dostępu do jego logu z tego
+poziomu) -- może to być zwykłe wyczerpanie zasobów po 5 ciężkich przebiegach R5 z rzędu.
+
+**Nowa funkcja `compute_metrics.compute_vacation_vs_term_delta()`** -- jak
+`compute_multiday_lodz_delta`, ale z osobną bazą statyczną per dzień (`VACATION_DAY_STATIC`
+mapuje 08-13/14 -> plik bazy 08-13, 08-17/18 -> plik bazy 08-17). Wypisuje
+`out/lodz_delta_summary_vacation.csv`, ten sam kształt co wrześniowy wielodniowy plik.
+
+**Wynik -- delta total @30min, ważona populacją:**
+
+| Dzień | Δ total |
+|---|---:|
+| 2026-08-13 (śr) | +1,398 |
+| 2026-08-14 (czw) | -2,318 |
+| 2026-08-17 (pon) | -2,748 |
+| 2026-08-18 (wt) | -2,192 |
+| **średnia 4 dni** | **-1,465** |
+| (dla porównania) średnia 3 dni wrzesień | **-12,369** |
+
+Sierpień: ~8,4x mniejszy efekt niż wrzesień, i dużo mniej jednorodny -- 61/84 komórek
+kategoria×dzień ujemnych (73%) wobec 62/63 we wrześniu (98%); jeden dzień (08-13) wyszedł
+NETTO DODATNI. Po uśrednieniu 4 dni: 17/21 kategorii nadal ujemnych, ale 4
+(`dom_kultury`, `basen`, `boisko_sport`, `supermarket`) w plusie.
+
+**Niezależne potwierdzenie spoza tego pipeline'u** -- surowe `lodz_diff_<data>_p50_summary.csv`
+z `easy-GTFS-RT` (agregacja per-linia, całkowicie inny kod niż R5/routing):
+
+| Dzień | mean_delay_sec | % kursów zmienionych |
+|---|---:|---:|
+| 08-13 | 6,48 s | 18,4% |
+| 08-14 | 6,00 s | 18,1% |
+| 08-17 | 7,93 s | 18,5% |
+| 08-18 | 10,44 s | 18,5% |
+| **09-10** | **27,19 s** | **38,5%** |
+
+Dwa niezależne pomiary (mój routing R5 i surowe opóźnienia z dashboardu) zgadzają się co
+do kierunku i rzędu wielkości: wrzesień ma realnie ~3-4x wyższe opóźnienia i >2x wyższy
+odsetek zmienionych kursów niż sierpień, nie tylko inną deltę dostępności.
+
+**Zastrzeżenie do zapisania uczciwie:** `n_rows` w surowym podsumowaniu opóźnień jest we
+wrześniu ~2x mniejsze niż w sierpniu przy niemal identycznej liczbie aktywnych kursów --
+sugeruje to zmianę gęstości próbkowania GTFS-RT między oknami, nie tylko realną zmianę na
+drodze. Nie unieważnia wniosku (dwa niezależne pomiary zgadzają się), ale to jest różnica
+w zbieraniu danych między dwoma oknami czasowymi, do wpisania w ograniczenia metodyki.
+
+**Wniosek:** jednorodna ujemna delta NIE jest czystą cechą Łodzi (systematycznie
+optymistyczny rozkład vs rzeczywistość) -- gdyby tak było, sierpień wyglądałby tak samo
+jednorodnie ujemnie jak wrzesień. Najbardziej prawdopodobne wyjaśnienie: powrót do
+szkoły/pracy po wakacjach pogarsza realną punktualność (potwierdzone niezależnie w
+surowych danych opóźnień), co przekłada się na spadek dostępności liczonej z rozkładu
+zrealizowanego. Nie jest to dowód eksperymentalny (brak drugiego roku/innego okresu do
+porównania), ale kierunek i rząd wielkości są spójne w dwóch niezależnych pomiarach.
+
+Pliki: `out/lodz_delta_summary_vacation.csv` (pełne dane per kategoria/dzień),
+`work/gtfs_raw/diff_summary_2026-08-{13,14,17,18}.csv` + `diff_summary_2026-09-10.csv`
+(surowe dane porównawcze, do wglądu).
+
 ## PRZERWANE 2026-09-13 -- Michał: napraw krytyczne bugi najpierw, nie kontynuuj sam
 
 *(sekcja historyczna, opisuje stan w momencie przerwania -- zobacz sekcję

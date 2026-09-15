@@ -59,6 +59,62 @@ RUNS = {
         "origins": f"{GPKG}|layername=hex_lodz_centroids",
         "destinations": f"{GPKG}|layername=poi_targets_lodz",
     },
+    # Vacation-vs-school-term check (Michal, 2026-09-14): is the uniform
+    # negative delta a September/return-to-school artifact, or a standing
+    # Lodz characteristic? Two static baselines needed (not one, unlike the
+    # Sept multiday check) -- 2026-08-13/14 (Wed/Thu) and 2026-08-17/18
+    # (Mon/Tue) run different active service_id ("11484_11" vs "11489_11",
+    # confirmed via validate_gtfs.active_service_ids), so one fixed DATE
+    # cannot stand in for both pairs.
+    "A3a_lodz_static_2026-08-13": {
+        "network": C.NETWORKS_DIR / "net_lodz_static_2026-08" / "cache",
+        "origins": f"{GPKG}|layername=hex_lodz_centroids",
+        "destinations": f"{GPKG}|layername=poi_targets_lodz",
+        "date": "2026-08-13",
+    },
+    "A3a_lodz_static_2026-08-17": {
+        "network": C.NETWORKS_DIR / "net_lodz_static_2026-08" / "cache",
+        "origins": f"{GPKG}|layername=hex_lodz_centroids",
+        "destinations": f"{GPKG}|layername=poi_targets_lodz",
+        "date": "2026-08-17",
+    },
+    "A3b_lodz_p50_2026-08-13": {
+        "network": C.NETWORKS_DIR / "net_lodz_p50_2026-08-13" / "cache",
+        "origins": f"{GPKG}|layername=hex_lodz_centroids",
+        "destinations": f"{GPKG}|layername=poi_targets_lodz",
+        "date": "2026-08-13",
+    },
+    "A3b_lodz_p50_2026-08-14": {
+        "network": C.NETWORKS_DIR / "net_lodz_p50_2026-08-14" / "cache",
+        "origins": f"{GPKG}|layername=hex_lodz_centroids",
+        "destinations": f"{GPKG}|layername=poi_targets_lodz",
+        "date": "2026-08-14",
+    },
+    "A3b_lodz_p50_2026-08-17": {
+        "network": C.NETWORKS_DIR / "net_lodz_p50_2026-08-17" / "cache",
+        "origins": f"{GPKG}|layername=hex_lodz_centroids",
+        "destinations": f"{GPKG}|layername=poi_targets_lodz",
+        "date": "2026-08-17",
+    },
+    "A3b_lodz_p50_2026-08-18": {
+        "network": C.NETWORKS_DIR / "net_lodz_p50_2026-08-18" / "cache",
+        "origins": f"{GPKG}|layername=hex_lodz_centroids",
+        "destinations": f"{GPKG}|layername=poi_targets_lodz",
+        "date": "2026-08-18",
+    },
+    # Threshold-sensitivity check (Michal, 2026-09-14): with no RT data at
+    # voivodeship scale, "delta" is redefined here as the GROWTH in reachable
+    # POI when the cutoff doubles (30 -> 60 min), not a static-vs-realized
+    # comparison. Same network/origins/destinations as A1_woj_static, just a
+    # wider CUTOFFS -- MAX_TRIP_DURATION's plugin default (90 min) already
+    # covers 60 min, so this does not re-search a larger radius than the
+    # existing A1 run did, only sums the accessibility at one more cutoff.
+    "A1_woj_static_thresholds": {
+        "network": C.NETWORKS_DIR / "net_woj_static" / "cache",
+        "origins": f"{GPKG}|layername=hex_woj_centroids",
+        "destinations": f"{GPKG}|layername=poi_targets_woj",
+        "cutoffs": "30,60",
+    },
     # NOTE 2026-09-13: the *_new11 split-layer workaround for easy-R5 issue #5
     # (destinations-field corruption from a stale cached QGIS layer, not
     # actually a destination-count limit) is no longer needed -- the plugin
@@ -116,12 +172,12 @@ def run_one(name, spec):
         "ORIGIN_ID_FIELD": "hex_id",
         "DESTINATIONS": spec["destinations"],
         "DEST_ID_FIELD": "poi_id",
-        "DATE": C.ANALYSIS_DATE,
+        "DATE": spec.get("date", C.ANALYSIS_DATE),
         "DEPARTURE_TIME": C.DEPARTURE_TIME,
         "TIME_WINDOW": C.TIME_WINDOW_MIN,
         "PERCENTILES": C.PERCENTILE,
         "OPPORTUNITY_FIELDS": opp_fields,
-        "CUTOFFS": C.CUTOFFS,
+        "CUTOFFS": spec.get("cutoffs", C.CUTOFFS),
         "DECAY": _DECAY_ENUM[C.DECAY],
         "OUTPUT_CSV": str(out_csv),
         "OUTPUT_LAYER": str(out_gpkg),
