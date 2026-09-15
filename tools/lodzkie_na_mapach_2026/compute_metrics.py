@@ -516,30 +516,24 @@ MULTIDAY_CSVS = {
 }
 
 
-def compute_multiday_lodz_delta(survivors, out_gpkg, out_name="hex_lodz_delta_multiday"):
-    """3-day robustness check (MULTIDAY_LODZ_NOTES.md): static side is ONE
-    run (net_lodz_static schedule confirmed identical across all 3 days, see
-    notes), realized side is 3 independent day-runs. Per hex/category/cutoff:
-    delta_<day> = realized_day - static (NULL if static==0, same rule as the
-    single-day layer), then avg_delta = mean of whichever days are non-null
-    (comparability doesn't vary by day since static is shared, so this is
-    normally all-3-or-none) and delta_spread = max-min across days, a cheap
-    day-to-day consistency signal. Attribute table kept to 30 min only
-    (Michal, 2026-09-13: single-day 21-category table was already too wide;
-    a 3-day version needs it even more) -- full 45 min detail lives in the
-    per-day CSV summary this also writes."""
+def _day_delta_layer(day_static, day_realized, hex_layer_name, survivors, cutoff, out_gpkg, out_name):
+    """Per-hex avg_delta_<cat>_c<cutoff> / spread_<cat>_c<cutoff> /
+    base0_<cat>_c<cutoff> across multiple independent realized-vs-static day
+    comparisons. day_static/day_realized: dict day -> wide (load_wide
+    output), one entry per day being averaged. Delta for a given day is NULL
+    wherever THAT day's static value is 0/NULL (same rule as
+    compute_delta_layer, applied per day since day_static can differ day to
+    day -- see compute_vacation_delta_layer, where two different service_ids
+    are active across the 4 days). base0 is True only if every day's static
+    was 0/NULL for that hex/category. Shared by compute_multiday_lodz_delta
+    (one static schedule reused for every day -> day_static maps every day
+    to the SAME wide dict, so this reduces to the single-baseline case) and
+    compute_vacation_delta_layer (a different static baseline per day)."""
     import processing
     from qgis.core import QgsVectorLayer, QgsVectorFileWriter, QgsField
     from qgis.PyQt.QtCore import QVariant
-    import csv as csv_mod
 
-    static = load_wide(C.OUT / "acc_A3a_lodz_static.csv", survivors, CUTOFFS)
-    realized_by_day = {
-        day: load_wide(C.OUT / fname, survivors, CUTOFFS)
-        for day, fname in MULTIDAY_CSVS.items()
-    }
-
-    def value(wide, hid, cat, cutoff):
+    def value(wide, hid, cat):
         """Single category -> its own srv_<cat> field. "total" has no field
         of its own in R5's output -- it's the sum across every category,
         same convention as compute_delta_layer()'s base_total/delta_total."""
@@ -550,39 +544,40 @@ def compute_multiday_lodz_delta(survivors, out_gpkg, out_name="hex_lodz_delta_mu
             return sum(vals.get((f"srv_{c}", cutoff), 0) or 0 for c in survivors)
         return vals.get((f"srv_{cat}", cutoff))
 
-    hex_layer = QgsVectorLayer(f"{GPKG}|layername=hex_lodz_pop", "hex", "ogr")
+    hex_layer = QgsVectorLayer(f"{GPKG}|layername={hex_layer_name}", "hex", "ogr")
     out = processing.run("native:fixgeometries", {"INPUT": hex_layer, "OUTPUT": "memory:"})["OUTPUT"]
 
+    days = list(day_static)
     cats = survivors + ["total"]
     fields_to_add = []
     for cat in cats:
         fields_to_add += [
-            QgsField(f"avg_delta_{cat}_c30", QVariant.Double, len=12, prec=2),
-            QgsField(f"spread_{cat}_c30", QVariant.Double, len=12, prec=2),
-            QgsField(f"base0_{cat}_c30", QVariant.Int),
+            QgsField(f"avg_delta_{cat}_c{cutoff}", QVariant.Double, len=12, prec=2),
+            QgsField(f"spread_{cat}_c{cutoff}", QVariant.Double, len=12, prec=2),
+            QgsField(f"base0_{cat}_c{cutoff}", QVariant.Int),
         ]
     out.dataProvider().addAttributes(fields_to_add)
     out.updateFields()
 
     idx = {f.name(): out.fields().indexOf(f.name()) for f in fields_to_add}
-    summary_rows = []
     out.startEditing()
     for f in out.getFeatures():
         hid = str(f["hex_id"])
         for cat in cats:
-            s = value(static, hid, cat, 30)
-            base0 = s is None or s == 0.0
-            out.changeAttributeValue(f.id(), idx[f"base0_{cat}_c30"], int(base0))
-            if base0:
-                continue
             day_deltas = []
-            for day in MULTIDAY_DAYS:
-                r = value(realized_by_day[day], hid, cat, 30)
+            base0 = True
+            for day in days:
+                s = value(day_static[day], hid, cat)
+                if s is None or s == 0.0:
+                    continue
+                base0 = False
+                r = value(day_realized[day], hid, cat)
                 if r is not None:
                     day_deltas.append(r - s)
+            out.changeAttributeValue(f.id(), idx[f"base0_{cat}_c{cutoff}"], int(base0))
             if day_deltas:
-                out.changeAttributeValue(f.id(), idx[f"avg_delta_{cat}_c30"], sum(day_deltas) / len(day_deltas))
-                out.changeAttributeValue(f.id(), idx[f"spread_{cat}_c30"], max(day_deltas) - min(day_deltas))
+                out.changeAttributeValue(f.id(), idx[f"avg_delta_{cat}_c{cutoff}"], sum(day_deltas) / len(day_deltas))
+                out.changeAttributeValue(f.id(), idx[f"spread_{cat}_c{cutoff}"], max(day_deltas) - min(day_deltas))
     out.commitChanges()
 
     opts = QgsVectorFileWriter.SaveVectorOptions()
@@ -591,10 +586,44 @@ def compute_multiday_lodz_delta(survivors, out_gpkg, out_name="hex_lodz_delta_mu
     opts.actionOnExistingFile = QgsVectorFileWriter.CreateOrOverwriteLayer
     QgsVectorFileWriter.writeAsVectorFormatV3(out, str(out_gpkg), out.transformContext(), opts)
     print(f"  wrote {out_name} ({out.featureCount()} hexagons)")
+    return out
+
+
+def compute_multiday_lodz_delta(survivors, out_gpkg, out_name="hex_lodz_delta_multiday"):
+    """3-day robustness check (MULTIDAY_LODZ_NOTES.md): static side is ONE
+    run (net_lodz_static schedule confirmed identical across all 3 days, see
+    notes), realized side is 3 independent day-runs. Spatial layer written
+    by the shared _day_delta_layer() helper -- avg_delta = mean of whichever
+    days are non-null (comparability doesn't vary by day since static is
+    shared, so this is normally all-3-or-none) and spread = max-min across
+    days, a cheap day-to-day consistency signal. Attribute table kept to
+    30 min only (Michal, 2026-09-13: single-day 21-category table was
+    already too wide; a 3-day version needs it even more) -- full 45 min
+    detail lives in the per-day CSV summary this also writes."""
+    import csv as csv_mod
+
+    static = load_wide(C.OUT / "acc_A3a_lodz_static.csv", survivors, CUTOFFS)
+    realized_by_day = {
+        day: load_wide(C.OUT / fname, survivors, CUTOFFS)
+        for day, fname in MULTIDAY_CSVS.items()
+    }
+
+    def value(wide, hid, cat, cutoff):
+        vals = wide.get(hid)
+        if not vals:
+            return None
+        if cat == "total":
+            return sum(vals.get((f"srv_{c}", cutoff), 0) or 0 for c in survivors)
+        return vals.get((f"srv_{cat}", cutoff))
+
+    day_static = {day: static for day in MULTIDAY_DAYS}  # one shared static baseline
+    out = _day_delta_layer(day_static, realized_by_day, "hex_lodz_pop", survivors, 30, out_gpkg, out_name)
 
     # Per-day + averaged population-weighted summary (both cutoffs, full detail --
     # this is a CSV, not the attribute table, so no column-count pressure).
+    cats = survivors + ["total"]
     pop_field = "pop_total"
+    summary_rows = []
     for cat in cats:
         for c in CUTOFFS:
             per_day_means = {}
@@ -725,6 +754,23 @@ def compute_vacation_vs_term_delta(survivors, cutoff=30):
         w.writerows(summary_rows)
     print("  wrote out/lodz_delta_summary_vacation.csv")
     return summary_rows
+
+
+def compute_vacation_delta_layer(survivors, out_gpkg=None, out_name="hex_lodz_delta_vacation", cutoff=30):
+    """Spatial counterpart to compute_vacation_vs_term_delta() above, which
+    only wrote a CSV (Michal, 2026-09-14: the wakacje-vs-rok-szkolny
+    comparison goes on the map too, for E11, not only in report text).
+    Reuses _day_delta_layer() -- unlike compute_multiday_lodz_delta, each of
+    the 4 August days gets its OWN static baseline (VACATION_DAY_STATIC:
+    08-13/14 and 08-17/18 run different active service_id, confirmed via
+    validate_gtfs.active_service_ids, see MULTIDAY_LODZ_NOTES.md), so
+    day_static is NOT one shared dict repeated per day."""
+    out_gpkg = out_gpkg or GPKG
+    day_static = {day: load_wide(C.OUT / fname, survivors, [cutoff])
+                  for day, fname in VACATION_DAY_STATIC.items()}
+    day_realized = {day: load_wide(C.OUT / fname, survivors, [cutoff])
+                     for day, fname in VACATION_DAY_REALIZED.items()}
+    return _day_delta_layer(day_static, day_realized, "hex_lodz_pop", survivors, cutoff, out_gpkg, out_name)
 
 
 def main():

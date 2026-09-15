@@ -151,6 +151,13 @@ def apply_all():
     lodz_delta_multiday.setRenderer(classified_delta_renderer("avg_delta_total_c30", e, lbl))
     lodz_delta_multiday.triggerRepaint()
 
+    # wakacje vs rok szkolny (E11, 2026-09-14) -- same edges/field as the 3-day
+    # robustness layer above (both are avg_delta_total_c30, directly comparable
+    # side by side: -12.37 Sept 3-day avg vs -1.47 Aug 4-day avg).
+    lodz_delta_vacation = QgsVectorLayer(f"{gpkg}|layername=hex_lodz_delta_vacation", "delta_lodz_wakacje", "ogr")
+    lodz_delta_vacation.setRenderer(classified_delta_renderer("avg_delta_total_c30", e, lbl))
+    lodz_delta_vacation.triggerRepaint()
+
     woj_delta = QgsVectorLayer(f"{gpkg}|layername=hex_woj_delta", "delta_woj", "ogr")
     woj_delta.setRenderer(classified_delta_renderer("delta_total_c30", e, lbl))
     woj_delta.triggerRepaint()
@@ -165,6 +172,7 @@ def apply_all():
     rt_woj.triggerRepaint()
 
     return {"lvl": lvl, "lodz_delta": lodz_delta, "lodz_delta_multiday": lodz_delta_multiday,
+            "lodz_delta_vacation": lodz_delta_vacation,
             "woj_delta": woj_delta, "rt_lodz": rt_lodz, "rt_woj": rt_woj}
 
 

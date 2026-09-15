@@ -74,7 +74,8 @@ commity `25d9825`, `e09189d`, oba tickety zamknięte). Pełny log, dokładny opi
 | E7 — 4 przebiegi dostępności | ✅ zrobione (Łódź: 21 kategorii finalne 2026-09-13; A1 wojewódzki przeliczony 2026-09-14 z poprawionymi parkami) | `run_accessibility.py`; **A2 (podmiana feedu Łodzi na RT) świadomie NIE przeliczony** -- Michał 2026-09-14: ta tura bierze pod uwagę tylko statyczny GTFS dla województwa, delta zostaje do ewentualnej kolejnej tury |
 | E8 — delty, maska RT | ✅ zrobione (Łódź: 21 kategorii + 3-dniowy robustness finalne 2026-09-13; poziom wojewódzki przeliczony 2026-09-14) | `compute_metrics.py`; nowa `compute_level_layer()`/`main_woj_level()` -- poziom bez delty, patrz sekcja 6.6a |
 | E9 — kartografia | 🟡 częściowo | style gotowe dla 10-kategoriowego układu (`style_layers.py`, projekt `lodzkie_2026.qgz`) -- **do sprawdzenia po rozszerzeniu Łodzi do 21 kategorii** (nazwy pól się nie zmieniły, ale liczba kategorii/zakres `total` tak); **plansze drukowe (layouty) NIE zrobione** |
-| E10 — pakiet zgłoszeniowy | ❌ nie zaczęte | zip z GPKG + QGZ + wydrukami + załącznik 1; poprawka literówki w metodologii |
+| E10 — pakiet zgłoszeniowy | ❌ nie zaczęte | zip z GPKG + QGZ + wydrukami + załącznik 1; poprawka literówki w metodologii (zrobiona przy okazji E11, patrz niżej) |
+| E11 — publikacja na `mapy-analizy` | ✅ zrobione 2026-09-15 | mapa Leaflet + raport metodologiczny opublikowane, patrz sekcja 6.7 |
 
 **Następny krok, jeśli ktoś kontynuuje:** E9 layouty (`mcp__qgis__create_layout` +
 `add_layout_map`/`add_layout_legend` na wzór `realtime_delay_lodz/delay_lodz.qgz`'s
@@ -539,6 +540,36 @@ wyłączona. Projekt zapisany.
 `Poziom_Lodz` (na razie nietknięta — ten sam problem tam prawdopodobnie występuje, ale
 poza zakresem tego polecenia); czy `hex_lodz` też dostanie wersję progową 30/60 min.
 
+### 6.6c E8 — 2026-09-15: warstwa przestrzenna wakacje-vs-szkoła (prerequisite E11)
+
+Michał, przy zlecaniu E11: wakacje-vs-rok-szkolny (sekcja 6.6b's poprzednik —
+`compute_vacation_vs_term_delta()`, MULTIDAY_LODZ_NOTES.md) ma wejść na mapę Leaflet jako
+trzecia, przełączalna warstwa delty Łodzi, nie tylko jako tekst w raporcie. Problem:
+`compute_vacation_vs_term_delta()` pisał tylko CSV (`out/lodz_delta_summary_vacation.csv`),
+nie warstwę przestrzenną w GPKG.
+
+Rozwiązanie: wydzielony wspólny helper `_day_delta_layer(day_static, day_realized,
+hex_layer_name, survivors, cutoff, out_gpkg, out_name)` w `compute_metrics.py` — przyjmuje
+`dict day -> wide` dla obu stron zamiast zakładać jedną wspólną bazę statyczną. To jest
+uogólnienie logiki, która wcześniej żyła tylko w `compute_multiday_lodz_delta` (ta funkcja
+teraz woła helper z `day_static = {day: static for day in MULTIDAY_DAYS}` — bez zmiany
+zachowania/wyniku, zweryfikowane niżej). Nowa funkcja `compute_vacation_delta_layer()`
+woła ten sam helper z osobną bazą statyczną per dzień (`VACATION_DAY_STATIC` — 08-13/14 i
+08-17/18 mają różny aktywny `service_id`) → nowa warstwa **`hex_lodz_delta_vacation`**
+(4260 heksagonów, pola `avg_delta_<kat>_c30`/`spread_<kat>_c30`/`base0_<kat>_c30`, jak
+`hex_lodz_delta_multiday`).
+
+**Weryfikacja refaktoru:** pop-ważona wartość `avg_delta_total_c30` z nowej warstwy =
+**-1,4652760545155719** (zmierzone bezpośrednio w QGIS po zapisie), zgadza się co do 4
+miejsca po przecinku z `avg_4day = -1,4652760545155696` już policzonym w
+`out/lodz_delta_summary_vacation.csv` — rozjazd rzędu 1e-15 to tylko kolejność sumowania
+zmiennoprzecinkowego, nie błąd. Rozjazd większy oznaczałby błąd w refaktorze, nie nowy
+wynik — nie było go.
+
+Ostylowana tym samym `classified_delta_renderer` (RdBu-7, `scale=3`, pole
+`avg_delta_total_c30`) co pozostałe warstwy delty Łodzi, dodana do `lodzkie_2026.qgz` jako
+`Delta_Lodz_wakacje` (domyślnie niewidoczna, jak pozostałe warstwy delty poza aktywną).
+
 ### 6.7 E8 — delty i maska RT (`compute_metrics.py`)
 
 **Formuła delty** (identyczna jak `realtime_delay_lodz`): `delta = realized - static`,
@@ -644,7 +675,73 @@ Osobny, niepowiązany bug: `native:joinattributesbylocation`'s `METHOD` enum —
 przez `mcp__qgis__get_algorithm_help` przed użyciem w masce RT (sekcja 6.7) — gdyby
 zostało błędne, każdy heksagon miałby ucięte do maksymalnie 1 przystanku w promieniu.
 
-## 7. Warstwy w `lodzkie_base.gpkg` (26 warstw)
+### 6.9 E11 — 2026-09-15: publikacja na `mapy-analizy` (`export_geojson.py`)
+
+**Osobne repozytorium (`mapy-analizy`, `easy/CLAUDE.md`, nie ten CLAUDE.md).** Zrobione po
+potwierdzeniu Michała z konkretnym zakresem (slug, brak POI, brak maski RT po dodatkowym
+komentarzu, zestaw warstw) — plan w `C:\Users\Michal\.claude\plans\przeczytaj-docs-lodzkie-na-mapach-2026-m-zesty-moth.md`,
+sekcja E11.
+
+**Nowy plik `export_geojson.py`** (wzorem `tools/realtime_delay_lodz/export_geojson.py`):
+field whitelist w Pythonie (dropuje bookkeeping siatki `id/left/top/right/bottom/
+row_index/col_index`), reprojekcja EPSG:2180→EPSG:4326, GeoJSON z
+`COORDINATE_PRECISION=6`, kategorie czytane z `poi_targets_{woj,lodz}`'s `srv_*` w
+runtime (nie hardkodowane). `export_all(out_dir)` — jedna funkcja, dwa cele:
+
+1. **Staging** (`out/geojson_staging/`, w `easy-R5`, nie rusza `mapy-analizy`) — pierwszy
+   przebieg, do pomiaru rozmiaru przed publikacją.
+2. **Publish** (`../../../mapy-analizy/lodzkie-dostepnosc/data/`) — drugi, identyczny
+   przebieg, dopiero po potwierdzeniu rozmiarów.
+
+**Pomiar rozmiaru (decyzja o przycięciu podjęta na podstawie liczb, nie zgadywania):**
+pierwszy eksport `growth_woj.geojson` (`hex_woj_thresholds`, wszystkie pola per kategoria)
+wyszedł **23,6 MB** — ~4× cięższy niż następny plik. Michał: przyciąć do samych pól
+`_total` (per-kategoria szczegół i tak nie jest wpięty w żadną warstwę mapy w wersji 1) →
+**6,7 MB**. Suma końcowa **9 plików, ~52,7 MB** (bez maski RT, patrz niżej) — daleko poniżej
+progu, który w `izochrony-transport` wymusił przejście na geobuf (124 MB dla samej Łodzi).
+
+**Maska RT (`hex_{woj,lodz}_rt_mask`) świadomie POMINIĘTA w eksporcie i na mapie** —
+Michał, po zobaczeniu jej na żywej mapie: na siatce 1000 m/250 m nie czyta się sensownie,
+miałaby sens dopiero zagregowana do gminy/powiatu. Dane wciąż istnieją w
+`lodzkie_base.gpkg` i w projekcie QGIS/przyszłych wydrukach (E9), gdzie metodologiczny
+wymóg "oznacz brak RT, nie zeruj" jest spełniony inaczej.
+
+**`mapy-analizy/lodzkie-dostepnosc/`** — mapa Leaflet 1.9.4 (kopia szkieletu
+`opoznienia-dostepnosc/`: `index.html`+`app.js`+`i18n.js`+`styles.css`+`README.md`).
+Dwa poziomy przełączania: zakres (Województwo/Łódź, top select) × warstwa (panel z
+lewej, różna per zakres: poziom + wzrost 30→60 dla województwa, 3 warianty delty dla
+Łodzi). Renderery 1:1 z `style_layers.py` przepisane na JS (sequential level z
+`min_value=0,5`, sequential growth, RdBu-7 diverging `scale=3`). Zweryfikowane w
+przeglądarce (`py -m http.server` + Claude in Chrome): stat line w warstwie poziomu =
+**5930 heksagonów / 186,36** (zgadza się z `hexagons_with_c30_access` z
+`woj_threshold_summary.csv`); delta Łodzi dzień referencyjny = **-12,15**, 3-dniowa =
+**-12,37**, wakacyjna = **-1,47** (zgadza się z CSV co do 2 miejsc po przecinku); i18n
+PL/EN działa, brak błędów w konsoli.
+
+**`mapy-analizy/badanie-lodzkie-dostepnosc/`** — raport metodologiczny (kopia szkieletu
+nowszych `badanie-*` z `charts.js`, nie starszego `badanie-opoznienia`'s inline SVG) —
+liczby wpisane programowo do `report.js` wprost z `out/*.csv` i
+`work/gtfs_raw/diff_summary_*.csv` (nie ręcznie, nie `report_data.json` — prostszy wzorzec
+z `badanie-dochod-dostepnosc`, dane hardkodowane w JS wystarczają dla jednorazowego
+raportu). 8 sekcji: metoda/próg kategorii, feedy GTFS, poziom wojewódzki, wzrost 30→60,
+delta Łodzi (3 warianty), wakacje-vs-szkoła + niezależna korobacja RT-delay, ograniczenia
+wprost, źródła.
+
+**Strona główna `mapy-analizy/index.html`** — 2 nowe karty (`lodzkie-dostepnosc`,
+`badanie-lodzkie-dostepnosc`), nowy wpis w `topnav-link` (drugi link do raportu obok
+istniejącego `badanie-opoznienia` — konwencja niespójna w repo, tylko jeden raport miał
+taki link, dodany świadomie bo to nowa, flagowa analiza), wpis w `README.md`. **Żaden
+istniejący URL nie zmieniony.**
+
+Commit: jeden w `easy-R5` (Krok 0/1 + poprawka metodologii), jeden w `mapy-analizy`
+(Krok 2/3/4) — osobno per repo, tylko na wyraźną prośbę Michała.
+
+## 7. Warstwy w `lodzkie_base.gpkg`
+
+Tabela niżej grupuje warstwy tematycznie, nie 1:1 z `ogrinfo` (np. `poi_all_raw` i
+historyczny `poi_targets_lodz_new11` z bugu #5 nie są tu osobno wymienione) — licznik
+warstw celowo pominięty, bo się rozjeżdżał przy każdej aktualizacji; `ogrinfo -so
+lodzkie_base.gpkg` daje aktualną, dokładną listę.
 
 | Warstwa | Geometria | Rola |
 |---|---|---|
@@ -664,7 +761,8 @@ zostało błędne, każdy heksagon miałby ucięte do maksymalnie 1 przystanku w
 | `hex_woj_level` | Multi Polygon | E8 wynik 2026-09-14 — poziom wojewódzki bez delty (`level_<kat>_c30`, `level_total_c30`), tylko statyczny GTFS, aktualny |
 | `hex_woj_thresholds` | Multi Polygon | E8 wynik 2026-09-14 — "delta" przedefiniowana jako wzrost dostępności 30→60 min (`level_<kat>_c{30,60}`, `growth_<kat>`, `ratio_<kat>`), patrz 6.6b |
 | `hex_lodz_delta_multiday` | Multi Polygon | E8 wynik — 3-dniowy robustness check (śred. delta + rozrzut dzień-do-dnia), tylko Łódź |
-| `hex_{woj,lodz}_rt_mask` | Multi Polygon | E8 wynik — klasa wiarygodności RT |
+| `hex_lodz_delta_vacation` | Multi Polygon | E8 wynik 2026-09-15 — wakacje vs rok szkolny jako warstwa mapowa (4 dni sierpnia, dwie różne bazy statyczne per `VACATION_DAY_STATIC`), te same pola co `hex_lodz_delta_multiday` (`avg_delta_*_c30`, `spread_*_c30`, `base0_*_c30`); pisana przez wspólny helper `_day_delta_layer()` wydzielony z `compute_multiday_lodz_delta` |
+| `hex_{woj,lodz}_rt_mask` | Multi Polygon | E8 wynik (6.7) — klasa wiarygodności RT (na mapie webowej E11 świadomie NIE pokazana — nie czyta się sensownie na siatce 1000 m/250 m, patrz 6.9) |
 | `boundary_woj`, `boundary_lodz` | Polygon | granice do kartografii (odtworzone, patrz 6.8) |
 
 ## 8. Gdzie są liczby (bez powtarzania ich tutaj)
@@ -690,12 +788,16 @@ zostało błędne, każdy heksagon miałby ucięte do maksymalnie 1 przystanku w
    Wniosek: to nie jest cecha strukturalna Łodzi, tylko efekt związany z powrotem do
    szkoły/pracy po wakacjach (realnie gorsza punktualność, zmierzona dwoma niezależnymi
    sposobami). Pełny opis: `MULTIDAY_LODZ_NOTES.md` sekcja "2026-09-14: wakacje vs rok
-   szkolny". CZY i JAK ten wniosek ma trafić na mapę/w opisie — wciąż decyzja Michała.
+   szkolny". **Rozstrzygnięte 2026-09-15:** trafiło na mapę (warstwa
+   `hex_lodz_delta_vacation`/`Delta_Lodz_wakacje`, sekcja 6.6c) jako trzeci, przełączalny
+   wariant delty Łodzi, i do raportu (`badanie-lodzkie-dostepnosc`, sekcja 6) jako osobna
+   podsekcja z wykresem i tabelą korobacji RT.
 2. **Kategorie POI na granicy progu** (biblioteka 15/24, dom kultury 16/24, basen 11/24,
    centrum handlowe 9/24) — realna luka OSM czy realna rzadkość? Wpływa na to, czy
-   dodać je z powrotem jako osobną, jawnie oznaczoną warstwę.
-3. **`docs/lodzkie-na-mapach-2026-metodologia.md`** ma nieaktualne zdanie o RT dla
-   Kutna/ŁKA — do poprawki przy E10.
+   dodać je z powrotem jako osobną, jawnie oznaczoną warstwę. (Wymienione w raporcie E11
+   jako tabela "na granicy progu", ale nie dodane z powrotem jako warstwa mapowa.)
+3. **`docs/lodzkie-na-mapach-2026-metodologia.md`** — **poprawione 2026-09-15** (linie
+   ~31-33 i ~77), przy okazji E11, nie E10 jak pierwotnie planowano.
 4. **A1 wojewódzki przeliczony 2026-09-14** z poprawionymi parkami (sekcja 6.6a) --
    `hex_woj_level`/`Poziom_wojewodztwo` są teraz aktualne i to jest źródło prawdy dla
    poziomu wojewódzkiego. **A2 (podmiana feedu Łodzi na RT) i `hex_woj_delta`/
