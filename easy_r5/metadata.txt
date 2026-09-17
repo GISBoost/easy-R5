@@ -55,7 +55,8 @@ changelog=0.3.0
     * fix(runner): MONTE_CARLO_DRAWS is now really per minute. R5 reads
       monteCarloDraws as the total over the window, so the default 5 gave about
       one draw per minute on networks with frequency routes (every scenario
-      line, Warsaw's frequencies.txt). Such runs are now up to 5x slower but
+      line, Warsaw's frequencies.txt). Such runs are slower (measured 1.4x on
+      Lodz with one added line; up to 5x on mostly-frequency networks) but
       reproducible; networks without frequencies are unchanged.
     0.2.2
     * feat(analysis): RunServiceMinutes — for each origin-destination pair,

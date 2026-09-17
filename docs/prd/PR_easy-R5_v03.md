@@ -97,8 +97,9 @@ rozszerzania komendy `matrix`).
    w praktyce 1 losowaniem na minutę. Runner mnoży teraz przez długość okna (jak r5r), a
    histogram minut obsługi dzieli przez liczbę iteracji na minutę, żeby wynik został w 0–120.
    Dotyczy tylko sieci z kursami częstotliwościowymi (każda nowa linia ze scenariusza,
-   `frequencies.txt` Warszawy): tam liczenie jest do 5× dłuższe, ale powtarzalne i zgodne z opisem
-   parametru. Sieci bez częstotliwości (Gdańsk, walidacja r5r) — bez zmian.
+   `frequencies.txt` Warszawy): tam liczenie jest dłuższe — zmierzone 1,4× na Łodzi z jedną dodaną
+   linią (okno 120 min), teoretycznie do 5× dla sieci złożonej głównie z kursów częstotliwościowych
+   — ale powtarzalne i zgodne z opisem parametru. Sieci bez częstotliwości (Gdańsk, walidacja r5r) — bez zmian.
 7. **Znany artefakt silnika:** dodanie trasy częstotliwościowej może zmienić P50 pojedynczej,
    niezwiązanej pary o 1 min (Łódź: 1 z 144 par, 74 → 75), bo R5 przełącza sposób iterowania dla
    sieci z częstotliwościami. Wynik jest powtarzalny (dwa przebiegi = identyczny CSV).

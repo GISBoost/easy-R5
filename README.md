@@ -98,12 +98,311 @@ See [`docs/notes/product-scope.md`](docs/notes/product-scope.md) and
 7. **What if?** — *Scenarios → Build scenario* (draw a line, list routes to remove), then re-run
    step 6 with the file in `SCENARIO` (Advanced) and *Compare scenarios* against the baseline
    run. *Summarize accessibility equity* turns either run into "X% of residents reach …".
+   Step-by-step instructions for each of these are in **Guides** below.
 
 The Gdańsk reference data — 1389 origins, 956 destinations, the r5r ground-truth output — is in
 [`tools/accessibility_cities/gdansk/`](tools/accessibility_cities/gdansk/); the exact-match
 comparison is in [`docs/notes/validation-gdansk.md`](docs/notes/validation-gdansk.md).
 
 ![Isochrones from Gdańsk Główny — 15 / 30 / 45 min, 07:00, transit + walk](docs/img/isochrones-gdansk.png)
+
+## Guides — the newer algorithms, step by step
+
+The table above says what each algorithm is for. This section explains, for the algorithms added
+in 0.2.2 and 0.3.0, **what question each one answers, how it works inside, how to run it, and what
+to watch out for.** All of them live in the Processing toolbox under **Easy-R5**. Every parameter
+named in `CAPITALS` below is the parameter's id; in the dialog it has a readable label, and the
+ones marked *Advanced* are under the dialog's *Advanced parameters* fold.
+
+A typical study chains them like this:
+
+```
+Check transit data ─► Build R5 network ─► Run accessibility / Run competitive accessibility
+                                              │  (baseline)        │  (with SCENARIO = file)
+                         Build scenario ──────┘                    │
+                                              └──► Compare scenarios ◄┘
+                                                        │
+                            Summarize accessibility equity (either run, or both)
+```
+
+### Check transit data (GTFS) — *Diagnostics*
+
+**Question it answers:** "Can I trust this GTFS for an analysis on this date — before I spend
+minutes building a network?"
+
+**Why it exists.** When a GTFS feed has no trips on the chosen date, R5 does not fail — it quietly
+returns walking-only travel times, and the map looks plausible. That exact mistake once reached a
+published result. Easy-R5 already blocks such runs at analysis time; this algorithm catches the
+problem earlier, while you can still pick another feed or date.
+
+**How it works.** Pure Python reading the `.zip` files; no Java, no network build. It reads the
+calendar the same way the analysis-time date check does (weekday patterns in `calendar.txt`,
+additions and removals in `calendar_dates.txt`) and counts **trips actually running on each day**.
+It then checks the files against each other and against what R5 7.6 can read.
+
+**How to use it.**
+1. Open *Check transit data (GTFS)*.
+2. `GTFS` — pick one GTFS `.zip`. With `WHOLE_FOLDER` ticked (default) every `.zip` in the same
+   folder is checked together, because *Build R5 network* reads the whole folder. Untick it if the
+   zip sits among unrelated downloads.
+3. `DATE` — the date you intend to analyse, `yyyy-MM-dd`. Optional, but it is the most useful check.
+4. `EXTENT` — optional: your study area (e.g. *Calculate from layer* → your OSM or boundary layer).
+5. `OUTPUT_REPORT` — where to save the HTML report. Optionally also `OUTPUT_SERVICE_DAYS` (a CSV of
+   trips per date) and `OUTPUT_ROUTES` (a CSV of every route — you will want this for scenarios).
+6. Run, then open the HTML report in a browser.
+
+**Reading the report.** Findings are sorted ERROR → WARN → INFO, followed by a bar chart of trips
+per day.
+
+| Level | Examples | What to do |
+|---|---|---|
+| ERROR | no trips on `DATE` (the report lists the 3 nearest served days); a required file missing; a `route_type` R5 7.6 cannot read (it supports 0–7, 11, 12, 100–1499); a realized P50/P85 feed and its scheduled feed in one folder; two feeds with the same feed id; no stop inside `EXTENT` | fix before building — the build or the analysis would fail or silently mislead |
+| WARN | trips pointing at routes/stops that do not exist; stops at 0,0; part of the stops outside `EXTENT`; days inside the calendar with no service | usually survivable, but read them |
+| INFO | calendar span, trips per day (min/median/max), routes per type, stop bounding box | context |
+
+`ERRORS` and `WARNINGS` are also returned as numbers. `FAIL_ON_ERROR` (*Advanced*) makes the
+algorithm itself fail when there are errors — useful inside a model.
+
+---
+
+### Scenarios — "what if?" (*Build scenario* + the `SCENARIO` parameter)
+
+**Question it answers:** "What happens to travel times / accessibility if we add this tram line,
+close route 86, slow the buses down, or run route 14 every 5 minutes?"
+
+**How it works.** A scenario is a small `.json` file listing **modifications** to the transit
+network. You never edit GTFS and never rebuild the network: when an analysis algorithm gets a
+scenario file, the Java runner loads the normal `network.dat`, asks R5 to apply the modifications
+to an **in-memory copy** (about 1–2 s), recomputes walking transfers for any new stops, and routes
+on that copy. The saved network stays untouched, so the baseline is always one run away.
+
+Four kinds of modification are available from the dialog:
+
+| Modification | What R5 does |
+|---|---|
+| **New line** (from a line layer) | adds a new route: a stop at each vertex, runs both ways (default) every `HEADWAY_MINUTES` between `SERVICE_START` and `SERVICE_END`, every day |
+| **Remove routes** | deletes every trip of the listed routes |
+| **Change speed** | scales the running time of the listed routes (`SPEED_SCALE` 0.8 = 20% slower, 1.25 = 25% faster) |
+| **New headway** | replaces the timetable of the listed routes, between `HEADWAY_START` and `HEADWAY_END`, with a regular service every `NEW_HEADWAY_MINUTES`; trips outside that window are kept. Each direction keeps its busiest variant; short-turn and depot variants inside the window are dropped rather than each getting the full frequency |
+
+Routes are named the way passengers know them (`86`, `Z2`) — or by GTFS `route_id`, or
+`feed:route_id` when several feeds share a name. The exact list is in *Check transit data*'s
+`OUTPUT_ROUTES` CSV. A name that matches nothing stops the analysis with a clear error; a name
+that matches several routes produces a warning listing them.
+
+#### Step by step: add a new tram line and measure its effect
+
+**1. Draw the line in QGIS.** The new line is an ordinary QGIS line layer — you draw it by hand.
+The one rule: **every vertex you click is a stop**, in the order you click them.
+
+1. *Layer → Create Layer → New Temporary Scratch Layer…* (or *New GeoPackage Layer…* if you want to
+   keep it after closing QGIS).
+2. Geometry type **LineString**, any CRS (it is reprojected automatically). Optionally add a text
+   field `name`. OK.
+3. Select the layer, *Toggle Editing* (pencil icon), then *Add Line Feature* (Ctrl+.).
+4. Left-click once **at each stop location**, first stop to last — typically at intersections or
+   where a stop would really be. **Do not add vertices for bends** of the track: each vertex
+   becomes a stop.
+5. Right-click to finish the line, type a name if you added the field, OK.
+6. Repeat for more lines if you want, then *Save Layer Edits* and toggle editing off.
+
+The drawn path between stops is **not** followed. Only the stop positions matter: the travel time
+between two consecutive stops is their straight-line distance divided by `SPEED_KMH`, plus
+`DWELL_SECONDS` at each stop. So `SPEED_KMH` should be a realistic speed *over straight-line
+distance* — a tram through a city is around 18–22 km/h, a fast bus corridor 20–25 km/h, a
+regional train far more. New stops are linked to the nearest street, and R5 computes walking
+transfers between them and the existing stops, so passengers can change between the new line
+and the existing network.
+
+**2. Build the scenario file.** Open *Build scenario*:
+
+| Parameter | Example |
+|---|---|
+| `NEW_LINES` | your drawn layer |
+| `LINE_NAME_FIELD` | `name` (optional) |
+| `NEW_LINE_MODE` | `TRAM` |
+| `SPEED_KMH` | `20` |
+| `HEADWAY_MINUTES` | `7.5` |
+| `SERVICE_START` / `SERVICE_END` | `05:00` / `23:00` — must cover your analysis departure time **plus** its window |
+| `OUTPUT_SCENARIO` | e.g. `…/scenarios/new_tram.json` |
+
+Leave `REMOVE_ROUTES` etc. empty, or combine them in the same file (for example, the new tram
+plus removing the bus it replaces). The log prints each new line's stop count and end-to-end time
+— check that the time is plausible.
+
+**3. Run the baseline.** Run *Run accessibility* (or any matrix-based algorithm) as usual, with
+`SCENARIO` empty. Save the output layer to a file, e.g. `acc_baseline.gpkg`.
+
+**4. Run the scenario.** Run the **same algorithm with exactly the same parameters**, and in
+*Advanced parameters* set `SCENARIO` to `new_tram.json`. Save to `acc_new_tram.gpkg`. The output
+layer gets a `scenario` field (`new_tram.json:<checksum>`; the baseline says `baseline`), so the
+two layers can never be confused later.
+
+**5. Compare.** *Compare scenarios* with `LAYER_A` = baseline, `LAYER_B` = scenario (see below).
+
+The same `SCENARIO` parameter works in *Run travel time matrix*, *Run accessibility*, *Run service
+minutes*, *Generate isochrones* and *Run competitive accessibility*.
+
+**Things to know.**
+- A scenario that removes routes can leave some trips walking-only; the analysis then warns
+  instead of failing. For any other scenario, "not one pair uses transit" is still a hard error,
+  because it almost always means a wrong date or a feed that does not match the map.
+- Scenario lines run as a regular service ("every N minutes"), so R5 randomises where in the
+  headway a passenger arrives — see *Speed of scenario runs* below.
+- Advanced users can hand-write the JSON with any of R5's own modification types
+  (`add-trips`, `remove-trips`, `adjust-speed`, `adjust-frequency`, `remove-stops`, `reroute`, …).
+
+---
+
+### Compare scenarios — *Scenarios*
+
+**Question it answers:** "Where did it get better or worse, and by how much?"
+
+**How it works.** Joins two result layers **by an id field** (not by location), takes one numeric
+field from each and writes a copy of layer A with `value_a`, `value_b`, `diff` (= B − A),
+`pct_change` and `status`: `better`, `worse`, `same`, `only_a`, `only_b`. The output is coloured
+by `status`.
+
+It refuses to compare runs whose **method** differs — percentile, decay, departure time, window,
+modes, catchment, maximum trip time, maximum walk, walking speed, maximum rides, Monte Carlo draws
+— because such a difference mixes a method change into the result. It reports, but accepts,
+differences that are the point of a comparison: date, network, scenario, transit sub-modes.
+
+**How to use it.**
+1. `LAYER_A` — before / baseline; `LAYER_B` — after / scenario.
+2. `JOIN_FIELD` — the id field (the same origin id you used in the analysis). `JOIN_FIELD_B` only
+   if it is named differently in B.
+3. `FIELD` — the value to compare, e.g. `acc_jobs_p50_c30`; `FIELD_B` only if named differently.
+4. `HIGHER_IS_BETTER` — **on** for accessibility, service minutes and 2SFCA (an empty value counts
+   as 0). **Off** for travel times: lower is better, and an empty value means "unreachable", so a
+   lost connection shows as `worse`, never as a gain.
+5. Run. The log summarises better / worse / same counts and the mean change.
+
+`ALLOW_METHOD_MISMATCH` (*Advanced*) overrides the method check — only when you really mean to
+compare, say, P50 with P85.
+
+It is also the tool for **timetable changes** and **scheduled vs realized** comparisons: run the
+same analysis on two networks and compare.
+
+---
+
+### Run competitive accessibility (2SFCA) — *Analysis*
+
+**Question it answers:** "How many doctors (school places, beds …) are there **per 1000
+residents**, counting that everyone who can reach a clinic competes for it?"
+
+*Run accessibility* counts what you can reach — a clinic with 5 doctors counts as 5 for everyone
+within 30 minutes, however many people that is. 2SFCA (two-step floating catchment area, Luo &
+Wang 2003) shares the supply among the people who can reach it.
+
+**How it works.** One travel-time matrix from demand points (origins, with population) to supply
+points (destinations, with capacity), then two steps in Python:
+
+1. For each destination: `ratio = capacity ÷ population that reaches it within CATCHMENT_MINUTES`.
+2. For each origin: sum the ratios of every destination it reaches within the catchment, then
+   multiply by `PER_POPULATION`.
+
+With `DECAY = STEP` this is classic 2SFCA. `LOGISTIC` / `EXPONENTIAL` give nearer destinations
+more weight (an E2SFCA-style variant); the weight still drops to 0 at the catchment, so results
+are sensitive to `CATCHMENT_MINUTES`. The log checks the method's own identity: all supply that
+anyone can reach is distributed — no more, no less.
+
+**How to use it.**
+1. `ORIGINS` — population points, e.g. hex-grid centroids with a population field from *Population
+   overlay*. They must cover **everyone who competes** for the destinations, not only the area you
+   want to map, or the supply looks less crowded than it is.
+2. `POPULATION_FIELD` — the population field on the origins.
+3. `DESTINATIONS` + `CAPACITY_FIELD` — the facilities and their capacity (doctors, places, beds).
+4. `CATCHMENT_MINUTES` — e.g. 30. `PERCENTILES` — **one** value (50 by default).
+5. `PER_POPULATION` — 1000 gives "per 1000 residents".
+6. The date, time, mode and other travel parameters are the same as in *Run accessibility*;
+   `SCENARIO` works too.
+7. Outputs: `OUTPUT_LAYER` (origins + `fca`), optional `OUTPUT_SUPPLY_LAYER` (facilities +
+   `supply_ratio` and `demand_in_catchment` — which facilities are overloaded), `OUTPUT_CSV`.
+
+The result is on a **different scale** from *Run accessibility* — never compare the two numbers
+directly. Facilities no one can reach are reported in the log.
+
+---
+
+### Summarize accessibility equity — *Analysis*
+
+**Question it answers:** "What share of residents can reach at least one hospital within 30
+minutes — and is access spread evenly or concentrated?"
+
+**How it works.** Takes any layer that has a population field and numeric accessibility fields
+(typically the output of *Run accessibility* or *Run competitive accessibility* on a population
+grid — those outputs keep the origin layer's fields). Every statistic is **weighted by
+population**, so it speaks about people, not hexagons:
+
+| Column | Meaning |
+|---|---|
+| `population` | residents counted |
+| `pop_at_least`, `share_at_least` | residents with a value ≥ `THRESHOLD` |
+| `pop_zero`, `share_zero` | residents with no access at all |
+| `mean` | population-weighted mean |
+| `p10` … `p90` | the value below which 10% … 90% of residents fall |
+| `gini` | inequality of access, 0 = everyone equal, towards 1 = concentrated in few places |
+
+An empty accessibility value counts as 0 (no access); a feature with empty or negative population
+is skipped and counted in the log.
+
+**How to use it.**
+1. `INPUT` — the accessibility layer.
+2. `POPULATION_FIELD` — e.g. the field from *Population overlay*.
+3. `ACCESSIBILITY_FIELDS` — one or more, e.g. `acc_hospitals_p50_c30`.
+4. `THRESHOLD` — `1` answers "reaches at least one"; `500` answers "reaches at least 500 jobs".
+5. `GROUP_FIELD` — optional, e.g. a district name joined to the grid: adds one row per district.
+6. Outputs: `OUTPUT_TABLE` (a table layer, one row per group × field) and `OUTPUT_REPORT` (HTML with
+   a plain-language sentence per field, e.g. *"ALL: 52.6% of residents (15 000 of 28 500) have
+   acc_jobs_p50_c30 ≥ 500; 0.0% have none."*, and the run method recorded in the layer — percentile,
+   date, scenario …).
+
+Run it on the baseline and on a scenario to report a change in people, not in hexagons.
+
+---
+
+### Run service minutes — *Analysis*
+
+**Question it answers:** "Not just *how long* the trip takes, but *how often* the destination is
+reachable in time" — a trip with a 25-minute median can be every 8 minutes or once an hour.
+
+**How it works.** R5 already routes every minute of the departure window. This algorithm keeps
+R5's per-minute distribution and counts, for each origin–destination pair and each cutoff, **how
+many departure minutes arrive within the cutoff** (`svc_min_c30` = 90 means: leaving at 90 of the
+120 minutes gets you there within 30 minutes).
+
+**How to use it.** Like *Run travel time matrix*, but with `CUTOFFS` (e.g. `15,30,45,60`) instead
+of percentiles. Cutoffs and `MAX_TRIP_DURATION` must stay **below 120 minutes** (R5 records this
+distribution over a fixed 120-minute range). Output: a CSV with `from_id, to_id, svc_min_c<cutoff>…`,
+values 0–120, and optional OD lines.
+
+This is **not** the same number as easy-OTP's service-time classification — a different method
+and reference window. Do not compare the two.
+
+---
+
+### Speed of scenario runs (Monte Carlo draws)
+
+Some routes run "every N minutes" instead of at fixed times: every line added by *Build scenario*,
+every route given a new headway, and GTFS feeds with `frequencies.txt` (e.g. Warsaw). For those,
+the arrival time within the headway is random, so R5 samples several random timetables per
+departure minute — `MONTE_CARLO_DRAWS` (*Advanced*, default 5 per minute, as in r5r).
+
+Before 0.3.0 Easy-R5 passed this number to R5 the wrong way: R5 treats it as a total for the whole
+window, so the default gave about one sample per minute. Results for frequency routes were then
+noisy and could differ between two identical runs, which would make *Compare scenarios* show
+changes that are not there. 0.3.0 passes it correctly (identical runs now give identical results).
+
+**What it costs.**
+- **Networks without frequency routes** (most Polish scheduled GTFS, with no scenario): no change
+  at all — R5 does one pass per minute regardless of this setting.
+- **With frequency routes:** slower, in proportion to how much of the network runs by frequency.
+  Measured on Łódź with one drawn tram line and a 120-minute window: routing took **~1.4×** as long
+  as the same network without it. A network where most routes are frequency-based can approach
+  the theoretical **5×**.
+- For a quick first look, set `MONTE_CARLO_DRAWS` to `1` — as fast as before, but noisier. Use the
+  default for anything you publish or compare.
 
 ## Archival / realized GTFS
 
