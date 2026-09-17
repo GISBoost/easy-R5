@@ -175,10 +175,66 @@ def test_cap_at_90_days(tmp_path):
         calendar=[_cal_row("A", [1] * 7, "20260101", "20261231")],  # ~365 days
         trips=["A"],
     )
-    days = compute_service_days([z])
+    days = compute_service_days([z], cap_days=90)
     assert len(days) == 90
     assert min(days) == "2026-01-01"
     assert max(days) == "2026-03-31"    # 2026-01-01 + 89 days
+
+
+def test_default_cap_is_generous(tmp_path):
+    # A feed valid well past 90 days from its own start must not be truncated
+    # by the default cap (#3: 90 had no documented rationale and real GTFS
+    # feeds routinely publish a full season/year of calendar).
+    z = tmp_path / "f.zip"
+    _make_gtfs(
+        z,
+        calendar=[_cal_row("A", [1] * 7, "20260101", "20260601")],  # 152 days
+        trips=["A"],
+    )
+    days = compute_service_days([z])
+    assert len(days) == 152
+    assert min(days) == "2026-01-01"
+    assert max(days) == "2026-06-01"
+
+
+def test_multi_feed_non_overlapping_calendars(tmp_path):
+    # Regression for #3: a rail feed (A) with an old calendar start must not
+    # drag a city feed's (B) window down and hide a date only B covers.
+    z1 = tmp_path / "rail.zip"
+    z2 = tmp_path / "city.zip"
+    _make_gtfs(
+        z1,
+        calendar=[_cal_row("R", [1] * 7, "20251214", "20260313")],  # Dec-Mar
+        trips=["R"],
+    )
+    _make_gtfs(
+        z2,
+        calendar=[_cal_row("C", [1] * 7, "20260801", "20261031")],  # Aug-Oct
+        trips=["C", "C"],
+    )
+    days = compute_service_days([z1, z2])
+    assert days["2026-08-21"] == 2      # valid only in the city feed's window
+    assert days["2025-12-20"] == 1      # valid only in the rail feed's window
+
+
+def test_per_feed_cap_independent(tmp_path):
+    # A sentinel/garbage end_date ("indefinite") on one feed must not blow up
+    # its own window past cap_days, nor affect the other feed's window.
+    z1 = tmp_path / "sentinel.zip"
+    z2 = tmp_path / "normal.zip"
+    _make_gtfs(
+        z1,
+        calendar=[_cal_row("S", [1] * 7, "20260101", "20991231")],
+        trips=["S"],
+    )
+    _make_gtfs(
+        z2,
+        calendar=[_cal_row("N", [1] * 7, "20260101", "20260201")],  # 32 days
+        trips=["N"],
+    )
+    days = compute_service_days([z1, z2], cap_days=90)
+    assert max(days) == "2026-03-31"    # sentinel feed capped 90 days from ITS start
+    assert "2026-08-01" not in days     # well past the cap, not silently included
 
 
 def test_multi_feed_sums(tmp_path):

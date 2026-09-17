@@ -66,7 +66,7 @@ class BuildNetwork(QgsProcessingAlgorithm):
         return self.tr(
             "Builds an R5 network.dat from one OSM .pbf extract and every .zip "
             "GTFS feed in a folder, and writes a network.json summary that "
-            "includes service_days (active trip count per date, 90-day window).\n\n"
+            "includes service_days (active trip count per date, capped per feed).\n\n"
             "The result is cached under CACHE_FOLDER/<hash>/ keyed by the input "
             "file contents and the pinned R5 version; an unchanged re-run returns "
             "at once. FORCE_REBUILD ignores the cache.\n\n"

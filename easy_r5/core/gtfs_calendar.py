@@ -25,7 +25,7 @@ _WEEKDAY_COLS = [
     "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
 ]
 
-_DEFAULT_CAP_DAYS = 90
+_DEFAULT_CAP_DAYS = 400
 
 
 def _iter_rows(zf, name):
@@ -120,39 +120,43 @@ def _active_on(sid, day, services, exceptions):
 
 
 def compute_service_days(gtfs_zip_paths, cap_days=_DEFAULT_CAP_DAYS):
-    """Return {ISO date: active trip count} for every day of the feed span.
+    """Return {ISO date: active trip count}, summed across feeds.
 
-    Span = min/max over calendar start/end dates and calendar_dates dates,
-    across all feeds, capped at ``cap_days`` from the first day. Trip counts are
-    summed across feeds. Empty span (no calendar data anywhere) -> {}.
+    Each feed gets its OWN span (min/max over its calendar start/end dates and
+    calendar_dates dates), independently capped at ``cap_days`` from ITS OWN
+    first day — not one global window anchored at the earliest date across all
+    feeds (#3: that let a feed with an old calendar start, e.g. a rail feed,
+    drag the whole window before a later feed's requested date, even though
+    both feeds had real service that day). ``cap_days`` is a defensive ceiling
+    against sentinel/garbage end_date values (e.g. 20991231 for "indefinite"),
+    not a deliberate scope limit — real GTFS feeds are routinely published for
+    well over 90 days. A feed with no calendar data at all is skipped.
     """
-    feeds = []
-    all_dates = []
+    result = {}
     for path in gtfs_zip_paths:
         with zipfile.ZipFile(path) as zf:
             services = _services(zf)
             exceptions = _exceptions(zf)
             trips = _trip_counts(zf)
-        feeds.append((services, exceptions, trips))
+
+        feed_dates = []
         for svc in services.values():
-            all_dates.append(svc["start"])
-            all_dates.append(svc["end"])
-        all_dates.extend(day for (_sid, day) in exceptions)
+            feed_dates.append(svc["start"])
+            feed_dates.append(svc["end"])
+        feed_dates.extend(day for (_sid, day) in exceptions)
+        if not feed_dates:
+            continue
 
-    if not all_dates:
-        return {}
+        start = min(feed_dates)
+        end = min(max(feed_dates), start + datetime.timedelta(days=cap_days - 1))
 
-    start = min(all_dates)
-    end = min(max(all_dates), start + datetime.timedelta(days=cap_days - 1))
-
-    result = {}
-    day = start
-    while day <= end:
-        total = 0
-        for services, exceptions, trips in feeds:
+        day = start
+        while day <= end:
+            total = 0
             for sid, count in trips.items():
                 if count and _active_on(sid, day, services, exceptions):
                     total += count
-        result[day.isoformat()] = total
-        day += datetime.timedelta(days=1)
+            key = day.isoformat()
+            result[key] = result.get(key, 0) + total
+            day += datetime.timedelta(days=1)
     return result

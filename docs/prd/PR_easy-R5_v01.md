@@ -163,8 +163,12 @@ Kody błędów (stabilne, Python mapuje je na komunikaty dla użytkownika):
 }
 ```
 
-`service_days` = **liczba kursów aktywnych w danym dniu** dla każdego dnia w zakresie feedu
-(cap 90 dni). To ono, a nie udział `service_id`, rozstrzyga, czy data ma sens.
+`service_days` = **liczba kursów aktywnych w danym dniu** dla każdego dnia w zakresie feedu.
+To ono, a nie udział `service_id`, rozstrzyga, czy data ma sens. Każdy feed w folderze budowy
+dostaje własne, niezależnie liczone okno (własny start, cap 400 dni od WŁASNEGO startu —
+sufit obronny na sentinelowe `end_date`, nie limit zasięgu), wyniki sumowane po dacie; wcześniej
+było to jedno globalne okno cap 90 dni od najwcześniejszej daty ze wszystkich feedów, co dawało
+fałszywe blokady na sieciach wielofeedowych (issue #3, `KNOWN_ISSUES.md`, naprawione).
 
 #### `command: "matrix"`
 

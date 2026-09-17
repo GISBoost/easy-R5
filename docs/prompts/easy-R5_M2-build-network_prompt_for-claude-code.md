@@ -70,6 +70,12 @@ that date**, honouring `calendar.txt` weekday flags, `start_date`/`end_date`, an
 not a percentage — Polish feeds routinely ship one `service_id` per day (Gdańsk has no
 `calendar.txt` at all), which is exactly what makes share-based heuristics useless.
 
+> Historical note: this M2 prompt described a single global 90-day window across all feeds in
+> the build folder. That design caused issue #3 (`KNOWN_ISSUES.md`) — a multi-feed network could
+> get a window anchored before a later feed's requested date. Fixed post-M2: each feed now gets
+> its own independently-capped window (own start, cap 400 days), summed by date across feeds.
+> See `easy_r5/core/gtfs_calendar.py::compute_service_days`.
+
 Emit `PROGRESS` during the build; it takes minutes on a large PBF.
 
 ### Python: `core/network_cache.py` + `algorithms/build_network.py`

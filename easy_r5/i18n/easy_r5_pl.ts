@@ -15,12 +15,12 @@
     </message>
     <message>
         <location filename="../algorithms/build_network.py" line="66"/>
-        <source>Builds an R5 network.dat from one OSM .pbf extract and every .zip GTFS feed in a folder, and writes a network.json summary that includes service_days (active trip count per date, 90-day window).
+        <source>Builds an R5 network.dat from one OSM .pbf extract and every .zip GTFS feed in a folder, and writes a network.json summary that includes service_days (active trip count per date, capped per feed).
 
 The result is cached under CACHE_FOLDER/&lt;hash&gt;/ keyed by the input file contents and the pinned R5 version; an unchanged re-run returns at once. FORCE_REBUILD ignores the cache.
 
 Building can take minutes on a large PBF. Run &apos;Download R5 engine and Java 21&apos; first.</source>
-        <translation>Buduje plik network.dat z jednego wyciągu OSM .pbf oraz każdego strumienia GTFS w folderze i zapisuje podsumowanie network.json, które zawiera service_days (aktywna liczba kursów na datę, okno 90-dniowe).
+        <translation>Buduje plik network.dat z jednego wyciągu OSM .pbf oraz każdego strumienia GTFS w folderze i zapisuje podsumowanie network.json, które zawiera service_days (aktywna liczba kursów na datę, limit liczony osobno dla każdego feedu).
 
 Wynik jest buforowany w CACHE_FOLDER/&lt;hash&gt;/ z kluczem opartym na zawartości plików wejściowych i przypisanej wersji R5; ponowne uruchomienie bez zmian zwraca wynik natychmiast. FORCE_REBUILD ignoruje pamięć podręczną.
 
@@ -716,12 +716,12 @@ Statystyki {}:  min={:.1f}  max={:.1f}  suma={:.1f}</translation>
         <location filename="../algorithms/run_accessibility.py" line="69"/>
         <source>For each origin, counts the opportunities (jobs, schools, shops…) at destinations reachable within each cutoff, weighted by a decay function of travel time. Runs the same matrix as RunTravelTimeMatrix then sums in Python.
 
-OPPORTUNITY_FIELDS are numeric columns on the destination layer. STEP decay (count everything at or under the cutoff) is the default and what accessibility studies use; LOGISTIC and EXPONENTIAL taper.
+OPPORTUNITY_FIELDS are numeric columns on the destination layer. STEP decay (count everything strictly under the cutoff — a trip of exactly the cutoff length does not count) is the default and what accessibility studies use; LOGISTIC and EXPONENTIAL taper.
 
 Output: a long CSV (id, opportunity, percentile, cutoff, accessibility) and an ORIGINS copy with acc_&lt;opp&gt;_p&lt;pct&gt;_c&lt;cutoff&gt; fields.</source>
         <translation>Dla każdego źródła liczy możliwości (miejsca pracy, szkoły, sklepy…) w celach osiągalnych w ramach każdego progu czasowego, ważonych funkcją zaniku czasu podróży. Uruchamia tę samą macierz co RunTravelTimeMatrix, a następnie sumuje ją w Pythonie.
 
-OPPORTUNITY_FIELDS to kolumny numeryczne na warstwie docelowej. Domyślne jest wygaszenie STEP (liczy wszystko przy lub poniżej progu czasowego), którego używają badania dostępności; LOGISTYCZNE i EKSPONENCJALNE wygaszanie.
+OPPORTUNITY_FIELDS to kolumny numeryczne na warstwie docelowej. Domyślne jest wygaszenie STEP (liczy wszystko ściśle poniżej progu czasowego — podróż dokładnie tak długa jak próg się nie liczy), którego używają badania dostępności; LOGISTYCZNE i EKSPONENCJALNE wygaszanie.
 
 Wyjście: długi plik CSV (id, opportunity, percentile, cutoff, accessibility) oraz kopia ORIGINS z polami acc_&lt;opp&gt;_p&lt;pct&gt;_c&lt;cutoff&gt;.</translation>
     </message>
