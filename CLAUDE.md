@@ -13,7 +13,7 @@ izochron dla 6+ miast PL), migrowane z easy-OTP. Patrz ADR-0003.
 
 ## Stan projektu (2026-09-17)
 **v0.1 (M1–M5), v0.2 (realized GTFS, service minutes) i v0.3 na `main`.** 15 algorytmów
-Processing, `metadata.txt` `0.3.0` / `experimental=True`, 254 testy pytest zielone, flake8
+Processing, `metadata.txt` `0.3.0` / `experimental=True`, 256 testów pytest zielonych, flake8
 czysto. v0.3 (`docs/prd/PR_easy-R5_v03.md`): scenariusze R5 + porównanie, CheckTransitData,
 2SFCA, podsumowanie równościowe — każde zweryfikowane przez MCP na sieci łódzkiej.
 M3 zweryfikowane end-to-end vs R5 7.6; M4 odtwarza wynik r5r dla Gdańska **co do wiersza**

@@ -4,7 +4,7 @@
 przez QGIS MCP na sieci łódzkiej (`tools/f1_smoke_test_lodz`): CheckTransitData na realnym GTFS,
 scenariusz z narysowaną linią tramwajową (para 953→587: 63 → 14 min), porównanie dostępności
 przed/po, 2SFCA zgodne z niezależnym przeliczeniem z macierzy, podsumowanie równościowe zgodne
-z ręcznym. 254 testy pytest zielone, flake8 czysto.
+z ręcznym. 256 testów pytest zielonych, flake8 czysto.
 **Data:** 2026-09-17
 **Autor:** Michał Kaczorowski
 **Kontekst wymagany do pracy:** ten plik + `CLAUDE.md` + `CONTEXT.md` +
