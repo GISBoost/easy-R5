@@ -186,3 +186,36 @@ def test_build_command_extra_jvm_args():
     assert cmd[3] == "-Djava.io.tmpdir=/tmp/x"
     assert cmd[4] == "-cp"
     assert "EasyR5Runner" in cmd
+
+
+# --- stale compiled runner (plugin update) ----------------------------------
+
+def test_runner_is_stale(tmp_path):
+    src = tmp_path / "EasyR5Runner.java"
+    src.write_text("class A {}", encoding="utf-8")
+    classes = tmp_path / "rc"
+    classes.mkdir()
+    assert java_env.runner_is_stale(classes, src) is True  # no stamp yet
+    (classes / "source.sha256").write_text(java_env.sha256_file(src), encoding="utf-8")
+    assert java_env.runner_is_stale(classes, src) is False
+    src.write_text("class B {}", encoding="utf-8")
+    assert java_env.runner_is_stale(classes, src) is True
+
+
+def test_resolve_env_recompiles_stale_runner(tmp_path, monkeypatch):
+    jdk = tmp_path / "bin" / "java"
+    jdk.parent.mkdir()
+    jdk.write_text("")
+    jar = tmp_path / "r5.jar"
+    jar.write_text("")
+    classes = tmp_path / "rc"
+    classes.mkdir()
+    (classes / "EasyR5Runner.class").write_text("")
+    src = tmp_path / "EasyR5Runner.java"
+    src.write_text("class B {}", encoding="utf-8")
+    calls = []
+    monkeypatch.setattr(java_env, "compile_runner", lambda *a: calls.append(a) or ("source", "javac failed"))
+    env = java_env.resolve_env({"jdk_path": str(jdk), "r5_jar_path": str(jar), "runner_mode": "compiled",
+                                "runner_class_dir": str(classes), "runner_source_path": str(src)})
+    assert len(calls) == 1
+    assert env.runner_mode == "source"  # failed recompile falls back to the source launcher

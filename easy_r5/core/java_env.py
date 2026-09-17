@@ -190,6 +190,25 @@ def xmx_arg(mb):
 
 # --- runner compile + command ---------------------------------------------
 
+_SOURCE_STAMP = "source.sha256"
+
+
+def runner_is_stale(class_dir, source_path):
+    """True if the compiled runner in ``class_dir`` was not built from ``source_path`` as it is now.
+
+    A plugin update replaces EasyR5Runner.java but not the classes compiled at
+    setup time; a stale runner silently ignores job fields it predates (a
+    scenario, service-minute histograms) and returns baseline results.
+    """
+    stamp = Path(class_dir) / _SOURCE_STAMP
+    if not Path(source_path).is_file():
+        return False
+    try:
+        return stamp.read_text(encoding="utf-8").strip() != sha256_file(source_path)
+    except OSError:
+        return True
+
+
 def compile_runner(java_bin_dir, jar_path, source_path, class_dir):
     """javac the runner once. Return ``(mode, detail)``.
 
@@ -215,6 +234,7 @@ def compile_runner(java_bin_dir, jar_path, source_path, class_dir):
         return "source", "javac could not be run: {}".format(exc)
     produced = class_dir / (pins.RUNNER_MAIN_CLASS + ".class")
     if proc.returncode == 0 and produced.exists():
+        (class_dir / _SOURCE_STAMP).write_text(sha256_file(source_path), encoding="utf-8")
         return "compiled", str(class_dir)
     return "source", (proc.stderr or proc.stdout or "javac failed").strip()[-1000:]
 
@@ -241,6 +261,8 @@ def resolve_env(settings_snapshot):
                 "Compiled runner missing from '{}'. Re-run 'Download R5 engine "
                 "and Java 21'.".format(class_dir)
             )
+        if runner_is_stale(class_dir, source_path):
+            mode, _detail = compile_runner(jdk.parent, jar, source_path, class_dir)
     elif mode == "source":
         if not source_path.is_file():
             raise JavaEnvError(
