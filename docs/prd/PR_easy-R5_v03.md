@@ -229,15 +229,15 @@ Luo & Wang (2003) 2SFCA, z opcjonalnym zanikiem (wariant E2SFCA-like, jak w
 
 1. **Jeden bieg macierzy** (origins = lokalizacje popytu, destinations = podaż). `MatrixBase`,
    jak `RunAccessibility`; `SCENARIO` działa automatycznie.
-2. **Jeden percentyl** (`PERCENTILE`, domyślnie 50) — mieszanie percentyli w jednym indeksie
-   nie ma interpretacji.
+2. **Jeden percentyl** (wspólny parametr `PERCENTILES`, walidowany do dokładnie jednej wartości,
+   domyślnie 50) — mieszanie percentyli w jednym indeksie nie ma interpretacji.
 3. Populacja trafia do CSV origins jako dodatkowa kolumna (`origin_extra_fields` w `_run_matrix`).
 4. Suma kontrolna w logu: `Σ_i A_i·P_i = Σ_j S_j` dla podaży z niezerowym popytem (własność
    2SFCA — cała podaż jest rozdzielona).
 
 ### R-5.3 Parametry i wyjścia
 
-Wspólne z `MatrixBase` (bez `PERCENTILES`, zamiast tego `PERCENTILE`), `POPULATION_FIELD`
+Wspólne z `MatrixBase` (`PERCENTILES` = jedna wartość), `POPULATION_FIELD`
 (origins), `CAPACITY_FIELD` (destinations), `CATCHMENT_MINUTES` (30), `DECAY` (STEP),
 `PER_POPULATION` (1000), `OUTPUT_LAYER` (origins + `fca`, meta), `OUTPUT_SUPPLY_LAYER`
 (opcj.: destinations + `supply_ratio`, `demand_in_catchment`), `OUTPUT_CSV`

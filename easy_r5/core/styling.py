@@ -69,3 +69,33 @@ def apply_categories(context, dest_id, field, categories):
         context.layerToLoadOnCompletionDetails(dest_id).setPostProcessor(pp)
     except Exception:  # nosec B110 — styling is cosmetic, never fail the run for it
         pass
+
+
+def apply_graduated(context, dest_id, field, classes=5, ramp="Viridis"):
+    """Quantile graduated renderer on ``field``, symbol matched to the output geometry type."""
+    if not dest_id:
+        return
+    try:
+        from qgis.core import (
+            QgsClassificationQuantile,
+            QgsGraduatedSymbolRenderer,
+            QgsProcessingLayerPostProcessorInterface,
+            QgsStyle,
+            QgsSymbol,
+        )
+
+        class _GraduatedPP(QgsProcessingLayerPostProcessorInterface):
+            def postProcessLayer(self, layer, context, feedback):  # noqa: N802
+                renderer = QgsGraduatedSymbolRenderer(field)
+                renderer.setSourceSymbol(QgsSymbol.defaultSymbol(layer.geometryType()))
+                renderer.setSourceColorRamp(QgsStyle.defaultStyle().colorRamp(ramp))
+                renderer.setClassificationMethod(QgsClassificationQuantile())
+                renderer.updateClasses(layer, classes)
+                layer.setRenderer(renderer)
+                layer.triggerRepaint()
+
+        pp = _GraduatedPP()
+        _KEEPALIVE.append(pp)
+        context.layerToLoadOnCompletionDetails(dest_id).setPostProcessor(pp)
+    except Exception:  # nosec B110 — styling is cosmetic, never fail the run for it
+        pass
