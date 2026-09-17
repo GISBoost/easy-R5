@@ -125,6 +125,12 @@ Check transit data ─► Build R5 network ─► Run accessibility / Run compet
                             Summarize accessibility equity (either run, or both)
 ```
 
+> **Worked example.** All of this run end to end on the real Łódź network, with the QGIS project,
+> the layers and the numbers: [`tools/demo_v03_lodz/`](tools/demo_v03_lodz/README.md). Headline
+> results — 97.0% of residents reach at least one school within 30 minutes, one scenario tram line
+> brings 6 280 more people into that group (3.0% → 2.1% with no access), and 2SFCA shows only 25%
+> of residents have as many school places per capita as the city average.
+
 ### Check transit data (GTFS) — *Diagnostics*
 
 **Question it answers:** "Can I trust this GTFS for an analysis on this date — before I spend
