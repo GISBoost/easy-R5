@@ -249,7 +249,7 @@ def check_feeds(zip_paths, *, date=None, extent=None):
 
     seen_ids = {}
     for f in feeds:
-        fid = f["feed_id"]
+        fid = f["feed_id"] or f["feed"]  # R5 falls back to the file name without feed_id
         if fid:
             if fid in seen_ids:
                 issues.append(Issue(ERROR, "DUPLICATE_FEED_ID",
@@ -259,11 +259,17 @@ def check_feeds(zip_paths, *, date=None, extent=None):
     for i, a in enumerate(feeds):
         for b in feeds[i + 1:]:
             shared = a["trip_ids"] & b["trip_ids"]
-            if shared:
+            smaller = min(len(a["trip_ids"]), len(b["trip_ids"])) or 1
+            if len(shared) / smaller >= 0.5:
                 issues.append(Issue(ERROR, "SHARED_TRIP_IDS",
                                     "{} and {} share {} trip_id(s) — a realized (P50/P85) feed and "
                                     "its static feed cannot sit in one network-build folder; use "
                                     "one folder per variant.".format(a["feed"], b["feed"], len(shared))))
+            elif shared:
+                issues.append(Issue(WARN, "SOME_SHARED_TRIP_IDS",
+                                    "{} and {} share {} trip_id(s) — harmless for different operators "
+                                    "(R5 prefixes ids per feed), but check these are not two variants of "
+                                    "one feed.".format(a["feed"], b["feed"], len(shared))))
 
     if extent is not None:
         xmin, ymin, xmax, ymax = extent

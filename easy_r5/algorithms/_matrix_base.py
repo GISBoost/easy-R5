@@ -489,8 +489,12 @@ class MatrixBase:
         rows = matrix.merge_batch_csvs(batch_csvs, matrix_csv)
         feedback.pushInfo(_tr("Matrix: {n} reachable pairs.").format(n=rows))
 
-        if is_transit and transit_used == 0 and scenario_data is not None:
-            # A scenario may legitimately remove transit; the date was already checked above.
+        removes_service = scenario_data is not None and any(
+            m.get("type") in ("easy-remove-routes", "remove-trips", "remove-stops")
+            for m in scenario_data["modifications"])
+        if is_transit and transit_used == 0 and removes_service:
+            # Removing routes may legitimately leave no useful transit. Any other scenario
+            # keeps the hard walk-only guard (the GZM incident class).
             feedback.pushWarning(_tr(
                 "Not one OD pair is faster by transit than on foot under this scenario — "
                 "the results are walk-only."))

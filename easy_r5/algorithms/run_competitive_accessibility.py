@@ -33,7 +33,8 @@ from ..core.styling import apply_graduated
 from ._matrix_base import MatrixBase
 
 _META_FIELDS = ("r5_version", "network_hash", "run_date", "departure_time", "time_window", "percentile",
-                "modes", "transit_submodes", "decay", "catchment", "scenario")
+                "modes", "transit_submodes", "decay", "catchment", "scenario", "max_trip_duration_minutes",
+                "max_walk_time_minutes", "walk_speed_kmh", "max_rides", "monte_carlo_draws")
 
 
 class RunCompetitiveAccessibility(MatrixBase, QgsProcessingAlgorithm):
@@ -74,8 +75,8 @@ class RunCompetitiveAccessibility(MatrixBase, QgsProcessingAlgorithm):
             "POPULATION_FIELD) that reaches it within CATCHMENT_MINUTES. Step 2: each origin "
             "sums those ratios over the destinations it reaches. The result 'fca' is capacity "
             "per PER_POPULATION residents (e.g. doctors per 1000). STEP decay is the classic "
-            "2SFCA; LOGISTIC and EXPONENTIAL weight nearer destinations more (E2SFCA-style), "
-            "cut off at the catchment.\n\n"
+            "2SFCA; LOGISTIC and EXPONENTIAL weight nearer destinations more (E2SFCA-style) "
+            "and drop to 0 at the catchment, so results are sensitive to CATCHMENT_MINUTES.\n\n"
             "Give exactly one percentile. Origins should cover all the population competing "
             "for the destinations, not only the area you want to map."
         )
@@ -115,6 +116,11 @@ class RunCompetitiveAccessibility(MatrixBase, QgsProcessingAlgorithm):
         if len(self.parameterAsString(parameters, self.PERCENTILES, context).replace(",", " ").split()) != 1:
             raise QgsProcessingException(self.tr(
                 "Give exactly one percentile — a 2SFCA index mixing percentiles has no meaning."))
+        # Checked before routing: a clash would otherwise surface only after the whole matrix ran.
+        self._check_clash(self.parameterAsSource(parameters, self.ORIGINS, context), ["fca"])
+        if parameters.get(self.OUTPUT_SUPPLY_LAYER) not in (None, ""):
+            self._check_clash(self.parameterAsSource(parameters, self.DESTINATIONS, context),
+                              ["supply_ratio", "demand_in_catchment"])
         if catchment > max_trip:
             feedback.pushWarning(self.tr(
                 "MAX_TRIP_DURATION ({t} min) is below the catchment ({c} min) — raising it to {c}."
@@ -171,6 +177,13 @@ class RunCompetitiveAccessibility(MatrixBase, QgsProcessingAlgorithm):
             return outputs
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
+
+    def _check_clash(self, source, names):
+        clash = [n for n in list(names) + list(_META_FIELDS) if source.fields().lookupField(n) >= 0]
+        if clash:
+            raise QgsProcessingException(self.tr(
+                "The input layer already has field(s) {f} — it looks like an earlier result. Use the "
+                "original layer or remove those fields.").format(f=", ".join(clash)))
 
     def _write(self, parameters, name, context, source, id_field, ids, value_maps, meta):
         """Copy ``source`` + one double field per (field_name, {id: value}) + method fields.

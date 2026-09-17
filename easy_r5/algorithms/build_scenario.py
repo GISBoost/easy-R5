@@ -201,7 +201,8 @@ class BuildScenario(QgsProcessingAlgorithm):
                 name = base if len(parts) == 1 else "{}-{}".format(base, i + 1)
                 try:
                     out.append(scenario.line_to_add_trips(
-                        [(p.x(), p.y()) for p in part], name=name, **line_kw))
+                        [(p.x(), p.y()) for p in part], name=name,
+                        entry_suffix="{}-{}".format(feat.id(), i), **line_kw))
                 except scenario.ScenarioError as exc:
                     raise QgsProcessingException("{}: {}".format(name, exc))
         return out

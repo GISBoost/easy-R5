@@ -64,7 +64,8 @@ class CheckTransitData(QgsProcessingAlgorithm):
             "(P50/P85) feed sharing a folder with its static feed.\n\n"
             "Pick a GTFS .zip; by default every .zip in its folder is checked together, "
             "the way Build R5 network reads them. The report is always written; errors only stop the "
-            "algorithm when FAIL_ON_ERROR is set.\n\n"
+            "algorithm when FAIL_ON_ERROR is set. Untick the folder option for a zip that sits next "
+            "to unrelated downloads.\n\n"
             "The routes CSV lists route_id and short names — use them in Build scenario."
         )
 
@@ -120,7 +121,8 @@ class CheckTransitData(QgsProcessingAlgorithm):
             if not rect.isNull() and not rect.isEmpty():
                 extent = (rect.xMinimum(), rect.yMinimum(), rect.xMaximum(), rect.yMaximum())
 
-        feedback.pushInfo(self.tr("Checking {n} feed(s)…").format(n=len(zips)))
+        feedback.pushInfo(self.tr("Checking {n} feed(s): {f}").format(
+            n=len(zips), f=", ".join(z.name for z in zips)))
         result = gtfs_check.check_feeds(zips, date=date, extent=extent)
 
         for issue in result["issues"]:

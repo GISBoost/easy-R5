@@ -38,7 +38,8 @@ from ._matrix_base import MatrixBase
 
 _META_FIELDS = ("r5_version", "network_hash", "run_date", "departure_time",
                 "time_window", "percentile", "modes", "transit_submodes", "decay",
-                "scenario")
+                "scenario", "max_trip_duration_minutes", "max_walk_time_minutes",
+                "walk_speed_kmh", "max_rides", "monte_carlo_draws")
 
 
 class RunAccessibility(MatrixBase, QgsProcessingAlgorithm):

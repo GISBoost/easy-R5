@@ -60,11 +60,12 @@ def parse_route_list(text):
 
 
 def line_to_add_trips(coords, *, mode="BUS", speed_kmh=25.0, dwell_seconds=30, headway_minutes=10.0,
-                      start="05:00", end="23:00", bidirectional=True, name=""):
+                      start="05:00", end="23:00", bidirectional=True, name="", entry_suffix="f"):
     """One ``add-trips`` modification: a stop at every vertex of ``coords`` [(lon, lat), ...] in WGS84.
 
     Hop times come from great-circle distance / ``speed_kmh`` (at least 1 s).
-    Consecutive duplicate vertices are merged.
+    Consecutive duplicate vertices are merged. ``entry_suffix`` keeps ``entryId`` unique when
+    two features share a name.
     """
     if mode not in LINE_MODES:
         raise ScenarioError("Unknown mode {!r}; use one of {}.".format(mode, ", ".join(LINE_MODES)))
@@ -90,7 +91,7 @@ def line_to_add_trips(coords, *, mode="BUS", speed_kmh=25.0, dwell_seconds=30, h
     speed_ms = speed_kmh / 3.6
     hops = [max(1, int(round(haversine_m(*a, *b) / speed_ms))) for a, b in zip(stops, stops[1:])]
     timetable = {
-        "entryId": (name or "line") + "-f",
+        "entryId": (name or "line") + "-" + entry_suffix,
         "hopTimes": hops,
         "dwellTimes": [int(dwell_seconds)] * len(stops),
         "headwaySecs": int(round(headway_minutes * 60)),

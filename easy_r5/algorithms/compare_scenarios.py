@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from qgis.PyQt.QtCore import QCoreApplication, QVariant
 from qgis.core import (
+    QgsCoordinateTransform,
     QgsFeature,
     QgsFeatureSink,
     QgsField,
@@ -36,6 +37,7 @@ class CompareScenarios(QgsProcessingAlgorithm):
     JOIN_FIELD_B = "JOIN_FIELD_B"
     FIELD = "FIELD"
     FIELD_B = "FIELD_B"
+    HIGHER_IS_BETTER = "HIGHER_IS_BETTER"
     ALLOW_METHOD_MISMATCH = "ALLOW_METHOD_MISMATCH"
     OUTPUT = "OUTPUT"
 
@@ -68,8 +70,9 @@ class CompareScenarios(QgsProcessingAlgorithm):
             "departure_time, modes), they must match; otherwise the difference mixes a "
             "method change into the result and the algorithm stops. run_date, scenario and "
             "network_hash may differ — that is what is being compared.\n\n"
-            "'better' means a higher value in B: right for accessibility, service minutes "
-            "and 2SFCA, reversed for travel times."
+            "HIGHER_IS_BETTER: on for accessibility, service minutes and 2SFCA (an empty "
+            "value counts as 0). Turn it off for travel times: lower is better and an empty "
+            "value means unreachable, so losing a connection shows as 'worse', never as a gain."
         )
 
     def initAlgorithm(self, config=None):  # noqa: N802
@@ -86,6 +89,9 @@ class CompareScenarios(QgsProcessingAlgorithm):
         self.addParameter(QgsProcessingParameterField(
             self.FIELD_B, self.tr("Field in layer B (blank = same name)"), parentLayerParameterName=self.LAYER_B,
             type=QgsProcessingParameterField.DataType.Numeric, optional=True))
+        self.addParameter(QgsProcessingParameterBoolean(
+            self.HIGHER_IS_BETTER,
+            self.tr("Higher values are better (off for travel times)"), defaultValue=True))
         allow = QgsProcessingParameterBoolean(
             self.ALLOW_METHOD_MISMATCH, self.tr("Compare even if the run methods differ"), defaultValue=False)
         allow.setFlags(allow.flags() | QgsProcessingParameterDefinition.Flag.FlagAdvanced)
@@ -107,8 +113,9 @@ class CompareScenarios(QgsProcessingAlgorithm):
                 raise QgsProcessingException(
                     self.tr("Layer {l} has no field(s): {f}").format(l=label, f=", ".join(missing)))
 
-        feats_a = self._by_id(src_a, join_a, "A")
-        feats_b = self._by_id(src_b, join_b, "B")
+        higher_is_better = self.parameterAsBool(parameters, self.HIGHER_IS_BETTER, context)
+        feats_a = self._by_id(src_a, join_a, "A", feedback)
+        feats_b = self._by_id(src_b, join_b, "B", feedback)
 
         blocking, info = compare.method_mismatches(self._meta(src_a, feats_a), self._meta(src_b, feats_b))
         for field, va, vb in info:
@@ -137,18 +144,20 @@ class CompareScenarios(QgsProcessingAlgorithm):
         n_attrs = src_a.fields().count()
         for key, fa in feats_a.items():
             fb = feats_b.get(key)
-            row = compare.diff_row(fa[field_a], fb[field_b] if fb is not None else None, in_b=fb is not None)
+            row = compare.diff_row(fa[field_a], fb[field_b] if fb is not None else None, in_b=fb is not None,
+                                   higher_is_better=higher_is_better)
             rows.append(row)
             self._add(sink, out_fields, fa.geometry(), list(fa.attributes()), row)
+        to_a = (QgsCoordinateTransform(src_b.sourceCrs(), src_a.sourceCrs(), context.transformContext())
+                if src_b.sourceCrs() != src_a.sourceCrs() else None)
         for key, fb in feats_b.items():
             if key in feats_a:
                 continue
             row = compare.diff_row(None, fb[field_b], in_a=False)
             rows.append(row)
-            if src_b.sourceCrs() == src_a.sourceCrs():
-                geom = fb.geometry()
-            else:
-                geom = None  # ponytail: no reprojection for only_b rows; add if layers differ in CRS
+            geom = fb.geometry()
+            if to_a is not None and not geom.isNull():
+                geom.transform(to_a)
             attrs = [None] * n_attrs
             attrs[src_a.fields().lookupField(join_a)] = fb[join_b]
             self._add(sink, out_fields, geom, attrs, row)
@@ -170,19 +179,23 @@ class CompareScenarios(QgsProcessingAlgorithm):
         ])
         return {self.OUTPUT: sink_id}
 
-    def _by_id(self, source, field, label):
+    def _by_id(self, source, field, label, feedback):
         out = {}
+        empty = 0
         idx = source.fields().lookupField(field)
         for f in source.getFeatures():
-            key = f.attribute(idx)
-            key = None if key is None else str(key)
-            if key in (None, "", "NULL"):
+            key = compare.join_key(f.attribute(idx))
+            if key is None:
+                empty += 1
                 continue
             if key in out:
                 raise QgsProcessingException(
                     self.tr("Layer {l}: id '{k}' appears more than once in field {f}.").format(
                         l=label, k=key, f=field))
             out[key] = f
+        if empty:
+            feedback.pushWarning(self.tr("Layer {l}: {n} feature(s) with an empty id were skipped.").format(
+                l=label, n=empty))
         return out
 
     @staticmethod

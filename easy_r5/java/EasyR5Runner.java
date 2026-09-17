@@ -407,11 +407,22 @@ public class EasyR5Runner {
                         o.put("route", route);
                         o.put("retainTripsOutsideFrequencyEntries", true);
                         ArrayNode entries = o.putArray("entries");
-                        int k = 0;
+                        // AdjustFrequency clears every pattern of the route and rebuilds trips
+                        // only from entries' sourceTrips (javap 2026-09-17). One entry per
+                        // direction, on the pattern with the most trips: branch/depot variants
+                        // must not each get the full headway, which would multiply service.
+                        java.util.Map<Integer, TripPattern> main = new java.util.TreeMap<>();
                         for (TripPattern p : base.transitLayer.tripPatterns) {
                             if (!route.equals(p.routeId) || p.tripSchedules == null || p.tripSchedules.isEmpty()) {
                                 continue;
                             }
+                            TripPattern best = main.get(p.directionId);
+                            if (best == null || p.tripSchedules.size() > best.tripSchedules.size()) {
+                                main.put(p.directionId, p);
+                            }
+                        }
+                        int k = 0;
+                        for (TripPattern p : main.values()) {
                             ObjectNode e = entries.addObject();
                             e.put("entryId", route + "#" + k++);
                             e.put("sourceTrip", p.tripSchedules.get(0).tripId);
@@ -465,7 +476,11 @@ public class EasyR5Runner {
         return modified;
     }
 
-    /** Full R5 route ids (feed:route_id) for each reference; ERROR if one matches nothing. */
+    /**
+     * Full R5 route ids (feed:route_id) for each reference; ERROR if one matches nothing.
+     * Tiers, first hit wins: full id, then GTFS route_id, then route_short_name — so "86"
+     * never silently removes both short-name 86 and an unrelated route whose internal id is 86.
+     */
     private static Set<String> resolveRoutes(TransportNetwork network, JsonNode refs) {
         Set<String> out = new LinkedHashSet<>();
         if (!refs.isArray() || refs.size() == 0) {
@@ -473,18 +488,27 @@ public class EasyR5Runner {
         }
         for (JsonNode ref : refs) {
             String want = ref.asText("").trim();
-            boolean found = false;
-            for (TripPattern p : network.transitLayer.tripPatterns) {
-                RouteInfo r = network.transitLayer.routes.get(p.routeIndex);
-                if (want.equals(p.routeId) || want.equals(r.route_id) || want.equals(r.route_short_name)) {
-                    out.add(p.routeId);
-                    found = true;
+            Set<String> hits = new LinkedHashSet<>();
+            for (int tier = 0; tier < 3 && hits.isEmpty(); tier++) {
+                for (TripPattern p : network.transitLayer.tripPatterns) {
+                    RouteInfo r = network.transitLayer.routes.get(p.routeIndex);
+                    String key = tier == 0 ? p.routeId : tier == 1 ? r.route_id : r.route_short_name;
+                    if (want.equals(key)) {
+                        hits.add(p.routeId);
+                    }
                 }
             }
-            if (!found) {
+            if (hits.isEmpty()) {
                 Emit.error("SCENARIO_INVALID", "Route '" + want + "' not found in the network "
                         + "(match by route_short_name, route_id or feed:route_id).");
             }
+            if (hits.size() > 1) {
+                Emit.warn("SCENARIO", "Route '" + want + "' matches " + hits.size() + " routes: "
+                        + String.join(", ", hits) + " - use feed:route_id to pick one.");
+            } else {
+                Emit.info("Scenario route '" + want + "' = " + hits.iterator().next());
+            }
+            out.addAll(hits);
         }
         return out;
     }
@@ -507,6 +531,9 @@ public class EasyR5Runner {
             task.recordTravelTimeHistograms = true;
         }
         OneOriginResult oneOrigin = new TravelTimeComputer(task, network).computeTravelTimes();
+        // With frequency routes R5 runs several Monte Carlo iterations per departure minute and
+        // records each in the histogram; divide so svc_min stays a count of minutes (0-120).
+        int iterationsPerMinute = Math.max(1, task.getIterationsPerMinute(network.transitLayer.hasFrequencies));
         int[][] transit = oneOrigin.travelTimes.getValues();
 
         int[] walkMedian = null;
@@ -535,6 +562,7 @@ public class EasyR5Runner {
                             count += hist[m];
                         }
                     }
+                    count = Math.round((float) count / iterationsPerMinute);
                     cells.append(',').append(count);
                     if (count > 0) {
                         anyReached = true;
@@ -598,7 +626,11 @@ public class EasyR5Runner {
         int fromTime = secondsOfDay(job.path("departure_time").asText("07:00"));
         r.fromTime = fromTime;
         r.toTime = fromTime + job.path("time_window_minutes").asInt(120) * 60;
-        r.monteCarloDraws = job.path("monte_carlo_draws").asInt(5);
+        // R5 treats monteCarloDraws as the total over the whole window:
+        // iterationsPerMinute = ceil(monteCarloDraws / windowMinutes) (ProfileRequest,
+        // javap 2026-09-17). The job carries draws per minute, as r5r's parameter does.
+        r.monteCarloDraws = job.path("monte_carlo_draws").asInt(5)
+                * Math.max(1, job.path("time_window_minutes").asInt(120));
         r.makeTauiSite = false;
         r.recordTimes = true;
         r.recordAccessibility = false;

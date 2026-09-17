@@ -51,8 +51,8 @@ def weighted_quantile(pairs, q):
 def weighted_gini(pairs):
     """Population-weighted Gini of x: sum_ij w_i w_j |x_i - x_j| / (2 W^2 mu). None when mu == 0."""
     total = sum(w for _x, w in pairs)
-    if total <= 0:
-        return None
+    if total <= 0 or any(x < 0 for x, _w in pairs):
+        return None  # Gini is only meaningful for non-negative values (not for a diff field)
     mean = sum(x * w for x, w in pairs) / total
     if mean <= 0:
         return None
