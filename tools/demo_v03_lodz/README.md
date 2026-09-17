@@ -105,6 +105,11 @@ akceptowalne, ale trzeba to wiedzieć, zanim poda się liczby bezwzględne).
 Czas: **~15 s** (410 źródeł × 311 celów). Wynik: pole `acc_srv_school_p50_c30` — liczba szkół
 osiągalnych w 30 minut. Maksimum 75 szkół; **51 zamieszkanych heksów ma zero**.
 
+![Szkoły osiągalne w 30 minut](../../docs/img/demo_v03_baseline.png)
+
+*(Rysunki w tym pliku to wydruki z QGIS-a: Widok → Nowy wydruk, mapa + legenda + tytuł, eksport do
+PNG. W demo zrobił to skrypt przez API layoutu — efekt jest ten sam, co klikanie w oknie wydruku.)*
+
 ---
 
 ## 4. Scenariusz: nowa linia tramwajowa (*Build scenario*)
@@ -160,6 +165,8 @@ więc nie da się ich później pomylić.
 | Największy zysk | `h0319`: **0 → 18 szkół** w 30 minut |
 | Kolejne | `h0280` 1 → 12, `h0261` 10 → 15, `h0300` 19 → 23 |
 | Heksy, w których jest gorzej | 0 |
+
+![Efekt nowej linii tramwajowej](../../docs/img/demo_v03_porownanie.png)
 
 ---
 
@@ -217,6 +224,12 @@ tyle placówek, ile wynosi średnia miejska** — i zależy to wyraźnie od tego
 oblegana szkoła ma w 30-minutowej zlewni **204 tys. mieszkańców**.
 
 To jest inna skala niż liczba szkół z kroku 3 — nie porównuj tych liczb wprost.
+
+![2SFCA: szkoły na 1000 mieszkańców](../../docs/img/demo_v03_2sfca.png)
+
+Mapa czyta się inaczej niż ta z kroku 3: pas wzdłuż centrum ma dostęp na poziomie średniej miejskiej
+albo wyżej (turkus i zieleń), a duże fragmenty osiedli mieszkaniowych są ciemne — dojadą do szkół,
+ale konkurują o nie z resztą miasta.
 
 ### Pułapka, na którą natrafiliśmy: cele spoza obszaru źródeł
 

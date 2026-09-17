@@ -144,14 +144,13 @@ class RunCompetitiveAccessibility(MatrixBase, QgsProcessingAlgorithm):
 
             if result["thin_supply"]:
                 feedback.pushWarning(self.tr(
-                    "{n} destination(s) are reached only by almost nobody (less than 1 resident in "
-                    "their whole catchment), so their capacity is divided by that handful and the "
-                    "few origins reaching them get extreme values (worst ratio {r:.3g} per person). "
-                    "This means the origins do not cover everyone competing for those destinations "
-                    "— usually destinations outside the study area. Either extend the origins "
-                    "beyond it, or clip the destinations to it. Examples: {e}").format(
-                        n=len(result["thin_supply"]), r=result["max_ratio"],
-                        e=", ".join(result["thin_supply"][:5])))
+                    "{n} destination(s) are reached by almost nobody: their capacity per resident is "
+                    "up to {r:.0f}x the study-wide average, so the few origins reaching them get "
+                    "extreme values. This means the origins do not cover everyone competing for "
+                    "those destinations — usually destinations outside the study area. Either "
+                    "extend the origins beyond it, or clip the destinations to it. Examples: "
+                    "{e}").format(n=len(result["thin_supply"]), r=result["worst_thin_factor"],
+                                  e=", ".join(result["thin_supply"][:5])))
             if result["unserved_supply"]:
                 feedback.pushWarning(self.tr(
                     "{n} destination(s) with capacity have no population within {c} min — their "

@@ -259,6 +259,11 @@ two layers can never be confused later.
 
 **5. Compare.** *Compare scenarios* with `LAYER_A` = baseline, `LAYER_B` = scenario (see below).
 
+![One scenario tram line in Łódź: hexes that gain schools within 30 minutes](docs/img/demo_v03_porownanie.png)
+
+*From the [worked example](tools/demo_v03_lodz/README.md): a drawn tram line, 7 stops, every 6 min.
+Six hexagons gain, none lose; the one at the eastern end goes from 0 to 18 schools within 30 min.*
+
 The same `SCENARIO` parameter works in *Run travel time matrix*, *Run accessibility*, *Run service
 minutes*, *Generate isochrones* and *Run competitive accessibility*.
 
@@ -353,6 +358,12 @@ anyone can reach is distributed — no more, no less.
    `SCENARIO` works too.
 7. Outputs: `OUTPUT_LAYER` (origins + `fca`), optional `OUTPUT_SUPPLY_LAYER` (facilities +
    `supply_ratio` and `demand_in_catchment` — which facilities are overloaded), `OUTPUT_CSV`.
+
+![2SFCA in Łódź: schools per 1000 residents](docs/img/demo_v03_2sfca.png)
+
+*Same city, same schools, same 30 minutes as a cumulative accessibility map — but read differently:
+dark hexagons can reach schools, they just compete with everyone else for them
+([worked example](tools/demo_v03_lodz/README.md)).*
 
 #### Step by step: doctors per 1000 residents
 

@@ -51,10 +51,11 @@ def test_read_matrix_pairs(tmp_path):
 
 def test_thin_supply_is_flagged():
     # X is reachable only by a near-empty origin: its ratio explodes and must be reported.
+    # Y, reached by everyone, must not be — the flag is relative to capacity per resident overall.
     pairs = [("A", "X", 10), ("B", "Y", 10)]
     r = two_step_fca(pairs, {"A": 0.2, "B": 5000}, {"X": 1, "Y": 1}, catchment=30)
     assert r["thin_supply"] == ["X"]
-    assert r["max_ratio"] == pytest.approx(5.0)
+    assert r["worst_thin_factor"] > 1000
     assert r["access"]["A"] == pytest.approx(5.0)  # 1 facility per 0.2 residents
 
 

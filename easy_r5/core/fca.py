@@ -39,7 +39,7 @@ def read_matrix_pairs(matrix_csv, percentile):
 
 
 def two_step_fca(pairs, population, capacity, *, catchment, decay=STEP, per_population=1.0,
-                 thin_demand=1.0):
+                 thin_factor=50.0):
     """Run 2SFCA over ``pairs`` (origin, dest, minutes).
 
     ``population``: {origin: P}, ``capacity``: {dest: S}. Missing/negative values count as 0.
@@ -47,7 +47,8 @@ def two_step_fca(pairs, population, capacity, *, catchment, decay=STEP, per_popu
     ``population``), ``ratio`` {dest: R}, ``demand`` {dest: weighted demand},
     ``unserved_supply`` (dests with capacity but no demand in catchment),
     ``distributed_supply`` (sum S_j over dests with demand), ``thin_supply``
-    (dests whose whole catchment holds less than ``thin_demand`` of population).
+    (dests whose ratio exceeds ``thin_factor`` times the study-wide capacity per
+    resident) and ``worst_thin_factor`` (how many times over, for the worst one).
 
     ``thin_supply`` is the 2SFCA failure mode worth naming: a destination that
     only a nearly empty origin can reach divides its capacity by almost nobody,
@@ -71,8 +72,13 @@ def two_step_fca(pairs, population, capacity, *, catchment, decay=STEP, per_popu
         if o in access:
             access[o] += ratio.get(d, 0.0) * weight(decay, t, catchment)
 
+    total_pop = sum(pop.values())
+    fair_ratio = (sum(cap.values()) / total_pop) if total_pop > 0 else 0.0
+    thin = sorted(d for d in cap if cap[d] > 0 and demand[d] > 0
+                  and (fair_ratio <= 0 or ratio[d] > thin_factor * fair_ratio))
     return {
-        "thin_supply": sorted(d for d in cap if cap[d] > 0 and 0 < demand[d] < thin_demand),
+        "thin_supply": thin,
+        "worst_thin_factor": (max((ratio[d] for d in thin), default=0.0) / fair_ratio) if fair_ratio else 0.0,
         "max_ratio": max(ratio.values(), default=0.0),
         "access": {o: a * per_population for o, a in access.items()},
         "ratio": ratio,
