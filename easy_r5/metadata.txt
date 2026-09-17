@@ -14,10 +14,13 @@ about=Runs the Conveyal R5 routing engine (v7.6, MIT) as a child process to
     Setup: DownloadR5 (Temurin 21 JDK + r5-v7.6-all.jar, SHA-256 verified),
     DownloadRealizedGtfs (archival / realized feeds from GISBoost's
     gtfs-dashboard index), BuildNetwork (cached network.dat + network.json with
-    per-date active trip counts). Diagnostics: TestR5Setup. Analysis:
-    RunTravelTimeMatrix, RunAccessibility, RunServiceMinutes, GenerateIsochrones,
-    PreparePopulationLayer, PopulationOverlay.
-version=0.2.2
+    per-date active trip counts). Diagnostics: TestR5Setup, CheckTransitData.
+    Analysis: RunTravelTimeMatrix, RunAccessibility, RunServiceMinutes,
+    RunCompetitiveAccessibility (2SFCA), SummarizeAccessibilityEquity,
+    GenerateIsochrones, PreparePopulationLayer, PopulationOverlay. Scenarios:
+    BuildScenario (new lines, removed / re-timed routes, applied by R5 in
+    memory), CompareScenarios.
+version=0.3.0
 author=Michal Kaczorowski
 email=michal.kaczorowsx@gmail.com
 repository=https://github.com/GISBoost/easy-R5
@@ -31,7 +34,30 @@ experimental=True
 deprecated=False
 hasProcessingProvider=yes
 hasTranslations=yes
-changelog=0.2.2
+changelog=0.3.0
+    * feat(scenarios): BuildScenario + a SCENARIO parameter on every
+      matrix-based algorithm — new lines drawn in QGIS, routes removed, sped
+      up/slowed down or re-timed; R5 applies the modifications in memory, no
+      network rebuild. CompareScenarios diffs two result layers by id and
+      refuses to mix method changes (percentile, decay, window).
+    * feat(diagnostics): CheckTransitData — GTFS pre-flight report: active
+      trips per day and on DATE, route types R5 7.6 cannot read, broken
+      references, stops outside the study area, realized + static feeds in one
+      folder.
+    * feat(analysis): RunCompetitiveAccessibility — 2SFCA / E2SFCA-style
+      competitive accessibility (capacity per N residents).
+    * feat(analysis): SummarizeAccessibilityEquity — population-weighted share,
+      quantiles and Gini, overall and per group, with an HTML report.
+    * fix(runner): the compiled Java runner is rebuilt when a plugin update
+      changes its source (a stale runner silently ignored new job fields).
+    * fix(runner): timing results use a locale-independent decimal point, so
+      the sampled time estimate works on a Polish-locale system.
+    * fix(runner): MONTE_CARLO_DRAWS is now really per minute. R5 reads
+      monteCarloDraws as the total over the window, so the default 5 gave about
+      one draw per minute on networks with frequency routes (every scenario
+      line, Warsaw's frequencies.txt). Such runs are now up to 5x slower but
+      reproducible; networks without frequencies are unchanged.
+    0.2.2
     * feat(analysis): RunServiceMinutes — for each origin-destination pair,
       counts how many of the departure window's minutes (120 by default) reach
       the destination within each cutoff, from R5's per-minute travel-time

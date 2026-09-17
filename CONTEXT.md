@@ -50,8 +50,25 @@ Use these terms; avoid the synonyms listed as "not".
   this is the *only* way realtime information enters Easy-R5. *Not:* "realtime analysis".
 - **Static variant / RT variant** — a network built from the scheduled feed vs. one built from the
   realized feed. They share `trip_id`s and therefore need separate network directories.
-- **Scenario** — an R5 network modification (new line, closed street, changed speeds) applied at
-  request time. Future work; R5's real differentiator over OTP.
+- **Scenario** — a set of **modifications** to the transit network (a new line, removed routes,
+  changed speed or headway) that R5 applies to a copy of the network in memory, at request time —
+  the network is never rebuilt. In Easy-R5 a scenario is a `.json` file written by
+  *Build scenario* and passed to the `SCENARIO` parameter; results record it as
+  `scenario = <file>:<sha8>`, or `baseline`. R5's real differentiator over OTP 1.5.
+- **Modification** — one entry of a scenario. Either R5's own type (`add-trips`, `remove-trips`,
+  `adjust-speed`, `adjust-frequency`, …) or an easy-R5 shorthand the runner expands against the
+  network's ids (`easy-remove-routes`, `easy-adjust-speed`, `easy-set-headway`).
+- **Baseline** — the unmodified network run a scenario is compared against. *Not:* "before" when
+  the difference is a scenario rather than a timetable change.
+- **Competitive accessibility / 2SFCA** — accessibility where opportunities are shared by everyone
+  who can reach them: capacity at each destination divided by the population within its
+  catchment, summed back to origins (two-step floating catchment area). Reported as capacity per
+  N residents. *Not* the same scale as cumulative accessibility — never compare the two numbers.
+- **Catchment** — the travel-time limit of a 2SFCA run, in minutes. Plays the role a cutoff plays
+  in cumulative accessibility.
+- **Equity summary** — population-weighted statistics of an accessibility field: share of residents
+  at or above a threshold, residents with none, quantiles, Gini. Always weighted by population,
+  never by feature count.
 
 ## Boundaries
 

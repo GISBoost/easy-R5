@@ -33,7 +33,9 @@ either. This note is the capability map the roadmap should be built from.
   Łódź study built P50/P85 *feeds* to get at this; R5 gives the distribution directly for the
   scheduled case.
 - **Scenarios** — "what if this line existed / this street were closed". R5 is built for it;
-  easy-OTP cannot do it at all. Strong differentiator, later milestone.
+  easy-OTP cannot do it at all. Strong differentiator — **shipped in 0.3.0** for transit
+  (new lines, removed / re-timed routes; `docs/prd/PR_easy-R5_v03.md` R-1). Street modifications
+  are not exposed yet.
 
 **Where a port makes sense but the semantics change**
 

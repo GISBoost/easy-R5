@@ -5,6 +5,11 @@ SOURCES = easy_r5_plugin.py \
           algorithms/download_realized_gtfs.py \
           algorithms/build_network.py \
           algorithms/test_r5_setup.py \
+          algorithms/check_transit_data.py \
+          algorithms/build_scenario.py \
+          algorithms/compare_scenarios.py \
+          algorithms/run_competitive_accessibility.py \
+          algorithms/summarize_accessibility_equity.py \
           algorithms/_matrix_base.py \
           algorithms/run_travel_time_matrix.py \
           algorithms/run_accessibility.py \

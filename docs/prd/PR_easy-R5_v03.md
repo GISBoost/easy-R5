@@ -1,6 +1,10 @@
 # PRD — Easy-R5 v0.3 · scenariusze, porównanie, kontrola GTFS, równość, 2SFCA
 
-**Status:** 🔲 w implementacji (2026-09-17). Docelowo `metadata.txt` `0.3.0`.
+**Status:** ✅ zaimplementowane, 2026-09-17. `metadata.txt` `0.3.0`. Każda sekcja zweryfikowana
+przez QGIS MCP na sieci łódzkiej (`tools/f1_smoke_test_lodz`): CheckTransitData na realnym GTFS,
+scenariusz z narysowaną linią tramwajową (para 953→587: 63 → 14 min), porównanie dostępności
+przed/po, 2SFCA zgodne z niezależnym przeliczeniem z macierzy, podsumowanie równościowe zgodne
+z ręcznym. 254 testy pytest zielone, flake8 czysto.
 **Data:** 2026-09-17
 **Autor:** Michał Kaczorowski
 **Kontekst wymagany do pracy:** ten plik + `CLAUDE.md` + `CONTEXT.md` +
@@ -68,16 +72,36 @@ rozszerzania komendy `matrix`).
    - `easy-remove-routes {routes}` → `remove-trips {routes: [pełne id]}`;
    - `easy-adjust-speed {routes, scale}` → `adjust-speed {routes, scale}`;
    - `easy-set-headway {routes, headway_minutes, start, end}` → jeden `adjust-frequency` na trasę,
-     jeden wpis na wzorzec (`sourceTrip` = pierwszy kurs wzorca), wszystkie dni,
-     `retainTripsOutsideFrequencyEntries=true`.
-   - Wpis w `routes` pasuje do trasy, jeśli równa się **pełnemu id** (`feed:route_id`), **`route_id`**
-     albo **`route_short_name`**. Zero dopasowań → `ERROR SCENARIO_INVALID`.
+     **jeden wpis na kierunek, na wzorcu z największą liczbą kursów** (`sourceTrip` = jego pierwszy
+     kurs), wszystkie dni, `retainTripsOutsideFrequencyEntries=true`. `AdjustFrequency` czyści
+     wszystkie wzorce trasy i odtwarza kursy tylko z wpisów (javap), więc warianty (skrócone,
+     zjazdowe) znikają w oknie zamiast dostać pełną częstotliwość każdy — poprawka po review;
+     pierwsza wersja dawała wpis każdemu wzorcowi i zwielokrotniała kursowanie. Łódź, linia 86:
+     „Cleared 6 patterns, creating 2 new trip schedules”.
+   - Wpis w `routes` jest dopasowywany warstwami, pierwsza z trafieniem wygrywa: **pełne id**
+     (`feed:route_id`) → **`route_id`** → **`route_short_name`**. Zero dopasowań →
+     `ERROR SCENARIO_INVALID`; więcej niż jedna trasa → `WARN SCENARIO` z listą; zawsze `INFO` z
+     rozwiązanym id.
    - Natywne typy R5 przechodzą bez zmian — zaawansowany użytkownik może napisać plik ręcznie.
 3. **Nowa linia z warstwy liniowej QGIS**: każdy wierzchołek = przystanek. Czasy między
    przystankami z odległości po kole wielkim / prędkości (min. 1 s). Brak własnego snapowania
    do ulic — R5 linkuje nowe przystanki do sieci ulic sam.
 4. **Metoda w wyniku**: `meta["scenario"]` = `"<nazwa pliku>:<sha256[:8]>"` albo `"baseline"`;
    pole `scenario` w warstwach `RunAccessibility` / `RunCompetitiveAccessibility`.
+5. **Detektor walk-only** schodzi z błędu do ostrzeżenia **tylko** dla scenariusza, który usuwa
+   kursy (`easy-remove-routes`, `remove-trips`, `remove-stops`). Każdy inny scenariusz zostawia twardy
+   błąd — to klasa incydentu GZM.
+6. **Monte Carlo (poprawka znaleziona przy review, dotyczy całej wtyczki):** R5 traktuje
+   `monteCarloDraws` jako **łączną** liczbę losowań w oknie (`iterationsPerMinute =
+   ceil(draws / minuty_okna)`, javap `ProfileRequest`). Parametr „draws per minute” był więc
+   w praktyce 1 losowaniem na minutę. Runner mnoży teraz przez długość okna (jak r5r), a
+   histogram minut obsługi dzieli przez liczbę iteracji na minutę, żeby wynik został w 0–120.
+   Dotyczy tylko sieci z kursami częstotliwościowymi (każda nowa linia ze scenariusza,
+   `frequencies.txt` Warszawy): tam liczenie jest do 5× dłuższe, ale powtarzalne i zgodne z opisem
+   parametru. Sieci bez częstotliwości (Gdańsk, walidacja r5r) — bez zmian.
+7. **Znany artefakt silnika:** dodanie trasy częstotliwościowej może zmienić P50 pojedynczej,
+   niezwiązanej pary o 1 min (Łódź: 1 z 144 par, 74 → 75), bo R5 przełącza sposób iterowania dla
+   sieci z częstotliwościami. Wynik jest powtarzalny (dwa przebiegi = identyczny CSV).
 
 ### R-1.3 `BuildScenario` — parametry
 
@@ -122,10 +146,18 @@ Brak jakiejkolwiek modyfikacji → błąd. `SPEED_SCALE` ≤ 0 → błąd. Nazwy
 ### R-2.1 Decyzje
 
 1. **Jedno pole na przebieg**, stałe nazwy wyjścia (`value_a`, `value_b`, `diff`, `pct_change`,
-   `status`) → jeden stały styl rozbieżny `compare_diverging.qml`. Kilka pól = kilka przebiegów.
+   `status`). Kilka pól = kilka przebiegów. Styl: renderer kategorii na `status` budowany w kodzie
+   (`styling.apply_categories`), bo wynik może być punktowy albo poligonowy, a stały QML ma jeden
+   typ symbolu.
 2. **Złączenie po polu id**, nie po geometrii.
 3. **Pola metody muszą się zgadzać**, jeśli są w obu warstwach: `percentile`, `decay`,
-   `time_window`, `departure_time`, `modes`, `catchment`. Różnica → błąd z listą (albo
+   `time_window`, `departure_time`, `modes`, `catchment`, `max_trip_duration_minutes`,
+   `max_walk_time_minutes`, `walk_speed_kmh`, `max_rides`, `monte_carlo_draws` (te pięć
+   ostatnich warstwy wynikowe niosą od v0.3).
+4. **`HIGHER_IS_BETTER`** (domyślnie tak): dostępność, minuty obsługi, 2SFCA — pusta wartość = 0.
+   Wyłączone dla czasów przejazdu: niższy = lepszy, pusta wartość = nieosiągalne, więc utrata
+   połączenia to `worse` bez liczbowego `diff`, nigdy „poprawa”. Id złączenia normalizowane
+   (`12`, `12.0`, `"12"` to ten sam klucz); obiekty `only_b` w innym CRS są reprojektowane. Różnica → błąd z listą (albo
    `ALLOW_METHOD_MISMATCH`). Mogą się różnić (to jest cel porównania): `run_date`, `network_hash`,
    `scenario`, `transit_submodes`, `r5_version` (ostatnie → ostrzeżenie).
 
@@ -164,8 +196,8 @@ daje warstwę ze stylem, a porównanie dwóch przebiegów o różnym percentylu 
 | ERROR | brak `calendar.txt` i `calendar_dates.txt` albo zero dni z kursami |
 | ERROR | `DATE` podana i 0 kursów tego dnia (+ 3 najbliższe dni z kursami) |
 | ERROR | `route_type` nieobsługiwany przez R5 7.6 |
-| ERROR | te same `trip_id` w dwóch zipach (P50/P85 i static w jednym folderze) |
-| ERROR | zduplikowany `feed_id` między zipami (R5: `DuplicateFeedException`) |
+| ERROR | ≥ 50% wspólnych `trip_id` między dwoma zipami (P50/P85 i static w jednym folderze); mniej → WARN |
+| ERROR | zduplikowany `feed_id` między zipami (brak `feed_id` = nazwa pliku, jak w R5; `DuplicateFeedException`) |
 | ERROR | `EXTENT` podany, a żaden przystanek w nim nie leży |
 | WARN | `trips.route_id` / `trips.service_id` / `stop_times.trip_id` / `stop_times.stop_id` bez rekordu |
 | WARN | kursy bez `stop_times` |
@@ -196,7 +228,7 @@ data z kursami → 0 błędów kalendarza, data bez kursów → ERROR z najbliż
 2. Wszystkie statystyki **ważone populacją**. NULL / ujemna populacja → wiersz pominięty
    (licznik w logu); NULL dostępność → traktowana jako 0 (osoba bez dostępu, nie brak danych).
 3. Gini ważony: `G = Σ_i Σ_j w_i w_j |x_i − x_j| / (2 · W² · μ)` liczony w O(n log n) po sortowaniu.
-   μ = 0 → Gini = NULL.
+   μ = 0 albo jakakolwiek wartość ujemna (np. pole `diff`) → Gini = NULL.
 4. Kwantyle ważone: najmniejsze x, dla którego skumulowana waga ≥ q·W.
 
 ### R-4.2 Parametry i wyjścia

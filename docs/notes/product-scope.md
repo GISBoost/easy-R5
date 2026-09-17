@@ -67,7 +67,8 @@ Grouped the way easy-OTP groups its provider. `Setup/` and `Analysis/` only — 
   not worth a second implementation.
 - `CompareScenarios` — two runs → delta layer. Cheap to build once the matrix exists, and the
   thing planners actually ask for.
-- *(later)* `RunScenarioAnalysis` — R5 network modifications (a new line, a closed street). The
+- `BuildScenario` + a `SCENARIO` parameter (shipped 0.3.0, instead of a separate
+  `RunScenarioAnalysis`) — R5 network modifications (a new line, a closed street). The
   real long-term differentiator versus easy-OTP; needs its own PRD.
 
 ## Non-goals for v0.1

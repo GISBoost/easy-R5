@@ -104,6 +104,10 @@ reduction.
 
 #### T1-B. `CompareScenarios` — before/after delta layer
 
+> **Status: ✅ done in 0.3.0** — [`PR_easy-R5_v03.md`](../prd/PR_easy-R5_v03.md) R-2.
+> One field per run with fixed output names; the style is a categorized better/worse renderer
+> built in code (geometry-agnostic), not a diverging QML.
+
 **What it is.** Take two accessibility (or matrix, or service-minutes) result layers —
 same origins, different date / timetable / network — and emit one layer with the
 per-origin difference, %-change, and a diverging style. No routing; a keyed join plus
@@ -135,6 +139,9 @@ writes ([handoff, M4](../handoffs/2026-09-03_M3-M5-implementation.md)).
 ---
 
 #### T1-C. `CheckTransitData` — GTFS pre-flight diagnostic
+
+> **Status: ✅ done in 0.3.0** — [`PR_easy-R5_v03.md`](../prd/PR_easy-R5_v03.md) R-3. The OSM
+> overlap check takes an extent instead of reading the `.pbf` header.
 
 **What it is.** A Diagnostics-group algorithm that reads a GTFS zip (stdlib `zipfile` +
 `csv`, no engine) and reports, before anyone builds a network: calendar span and the
@@ -229,6 +236,11 @@ drill-down in vanilla JS ([`gtfs-dashboard/README.md`](../../../gtfs-dashboard/R
 
 #### T2-E. `RunScenarioAnalysis` — R5 network modifications
 
+> **Status: ✅ MVP done in 0.3.0** — [`PR_easy-R5_v03.md`](../prd/PR_easy-R5_v03.md) R-1. Not a
+> separate analysis algorithm: `BuildScenario` writes the file and every matrix-based algorithm
+> takes a `SCENARIO` parameter. Shipped: new lines from QGIS lines, remove / speed / headway by
+> route. Not yet: reroute, remove stops, dwell-time changes, street modifications.
+
 **What it is.** Apply an R5 `Scenario` (a list of modifications) at request time and route
 against the modified network: add a trip pattern (a new line, from a QGIS line layer),
 remove trips/stops, adjust speed or dwell time, reroute. Then diff against the baseline
@@ -274,6 +286,10 @@ r5r has no scenario support; r5py has none. This would be a genuine
 
 #### T2-F. Population-weighted accessibility + equity summary (one-click)
 
+> **Status: ✅ done in 0.3.0** as `SummarizeAccessibilityEquity` —
+> [`PR_easy-R5_v03.md`](../prd/PR_easy-R5_v03.md) R-4. Not a chained one-click run: it summarizes
+> any layer that already carries population and accessibility fields.
+
 **What it is.** Chain `PopulationOverlay` → `RunAccessibility` → a summary: "X % of
 residents / Y people reach ≥1 hospital within 30 min by transit at P85", plus a
 distribution (deciles, a Lorenz curve / Gini, a histogram) and a short text report. Today
@@ -306,6 +322,10 @@ population-weighting step; easy-OTP stops at the per-hex number.
 ---
 
 #### T2-G. Competitive accessibility (2SFCA / gravity with a demand side)
+
+> **Status: ✅ done in 0.3.0** as `RunCompetitiveAccessibility` —
+> [`PR_easy-R5_v03.md`](../prd/PR_easy-R5_v03.md) R-5. Classic 2SFCA plus an E2SFCA-style decay;
+> one matrix run with origins as demand and destinations as supply.
 
 **What it is.** Cumulative-opportunity accessibility ignores that opportunities are
 *consumed* — a hospital reachable by 200 k people is not as accessible as the raw count

@@ -128,6 +128,17 @@ own points or a regular grid.
   r5r does the same.
 - `N_SINGLE_POINT_CUTOFFS = 121` — 0..120 min cutoffs for single-point analysis. Note the same
   120-minute horizon easy-OTP hits with OTP surfaces.
+- **Scenarios work standalone.** Verified 2026-09-17 (`javap` + a spike on the Łódź network):
+  `Scenario.applyToTransportNetwork(network)` returns a modified copy in ~1.5 s, and
+  `TravelTimeComputer` does **not** apply `task.scenario` — route on the returned network.
+  Read the JSON with `JsonUtilities.lenientObjectMapper`; the strict mapper rejects the
+  visible `type` property. Route and trip ids in the network carry the feed prefix
+  (`lodz_static_gtfs_2026-08-21:86`); `RouteInfo.route_id` does not. New `add-trips` stops
+  must carry **only** `lat`/`lon` — an `id` or `name` next to coordinates is an error.
+  `adjust-frequency` copies hop times from `sourceTrip`. Errors land in `modification.errors`
+  and `applyToTransportNetwork` throws `ScenarioApplicationException`.
+- **Supported `route_type`** (`TransitLayer.getTransitModes`, javap 2026-09-17): 0–7, 11, 12 and
+  100–1499. Anything else throws `IllegalArgumentException`. `CheckTransitData` reports it.
 
 ---
 

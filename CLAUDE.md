@@ -11,9 +11,11 @@ wtyczek QGIS.
 Repo zawiera też `tools/` — samodzielne narzędzia badawcze (analizy dostępności i
 izochron dla 6+ miast PL), migrowane z easy-OTP. Patrz ADR-0003.
 
-## Stan projektu (2026-09-03)
-**Całe v0.1 (M1–M5) zaimplementowane i na `main`.** 9 algorytmów Processing,
-`metadata.txt` `0.2.1` / `experimental=True`, 178 testów pytest zielonych, flake8 czysto.
+## Stan projektu (2026-09-17)
+**v0.1 (M1–M5), v0.2 (realized GTFS, service minutes) i v0.3 na `main`.** 15 algorytmów
+Processing, `metadata.txt` `0.3.0` / `experimental=True`, 254 testy pytest zielone, flake8
+czysto. v0.3 (`docs/prd/PR_easy-R5_v03.md`): scenariusze R5 + porównanie, CheckTransitData,
+2SFCA, podsumowanie równościowe — każde zweryfikowane przez MCP na sieci łódzkiej.
 M3 zweryfikowane end-to-end vs R5 7.6; M4 odtwarza wynik r5r dla Gdańska **co do wiersza**
 (`docs/notes/validation-gdansk.md`); M5 zweryfikowane w QGIS 3.40.
 **Zostaje:** przebieg Michała na czystym profilu (instalacja ZIP → `DownloadR5` realne
@@ -77,11 +79,13 @@ Wtyczka = provider Processing, sekcje jak w easy-OTP, **bez sekcji `Realtime/`**
 
 ```
 Setup/       — DownloadR5 (JDK 21 + jar R5), DownloadRealizedGtfs,
-               DownloadTransitData, BuildNetwork
-Diagnostics/ — TestR5Setup
-Analysis/    — RunTravelTimeMatrix (flagowy), RunAccessibility, GenerateIsochrones,
-               PreparePopulationLayer, PopulationOverlay, CompareScenarios,
-               (później) RunScenarioAnalysis
+               (później) DownloadTransitData, BuildNetwork
+Diagnostics/ — TestR5Setup, CheckTransitData
+Analysis/    — RunTravelTimeMatrix (flagowy), RunAccessibility, RunServiceMinutes,
+               RunCompetitiveAccessibility, SummarizeAccessibilityEquity,
+               GenerateIsochrones, PreparePopulationLayer, PopulationOverlay
+Scenarios/   — BuildScenario, CompareScenarios (scenariusz = parametr SCENARIO
+               algorytmów macierzowych, nie osobna komenda Javy)
 ```
 
 **`easy_r5/gui/` istnieje wyłącznie dla okna „Download transit recordings…"** —

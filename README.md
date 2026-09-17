@@ -5,11 +5,13 @@ A QGIS processing plugin for transit accessibility analysis on the
 cumulative-opportunity accessibility and isochrones over a departure-time window, computed inside
 QGIS with no R, no conda and no Docker.
 
-> **Status: 0.2.2, experimental.** All ten algorithms work; the travel-time matrix and
+> **Status: 0.3.0, experimental.** All fifteen algorithms work; the travel-time matrix and
 > accessibility are verified end-to-end (accessibility reproduces r5r's Gdańsk output
 > *exactly* — [`docs/notes/validation-gdansk.md`](docs/notes/validation-gdansk.md)).
-> **Run service minutes** (new in 0.2.2) is verified against a real R5 run on a Łódź
-> network — see [`docs/prd/PR_easy-R5_v02_service-minutes.md`](docs/prd/PR_easy-R5_v02_service-minutes.md).
+> New in 0.3.0, each verified on a real Łódź network: **network scenarios** (draw a new line,
+> remove or re-time routes — R5 applies them in memory) with **Compare scenarios**, a **GTFS
+> pre-flight check**, **2SFCA competitive accessibility** and a **population-weighted equity
+> summary** — see [`docs/prd/PR_easy-R5_v03.md`](docs/prd/PR_easy-R5_v03.md).
 > The flag stays `experimental` until a clean-install run of the full pipeline is signed
 > off. See [`KNOWN_ISSUES.md`](KNOWN_ISSUES.md).
 
@@ -52,12 +54,17 @@ Processing toolbox → **Easy-R5**:
 | Setup | **Download realized GTFS** | pick a city + date + variant (realized P50/P85 or scheduled), download from GISBoost's gtfs-dashboard index into a folder ready for Build R5 network. |
 | Setup | **Build R5 network** | one `.osm.pbf` + a folder of GTFS `.zip` → cached `network.dat` + a `network.json` summary with a per-date active-trip count. |
 | Diagnostics | **Test R5 setup** | checks the JDK, jar and runner independently. |
+| Diagnostics | **Check transit data (GTFS)** | before building: calendar span and active trips per day, whether your `DATE` has service, route types R5 cannot read, broken references between files, stops outside the study area, a realized feed sharing a folder with its static feed. HTML report + routes CSV (the names to use in *Build scenario*). |
 | Analysis | **Run travel time matrix** | N origins × M destinations, percentiles over a departure window, batched processes, sampled time estimate, hard dead-date gate + post-run walk-only detector. Long CSV out. `TRANSIT_SUBMODES` narrows which transit modes R5 routes over (e.g. `TRAM` only, or `TRAM, BUS`) — blank means all. |
 | Analysis | **Run accessibility** | opportunities reachable per origin / cutoff / percentile (STEP / LOGISTIC / EXPONENTIAL decay), summed in Python from the matrix. Long CSV + an ORIGINS copy with `acc_<opp>_p<pct>_c<cutoff>` fields. Same `TRANSIT_SUBMODES` narrowing as the matrix — run once for `TRAM` and once for `BUS` to compare modal accessibility. |
 | Analysis | **Run service minutes** | for each origin-destination pair, how many of the departure window's minutes (120 by default) reach the destination within each cutoff — from R5's per-minute travel-time histogram, reduced in Java. Long CSV (`svc_min_c<cutoff>` per cutoff, values 0-120). **Not** the same number as easy-OTP's service-time classification (`otp_mean`/`st_class`) — different mechanism, different reference window; see [`docs/prd/PR_easy-R5_v02_service-minutes.md`](docs/prd/PR_easy-R5_v02_service-minutes.md). |
+| Analysis | **Run competitive accessibility (2SFCA)** | two-step floating catchment area: capacity (doctors, school places) shared by the population that can reach it within a catchment — e.g. doctors per 1000 residents. STEP = classic 2SFCA, LOGISTIC / EXPONENTIAL = E2SFCA-style weighting. |
+| Analysis | **Summarize accessibility equity** | population-weighted share of residents at or above a threshold, residents with none, mean, p10–p90, Gini — overall and per district. Table + HTML report with one plain-language sentence per field. |
 | Analysis | **Generate isochrones** | cumulative travel-time polygons, one per (origin, cutoff): a destination grid → one-origin matrix → TIN raster → `gdal:contour_polygon` per cutoff (the approach r5r/r5py/Conveyal all use — R5 has no isochrone output). Unreachable pockets stay as holes. |
 | Analysis | **Prepare population layer** | joins a GUS NSP 2021 sheet to census-tract geometry. |
 | Analysis | **Population overlay** | area-weighted population onto a hex grid (fractional, not rounded). |
+| Scenarios | **Build scenario** | a scenario file: new lines drawn as QGIS line features (each vertex a stop; speed, headway, service hours), existing routes removed, sped up / slowed down, or given a new headway. Feed it to the `SCENARIO` parameter (Advanced) of every matrix, accessibility, service-minutes, isochrone and 2SFCA run — nothing is rebuilt. |
+| Scenarios | **Compare scenarios** | two result layers of the same places, one field → `value_a`, `value_b`, `diff`, `pct_change`, `status` (better / worse / same), styled. Refuses to diff runs with different percentile / decay / window. |
 
 Isochrones are contoured **in QGIS** — R5 has no isochrone output (neither does r5r's or
 r5py's engine call; both grid-and-contour, like this). There is no hex-grid
@@ -65,7 +72,7 @@ algorithm: use stock `native:creategrid` (recipe below).
 
 See [`docs/notes/product-scope.md`](docs/notes/product-scope.md) and
 [`docs/notes/r5-vs-otp.md`](docs/notes/r5-vs-otp.md) for what is deliberately *not* here
-(scenarios, itineraries, GTFS-RT — later; the service-minutes metric shipped in 0.2.2).
+(itineraries, GTFS-RT; scenarios shipped in 0.3.0, the service-minutes metric in 0.2.2).
 
 ## Quick start
 
@@ -79,13 +86,18 @@ See [`docs/notes/product-scope.md`](docs/notes/product-scope.md) and
    or [BBBike](https://extract.bbbike.org/)) and the GTFS feed(s) (`.zip`) for your study area.
    For a *realized* feed (what actually ran on a given day, P50/P85) or that day's scheduled
    feed, see **Archival / realized GTFS** below.
-4. **Build a network** — *Setup → Build R5 network*: the `.osm.pbf` and a folder holding your
+4. **Check the feed** — *Diagnostics → Check transit data (GTFS)* with the date you plan to
+   analyse. Zero errors means the network build and the date gate will not surprise you.
+5. **Build a network** — *Setup → Build R5 network*: the `.osm.pbf` and a folder holding your
    GTFS `.zip`(s). Cached by content hash + R5 version, so re-runs are instant.
-5. **Analyse** — *Run travel time matrix*, *Run accessibility* or *Run service minutes*: the
+6. **Analyse** — *Run travel time matrix*, *Run accessibility* or *Run service minutes*: the
    network from step 4, an origins point layer, a destinations point layer, a `DATE` the feed
    actually serves (the run is blocked otherwise), a departure time and window. Output layers
    are styled automatically (except *Run service minutes*, which has no single field to style
    a gradient by — see its PRD).
+7. **What if?** — *Scenarios → Build scenario* (draw a line, list routes to remove), then re-run
+   step 6 with the file in `SCENARIO` (Advanced) and *Compare scenarios* against the baseline
+   run. *Summarize accessibility equity* turns either run into "X% of residents reach …".
 
 The Gdańsk reference data — 1389 origins, 956 destinations, the r5r ground-truth output — is in
 [`tools/accessibility_cities/gdansk/`](tools/accessibility_cities/gdansk/); the exact-match
