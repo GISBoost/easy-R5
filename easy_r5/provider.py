@@ -3,6 +3,7 @@
 from qgis.core import QgsProcessingProvider
 
 from .algorithms.build_network import BuildNetwork
+from .algorithms.check_transit_data import CheckTransitData
 from .algorithms.download_r5 import DownloadR5
 from .algorithms.download_realized_gtfs import DownloadRealizedGtfs
 from .algorithms.generate_isochrones import GenerateIsochrones
@@ -29,6 +30,7 @@ class EasyR5Provider(QgsProcessingProvider):
         self.addAlgorithm(DownloadRealizedGtfs())
         self.addAlgorithm(BuildNetwork())
         self.addAlgorithm(TestR5Setup())
+        self.addAlgorithm(CheckTransitData())
         self.addAlgorithm(RunTravelTimeMatrix())
         self.addAlgorithm(RunAccessibility())
         self.addAlgorithm(RunServiceMinutes())
