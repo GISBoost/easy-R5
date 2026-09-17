@@ -15,9 +15,9 @@ about=Runs the Conveyal R5 routing engine (v7.6, MIT) as a child process to
     DownloadRealizedGtfs (archival / realized feeds from GISBoost's
     gtfs-dashboard index), BuildNetwork (cached network.dat + network.json with
     per-date active trip counts). Diagnostics: TestR5Setup. Analysis:
-    RunTravelTimeMatrix, RunAccessibility, GenerateIsochrones,
+    RunTravelTimeMatrix, RunAccessibility, RunServiceMinutes, GenerateIsochrones,
     PreparePopulationLayer, PopulationOverlay.
-version=0.2.1
+version=0.2.2
 author=Michal Kaczorowski
 email=michal.kaczorowsx@gmail.com
 repository=https://github.com/GISBoost/easy-R5
@@ -31,7 +31,18 @@ experimental=True
 deprecated=False
 hasProcessingProvider=yes
 hasTranslations=yes
-changelog=0.2.1
+changelog=0.2.2
+    * feat(analysis): RunServiceMinutes — for each origin-destination pair,
+      counts how many of the departure window's minutes (120 by default) reach
+      the destination within each cutoff, from R5's per-minute travel-time
+      histogram (recordTravelTimeHistograms). Reuses the "matrix" runner
+      command so the walk-only/dead-date safety checks stay single-sourced;
+      Java does the cutoff-sum reduction, so the process boundary carries only
+      svc_min_c<cutoff> columns, never the raw 120-minute array. This is NOT
+      the same number as easy-OTP's service-time classification (otp_mean /
+      st_class) — different mechanism, different reference window; see
+      docs/prd/PR_easy-R5_v02_service-minutes.md.
+    0.2.1
     * fix(qt6): every enum access across algorithms/ + gui/ fully qualified
       (e.g. QgsFeatureSink.Flag.FastInsert, not QgsFeatureSink.FastInsert) —
       the short form is a PyQt5-only convenience that PyQt6 drops, and QGIS

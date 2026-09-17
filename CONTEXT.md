@@ -33,6 +33,12 @@ Use these terms; avoid the synonyms listed as "not".
   reported (P50 = median, P85 = a bad-but-not-worst day). R5 accepts at most 5 per task.
 - **Cutoff** — a travel-time threshold in minutes used by cumulative-opportunity accessibility
   (15/30/45/60 in the existing studies).
+- **Service minutes** — for one origin-destination pair, how many of the departure window's
+  minutes (120 by default) reach the destination within a cutoff — R5's
+  `recordTravelTimeHistograms` reduced per cutoff. *Not* the same number as easy-OTP's
+  service-time classification (`otp_mean` / `st_class`, a many-surface raster/zonal-stats
+  pipeline over a 960-minute reference window) — different mechanism, different reference
+  window. Never reuse easy-OTP's field names or category labels for this.
 - **Decay function** — how opportunities are weighted by travel time: `step` (cumulative
   opportunity, what the existing studies use), logistic, exponential.
 - **Accessibility** — the weighted count of opportunities reachable from an origin. Always say

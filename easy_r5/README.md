@@ -5,7 +5,7 @@ A QGIS Processing plugin for transit accessibility analysis on the
 matrices, cumulative-opportunity accessibility and isochrones over a
 departure-time window, computed inside QGIS with no R, no conda and no Docker.
 
-**Status: 0.1.0, experimental.**
+**Status: 0.2.2, experimental.**
 
 ## Quick start
 

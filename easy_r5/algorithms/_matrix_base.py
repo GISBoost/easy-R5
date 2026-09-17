@@ -127,7 +127,8 @@ class MatrixBase:
         param.setFlags(param.flags() | QgsProcessingParameterDefinition.Flag.FlagAdvanced)
         self.addParameter(param)
 
-    def _add_matrix_params(self, percentile_help, with_destinations=True):
+    def _add_matrix_params(self, percentile_help=None, with_destinations=True,
+                           with_percentiles=True):
         self.addParameter(
             QgsProcessingParameterFile(
                 self.NETWORK, _tr("R5 network (network.dat)"),
@@ -171,9 +172,10 @@ class MatrixBase:
                 type=QgsProcessingParameterNumber.Type.Integer, defaultValue=120, minValue=1,
             )
         )
-        self.addParameter(
-            QgsProcessingParameterString(self.PERCENTILES, percentile_help, defaultValue="50")
-        )
+        if with_percentiles:
+            self.addParameter(
+                QgsProcessingParameterString(self.PERCENTILES, percentile_help, defaultValue="50")
+            )
         self.addParameter(
             QgsProcessingParameterNumber(
                 self.MAX_TRIP_DURATION, _tr("Max trip duration (minutes)"),
@@ -245,11 +247,15 @@ class MatrixBase:
 
     def _run_matrix(self, parameters, context, feedback, *, tmp, matrix_csv,
                     walk_fallback, include_unreachable=False, dest_extra_fields=None,
-                    dests_source=None, dest_id_field=""):
+                    dests_source=None, dest_id_field="", service_minute_cutoffs=None):
         """Export points, run the batched matrix, merge to ``matrix_csv``.
 
         ``walk_fallback`` is the value MAX_WALK_TIME takes when left blank
         (max trip duration for the matrix, ``max(cutoffs)`` for step decay).
+        ``service_minute_cutoffs``, when given, switches the run to
+        service-minutes mode (PR_easy-R5_v02_service-minutes.md): no
+        PERCENTILES parameter is read, and Java emits ``svc_min_c<cutoff>``
+        columns instead of ``travel_time_p<percentile>`` ones.
         Returns a dict: ``origin_ids``, ``dest_ids``, ``origins_csv``,
         ``dests_csv``, ``meta``, ``is_transit``, ``mode_label``.
         """
@@ -282,12 +288,15 @@ class MatrixBase:
         if dests_source is None:
             dest_id_field = self.parameterAsString(parameters, self.DEST_ID_FIELD, context)
 
-        try:
-            percentiles = job_spec.parse_percentiles(
-                self.parameterAsString(parameters, self.PERCENTILES, context)
-            )
-        except job_spec.JobSpecError as exc:
-            raise QgsProcessingException(str(exc))
+        if service_minute_cutoffs is None:
+            try:
+                percentiles = job_spec.parse_percentiles(
+                    self.parameterAsString(parameters, self.PERCENTILES, context)
+                )
+            except job_spec.JobSpecError as exc:
+                raise QgsProcessingException(str(exc))
+        else:
+            percentiles = None
 
         direct_mode = MODE_MAP[mode][0]
         transit_modes = _resolve_transit_submodes(mode, submode_indices)
@@ -382,13 +391,19 @@ class MatrixBase:
         job_common = dict(
             network=str(network_path), origins_csv=str(origins_csv),
             destinations_csv=str(dests_csv), date=date, departure_time=departure_time,
-            time_window_minutes=time_window, percentiles=percentiles,
+            time_window_minutes=time_window,
             max_trip_duration_minutes=max_trip, max_walk_time_minutes=max_walk,
             walk_speed_kmh=walk_speed, bike_speed_kmh=12.0, max_rides=max_rides,
             monte_carlo_draws=monte_carlo, access_modes=[direct_mode],
             egress_modes=[direct_mode], direct_modes=[direct_mode],
             transit_modes=transit_modes, write_unreachable=include_unreachable,
         )
+        if service_minute_cutoffs is None:
+            job_builder = job_spec.build_matrix_job
+            mode_kwargs = {"percentiles": percentiles}
+        else:
+            job_builder = job_spec.build_service_minutes_job
+            mode_kwargs = {"cutoffs": service_minute_cutoffs}
 
         n_batches = math.ceil(len(origin_ids) / batch_size)
         multi = QgsProcessingMultiStepFeedback(n_batches + 1, feedback)
@@ -396,7 +411,8 @@ class MatrixBase:
         if estimate_first and len(origin_ids) > 15:
             multi.setCurrentStep(0)
             try:
-                self._estimate(tmp, origins_csv, origin_ids, job_common, env, heap_mb, multi)
+                self._estimate(tmp, origins_csv, origin_ids, job_common, job_builder,
+                               mode_kwargs, env, heap_mb, multi)
             except runner.RunnerCancelled:
                 raise QgsProcessingException(_tr("Cancelled by user."))
         if multi.isCanceled():
@@ -412,8 +428,9 @@ class MatrixBase:
                 start = b * batch_size
                 end = min(len(origin_ids), start + batch_size)
                 batch_csv = tmp / "matrix_{:06d}.csv".format(start)
-                job = job_spec.build_matrix_job(
-                    origin_range=[start, end], out_csv=str(batch_csv), **job_common
+                job = job_builder(
+                    origin_range=[start, end], out_csv=str(batch_csv),
+                    **job_common, **mode_kwargs
                 )
                 cmd = java_env.build_java_command(
                     env, java_env.xmx_arg(heap_mb), job_spec.write_job(job, tmp),
@@ -461,10 +478,20 @@ class MatrixBase:
             "time_window": time_window,
             # PRD §5.2 names this output field "percentile" (singular); the value
             # is the whole requested list so two maps that differ only by it are
-            # still tellable apart.
-            "percentile": ",".join(str(p) for p in percentiles),
+            # still tellable apart. None in service-minutes mode (no percentiles
+            # requested — PR_easy-R5_v02_service-minutes.md §4).
+            "percentile": (
+                ",".join(str(p) for p in percentiles) if service_minute_cutoffs is None else None
+            ),
             "modes": MODE_OPTIONS[mode],
             "transit_submodes": _transit_submodes_meta(mode, submode_indices, transit_modes),
+            "walk_speed_kmh": walk_speed,
+            "max_rides": max_rides,
+            "max_trip_duration_minutes": max_trip,
+            "max_walk_time_minutes": max_walk,
+            "monte_carlo_draws": monte_carlo,
+            "origins_sha256": java_env.sha256_file(origins_csv),
+            "destinations_sha256": java_env.sha256_file(dests_csv),
         }
         return {
             "origin_ids": origin_ids, "dest_ids": dest_ids,
@@ -483,16 +510,17 @@ class MatrixBase:
         except (OSError, ValueError):
             return {}
 
-    def _estimate(self, tmp, origins_csv, origin_ids, job_common, env, heap_mb, feedback):
+    def _estimate(self, tmp, origins_csv, origin_ids, job_common, job_builder, mode_kwargs,
+                  env, heap_mb, feedback):
         idx = matrix.systematic_sample_indices(len(origin_ids), 15)
         lines = origins_csv.read_text(encoding="utf-8").splitlines()
         sample_csv = tmp / "origins_sample.csv"
         sample_csv.write_text(
             "\n".join([lines[0]] + [lines[i + 1] for i in idx]) + "\n", encoding="utf-8"
         )
-        job = job_spec.build_matrix_job(
+        job = job_builder(
             origin_range=[0, len(idx)], out_csv=str(tmp / "estimate.csv"),
-            **{**job_common, "origins_csv": str(sample_csv)},
+            **{**job_common, "origins_csv": str(sample_csv)}, **mode_kwargs,
         )
         cmd = java_env.build_java_command(
             env, java_env.xmx_arg(heap_mb), job_spec.write_job(job, tmp),

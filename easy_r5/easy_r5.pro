@@ -8,6 +8,7 @@ SOURCES = easy_r5_plugin.py \
           algorithms/_matrix_base.py \
           algorithms/run_travel_time_matrix.py \
           algorithms/run_accessibility.py \
+          algorithms/run_service_minutes.py \
           algorithms/generate_isochrones.py \
           algorithms/prepare_population_layer.py \
           algorithms/population_overlay.py

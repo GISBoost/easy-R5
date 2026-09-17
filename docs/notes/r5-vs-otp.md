@@ -43,9 +43,12 @@ either. This note is the capability map the roadmap should be built from.
 - **Service-time / continuity classification** (easy-OTP's flagship 961-surface method) — R5 can
   in principle produce the same "for how many departure minutes is this cell within T?" metric
   much faster, but **only if** the per-departure distribution is reachable
-  (`recordTravelTimeHistograms`, or ≤5 percentiles, see primer §3). **Verify before promising
-  this.** If it is not reachable, the honest R5 metric is a percentile-based one, and it should be
-  named differently rather than pretending to be the same number.
+  (`recordTravelTimeHistograms`, or ≤5 percentiles, see primer §3). **Verified reachable** by
+  the 2026-09-02 spike and **shipped in 0.2.2** as `RunServiceMinutes` — see
+  [`docs/prd/PR_easy-R5_v02_service-minutes.md`](../prd/PR_easy-R5_v02_service-minutes.md).
+  As planned, it is named and computed differently from easy-OTP's metric (per-OD-pair
+  `svc_min_c<cutoff>` counts, not a zonal-stats `st_class` category over hex cells) rather
+  than pretending to be the same number.
 - **Population overlay and the GUS census-sheet importer** — engine-independent, but unique
   enough to be worth owning: **copied** here as `PopulationOverlay` and
   `PreparePopulationLayer` (decided 2026-09-02). easy-OTP keeps its own copies — nothing is

@@ -9,6 +9,7 @@ from easy_r5.core.job_spec import (
     build_build_job,
     build_info_job,
     build_matrix_job,
+    build_service_minutes_job,
     parse_percentiles,
     validate_percentiles,
     write_job,
@@ -163,6 +164,90 @@ def test_matrix_job_missing_raises(overrides):
 
 def test_matrix_job_modes_uppercased():
     job = build_matrix_job(**_matrix_kwargs(direct_modes=["walk"], transit_modes=["bus"]))
+    assert job["direct_modes"] == ["WALK"]
+    assert job["transit_modes"] == ["BUS"]
+
+
+def _service_minutes_kwargs(**overrides):
+    base = _matrix_kwargs()
+    del base["percentiles"]
+    base["cutoffs"] = [15, 30, 45, 60]
+    base.update(overrides)
+    return base
+
+
+def test_service_minutes_job_shape():
+    job = build_service_minutes_job(**_service_minutes_kwargs())
+    assert job["command"] == "matrix"
+    assert job["percentiles"] == [50]
+    assert job["record_histograms"] is True
+    assert job["service_minute_cutoffs"] == [15, 30, 45, 60]
+
+
+def test_service_minutes_job_cutoffs_sorted_deduped():
+    job = build_service_minutes_job(**_service_minutes_kwargs(cutoffs=[60, 15, 30, 30]))
+    assert job["service_minute_cutoffs"] == [15, 30, 60]
+
+
+@pytest.mark.parametrize("bad", [[], [0], [-5]])
+def test_service_minutes_job_bad_cutoffs_raises(bad):
+    with pytest.raises(JobSpecError, match="positive cutoff"):
+        build_service_minutes_job(**_service_minutes_kwargs(cutoffs=bad))
+
+
+def test_service_minutes_job_cutoff_at_histogram_limit_ok():
+    job = build_service_minutes_job(**_service_minutes_kwargs(cutoffs=[119]))
+    assert job["service_minute_cutoffs"] == [119]
+
+
+@pytest.mark.parametrize("bad", [[120], [150], [15, 200]])
+def test_service_minutes_job_cutoff_above_histogram_limit_raises(bad):
+    """R5's histogram is a fixed int[120] (0-119 min); see job_spec.HISTOGRAM_MAX_MINUTES."""
+    with pytest.raises(JobSpecError, match="120-minute range"):
+        build_service_minutes_job(**_service_minutes_kwargs(cutoffs=bad))
+
+
+def test_service_minutes_job_max_trip_duration_at_histogram_limit_ok():
+    job = build_service_minutes_job(
+        **_service_minutes_kwargs(cutoffs=[60], max_trip_duration_minutes=119)
+    )
+    assert job["max_trip_duration_minutes"] == 119
+
+
+@pytest.mark.parametrize("bad_trip", [120, 150, 200])
+def test_service_minutes_job_max_trip_duration_above_histogram_limit_raises(bad_trip):
+    """A reachable trip >= 120 min overflows R5's fixed-size histogram array."""
+    with pytest.raises(JobSpecError, match="120-minute range"):
+        build_service_minutes_job(
+            **_service_minutes_kwargs(cutoffs=[60], max_trip_duration_minutes=bad_trip)
+        )
+
+
+@pytest.mark.parametrize("overrides", [
+    {"network": ""},
+    {"origins_csv": ""},
+    {"destinations_csv": " "},
+    {"out_csv": ""},
+    {"direct_modes": []},
+])
+def test_service_minutes_job_missing_raises(overrides):
+    with pytest.raises(JobSpecError):
+        build_service_minutes_job(**_service_minutes_kwargs(**overrides))
+
+
+@pytest.mark.parametrize("walk", [None, "", 0, -5])
+def test_service_minutes_job_walk_time_always_numeric(walk):
+    job = build_service_minutes_job(
+        **_service_minutes_kwargs(max_walk_time_minutes=walk, max_trip_duration_minutes=90)
+    )
+    assert isinstance(job["max_walk_time_minutes"], int)
+    assert job["max_walk_time_minutes"] == 90
+
+
+def test_service_minutes_job_modes_uppercased():
+    job = build_service_minutes_job(
+        **_service_minutes_kwargs(direct_modes=["walk"], transit_modes=["bus"])
+    )
     assert job["direct_modes"] == ["WALK"]
     assert job["transit_modes"] == ["BUS"]
 

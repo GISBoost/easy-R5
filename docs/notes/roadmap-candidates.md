@@ -51,6 +51,11 @@ Confidence:
 
 #### T1-A. Service-minutes / reliability metric ("minutes of service")
 
+> **Status: ✅ done in 0.2.2** — shipped as `RunServiceMinutes`, spec in
+> [`PR_easy-R5_v02_service-minutes.md`](../prd/PR_easy-R5_v02_service-minutes.md). One
+> deviation from the sketch below: the histogram reduction runs in Java, not Python, and
+> cutoffs are capped at 119 min (R5's histogram is a fixed `int[120]`).
+
 **What it is.** For a `TRANSIT+WALK` matrix, report not just the P50/P85 travel time but
 *for how many of the 120 departure minutes each destination is reachable within T*. R5
 routes every one of the 120 minutes in a 2 h window internally
@@ -175,6 +180,10 @@ build-time feed warnings.
 ---
 
 #### T1-D. Complete the `Setup/` group: `DownloadTransitData` + `DownloadRealizedGtfs`
+
+> **Status: half done** — `DownloadRealizedGtfs` shipped in 0.2.0
+> ([`PR_easy-R5_v02_realized-gtfs.md`](../prd/PR_easy-R5_v02_realized-gtfs.md));
+> `DownloadTransitData` is still open.
 
 **What it is.** Two Setup algorithms:
 1. `DownloadTransitData` — OSM extract (Geofabrik) + scheduled GTFS (Mobility Database /

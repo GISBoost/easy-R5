@@ -30,7 +30,8 @@ reasoned about as far as it usefully can be.
 5. ~~Can the per-departure-minute distribution be recovered?~~ **Yes.**
    `recordTravelTimeHistograms = true` → `TravelTimeResult.getHistogram(target)` returns
    `int[120]`, one bin per travel-time minute, counting departure minutes. The service-minutes
-   metric is computable; scheduled for v0.2 under its own name.
+   metric is computable; **shipped in 0.2.2** as `RunServiceMinutes` — see
+   [`docs/prd/PR_easy-R5_v02_service-minutes.md`](../prd/PR_easy-R5_v02_service-minutes.md).
 6. ~~Does `validatePercentiles()` really reject more than 5?~~ **Yes**, `IllegalArgumentException`
    on six. Python validates before spawning Java. (Whether `TravelTimeComputer` calls it on the
    direct path is now moot.)

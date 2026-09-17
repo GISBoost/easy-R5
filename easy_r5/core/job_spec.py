@@ -17,6 +17,16 @@ from pathlib import Path
 # (validatePercentiles() throws IllegalArgumentException on six values).
 MAX_PERCENTILES = 5
 
+# TravelTimeResult.histograms is allocated as `new int[nPoints][120]` — a fixed
+# size, independent of maxTripDurationMinutes (verified 2026-09-17 by javap-
+# disassembling com.conveyal.r5.analyst.cluster.TravelTimeResult in the pinned
+# r5-v7.6-all.jar: `bipush 120; multianewarray [[I`). recordHistogramIfEnabled
+# then does an unguarded `histograms[target][travelTimeSeconds / 60]++` — no
+# bounds check. So whenever record_histograms is on, max_trip_duration_minutes
+# must stay below 120, or a reachable trip at/above 120 min throws
+# ArrayIndexOutOfBoundsException deep inside R5.
+HISTOGRAM_MAX_MINUTES = 119
+
 
 class JobSpecError(ValueError):
     """A job spec is malformed or a parameter is out of the range R5 accepts."""
@@ -182,6 +192,82 @@ def build_matrix_job(
         "write_unreachable": bool(write_unreachable),
         "out_csv": out_csv,
     }
+
+
+def build_service_minutes_job(
+    *,
+    network,
+    origins_csv,
+    destinations_csv,
+    origin_range,
+    date,
+    departure_time,
+    time_window_minutes,
+    cutoffs,
+    max_trip_duration_minutes,
+    max_walk_time_minutes,
+    walk_speed_kmh,
+    bike_speed_kmh,
+    max_rides,
+    monte_carlo_draws,
+    access_modes,
+    egress_modes,
+    direct_modes,
+    transit_modes,
+    write_unreachable,
+    out_csv,
+):
+    """Build a ``matrix`` job in service-minutes mode (PR_easy-R5_v02_service-minutes.md §3).
+
+    Same command as ``build_matrix_job`` — the runner's dead-date/walk-only
+    detector must stay single-sourced (see the PRD's §1.2). ``percentiles`` is
+    always the fixed, internal ``[50]`` (never user-facing); ``cutoffs`` drives
+    the ``svc_min_c<cutoff>`` columns Java emits from the departure-minute
+    histogram instead of percentile columns.
+    """
+    cutoffs = sorted({int(c) for c in cutoffs})
+    if not cutoffs or cutoffs[0] < 1:
+        raise JobSpecError("Give at least one positive cutoff.")
+    if cutoffs[-1] > HISTOGRAM_MAX_MINUTES:
+        raise JobSpecError(
+            "Cutoffs must be at most {} minutes — R5's departure-minute histogram "
+            "is a fixed 120-minute range (0-{}).".format(
+                HISTOGRAM_MAX_MINUTES, HISTOGRAM_MAX_MINUTES
+            )
+        )
+    if int(max_trip_duration_minutes) > HISTOGRAM_MAX_MINUTES:
+        raise JobSpecError(
+            "max_trip_duration_minutes must be at most {} minutes when "
+            "record_histograms is on — R5's histogram is a fixed 120-minute range "
+            "(0-{}) regardless of trip duration; a larger cap corrupts the "
+            "recording.".format(HISTOGRAM_MAX_MINUTES, HISTOGRAM_MAX_MINUTES)
+        )
+
+    job = build_matrix_job(
+        network=network,
+        origins_csv=origins_csv,
+        destinations_csv=destinations_csv,
+        origin_range=origin_range,
+        date=date,
+        departure_time=departure_time,
+        time_window_minutes=time_window_minutes,
+        percentiles=[50],
+        max_trip_duration_minutes=max_trip_duration_minutes,
+        max_walk_time_minutes=max_walk_time_minutes,
+        walk_speed_kmh=walk_speed_kmh,
+        bike_speed_kmh=bike_speed_kmh,
+        max_rides=max_rides,
+        monte_carlo_draws=monte_carlo_draws,
+        access_modes=access_modes,
+        egress_modes=egress_modes,
+        direct_modes=direct_modes,
+        transit_modes=transit_modes,
+        write_unreachable=write_unreachable,
+        out_csv=out_csv,
+    )
+    job["record_histograms"] = True
+    job["service_minute_cutoffs"] = cutoffs
+    return job
 
 
 def write_job(job, tmp_dir):

@@ -5,11 +5,13 @@ A QGIS processing plugin for transit accessibility analysis on the
 cumulative-opportunity accessibility and isochrones over a departure-time window, computed inside
 QGIS with no R, no conda and no Docker.
 
-> **Status: 0.1.0, experimental.** All eight algorithms work; the travel-time matrix and
+> **Status: 0.2.2, experimental.** All ten algorithms work; the travel-time matrix and
 > accessibility are verified end-to-end (accessibility reproduces r5r's Gdańsk output
-> *exactly* — [`docs/notes/validation-gdansk.md`](docs/notes/validation-gdansk.md)). The flag
-> stays `experimental` until a clean-install run of the full pipeline is signed off. See
-> [`KNOWN_ISSUES.md`](KNOWN_ISSUES.md).
+> *exactly* — [`docs/notes/validation-gdansk.md`](docs/notes/validation-gdansk.md)).
+> **Run service minutes** (new in 0.2.2) is verified against a real R5 run on a Łódź
+> network — see [`docs/prd/PR_easy-R5_v02_service-minutes.md`](docs/prd/PR_easy-R5_v02_service-minutes.md).
+> The flag stays `experimental` until a clean-install run of the full pipeline is signed
+> off. See [`KNOWN_ISSUES.md`](KNOWN_ISSUES.md).
 
 Sibling project: [**easy-OTP**](https://github.com/GISBoost/easy-OTP), the same idea on
 OpenTripPlanner 1.5.
@@ -47,10 +49,12 @@ Processing toolbox → **Easy-R5**:
 | Group | Algorithm | Does |
 |---|---|---|
 | Setup | **Download R5 engine and Java 21** | fetches Temurin 21 + `r5-v7.6-all.jar` (SHA-256 pinned), compiles the runner. No admin rights. |
+| Setup | **Download realized GTFS** | pick a city + date + variant (realized P50/P85 or scheduled), download from GISBoost's gtfs-dashboard index into a folder ready for Build R5 network. |
 | Setup | **Build R5 network** | one `.osm.pbf` + a folder of GTFS `.zip` → cached `network.dat` + a `network.json` summary with a per-date active-trip count. |
 | Diagnostics | **Test R5 setup** | checks the JDK, jar and runner independently. |
 | Analysis | **Run travel time matrix** | N origins × M destinations, percentiles over a departure window, batched processes, sampled time estimate, hard dead-date gate + post-run walk-only detector. Long CSV out. `TRANSIT_SUBMODES` narrows which transit modes R5 routes over (e.g. `TRAM` only, or `TRAM, BUS`) — blank means all. |
 | Analysis | **Run accessibility** | opportunities reachable per origin / cutoff / percentile (STEP / LOGISTIC / EXPONENTIAL decay), summed in Python from the matrix. Long CSV + an ORIGINS copy with `acc_<opp>_p<pct>_c<cutoff>` fields. Same `TRANSIT_SUBMODES` narrowing as the matrix — run once for `TRAM` and once for `BUS` to compare modal accessibility. |
+| Analysis | **Run service minutes** | for each origin-destination pair, how many of the departure window's minutes (120 by default) reach the destination within each cutoff — from R5's per-minute travel-time histogram, reduced in Java. Long CSV (`svc_min_c<cutoff>` per cutoff, values 0-120). **Not** the same number as easy-OTP's service-time classification (`otp_mean`/`st_class`) — different mechanism, different reference window; see [`docs/prd/PR_easy-R5_v02_service-minutes.md`](docs/prd/PR_easy-R5_v02_service-minutes.md). |
 | Analysis | **Generate isochrones** | cumulative travel-time polygons, one per (origin, cutoff): a destination grid → one-origin matrix → TIN raster → `gdal:contour_polygon` per cutoff (the approach r5r/r5py/Conveyal all use — R5 has no isochrone output). Unreachable pockets stay as holes. |
 | Analysis | **Prepare population layer** | joins a GUS NSP 2021 sheet to census-tract geometry. |
 | Analysis | **Population overlay** | area-weighted population onto a hex grid (fractional, not rounded). |
@@ -61,7 +65,7 @@ algorithm: use stock `native:creategrid` (recipe below).
 
 See [`docs/notes/product-scope.md`](docs/notes/product-scope.md) and
 [`docs/notes/r5-vs-otp.md`](docs/notes/r5-vs-otp.md) for what is deliberately *not* here
-(scenarios, itineraries, GTFS-RT, the service-minutes metric — all v0.2+).
+(scenarios, itineraries, GTFS-RT — later; the service-minutes metric shipped in 0.2.2).
 
 ## Quick start
 
@@ -77,9 +81,11 @@ See [`docs/notes/product-scope.md`](docs/notes/product-scope.md) and
    feed, see **Archival / realized GTFS** below.
 4. **Build a network** — *Setup → Build R5 network*: the `.osm.pbf` and a folder holding your
    GTFS `.zip`(s). Cached by content hash + R5 version, so re-runs are instant.
-5. **Analyse** — *Run travel time matrix* or *Run accessibility*: the network from step 4, an
-   origins point layer, a destinations point layer, a `DATE` the feed actually serves (the run
-   is blocked otherwise), a departure time and window. Output layers are styled automatically.
+5. **Analyse** — *Run travel time matrix*, *Run accessibility* or *Run service minutes*: the
+   network from step 4, an origins point layer, a destinations point layer, a `DATE` the feed
+   actually serves (the run is blocked otherwise), a departure time and window. Output layers
+   are styled automatically (except *Run service minutes*, which has no single field to style
+   a gradient by — see its PRD).
 
 The Gdańsk reference data — 1389 origins, 956 destinations, the r5r ground-truth output — is in
 [`tools/accessibility_cities/gdansk/`](tools/accessibility_cities/gdansk/); the exact-match

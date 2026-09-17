@@ -112,6 +112,16 @@ own points or a regular grid.
   (`FastRaptorWorker`: "Performing 120 total iterations (1 per minute)"), so the full
   per-departure-minute distribution is retrievable, and easy-OTP's service-minutes metric is
   computable from it. See [`spike-r5-probe-2026-09-02.md`](spike-r5-probe-2026-09-02.md).
+  **Hard limit, verified 2026-09-17 by `javap`-disassembling `r5-v7.6-all.jar`
+  (`com.conveyal.r5.analyst.cluster.TravelTimeResult`):** the histogram array is allocated
+  as `new int[nPoints][120]` — a **fixed size, independent of `maxTripDurationMinutes`**.
+  `recordHistogramIfEnabled` does an unguarded `histograms[target][travelTimeSeconds / 60]++`
+  — no bounds check. A reachable trip **≥120 minutes** (possible whenever
+  `maxTripDurationMinutes` itself reaches ≥120, e.g. via `RunServiceMinutes`'s
+  cutoff-vs-trip-duration guard) throws `ArrayIndexOutOfBoundsException` inside the JVM.
+  Easy-R5 validates `max_trip_duration_minutes ≤ 119` in Python whenever
+  `record_histograms` is on (`job_spec.HISTOGRAM_MAX_MINUTES`) — never rely on R5 to reject
+  this itself.
 - **Native accessibility is not usable standalone.** `recordAccessibility = true` fails with
   `NullPointerException: task.destinationPointSetKeys is null` — R5 fetches opportunity grids
   through Conveyal's storage layer. Compute accessibility from the travel-time matrix instead;

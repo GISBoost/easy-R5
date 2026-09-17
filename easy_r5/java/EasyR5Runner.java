@@ -228,6 +228,18 @@ public class EasyR5Runner {
         int maxTripMinutes = job.path("max_trip_duration_minutes").asInt(90);
         boolean writeUnreachable = job.path("write_unreachable").asBoolean(false);
 
+        // Service-minutes mode (PR_easy-R5_v02_service-minutes.md §1.2): reuses this
+        // command instead of adding a new one, so the walk-only detector below stays
+        // single-sourced. "percentiles" is still [50] in this mode (a fixed, internal
+        // value never shown in the UI) purely to feed that detector.
+        boolean recordHistograms = job.path("record_histograms").asBoolean(false);
+        int[] svcCutoffs = intArray(job.path("service_minute_cutoffs"));
+        if (recordHistograms && svcCutoffs.length == 0) {
+            Emit.error("BAD_JOB_SPEC",
+                    "'matrix' with record_histograms needs at least one service_minute_cutoffs value.");
+            return;
+        }
+
         TransportNetwork network = loadNetwork(networkPath);
 
         List<Pt> origins = readPoints(Path.of(originsPath));
@@ -281,8 +293,14 @@ public class EasyR5Runner {
         ExecutorService pool = Executors.newFixedThreadPool(nThreads);
         try (BufferedWriter w = Files.newBufferedWriter(Path.of(outCsv), StandardCharsets.UTF_8)) {
             StringBuilder header = new StringBuilder("from_id,to_id");
-            for (int p : percentiles) {
-                header.append(",travel_time_p").append(p);
+            if (recordHistograms) {
+                for (int c : svcCutoffs) {
+                    header.append(",svc_min_c").append(c);
+                }
+            } else {
+                for (int p : percentiles) {
+                    header.append(",travel_time_p").append(p);
+                }
             }
             w.write(header.toString());
             w.write('\n');
@@ -291,7 +309,8 @@ public class EasyR5Runner {
             for (Pt origin : slice) {
                 futures.add(pool.submit(() -> routeOneOrigin(
                         origin, network, job, percentiles, transitModes, transitRun,
-                        medianIdx, pointSet, dests, maxTripMinutes, writeUnreachable)));
+                        medianIdx, pointSet, dests, maxTripMinutes, writeUnreachable,
+                        recordHistograms, svcCutoffs)));
             }
 
             // Consumed in submission (= origin) order, not completion order, so
@@ -338,10 +357,14 @@ public class EasyR5Runner {
     private static OriginResult routeOneOrigin(Pt origin, TransportNetwork network, JsonNode job,
             int[] percentiles, EnumSet<TransitModes> transitModes, boolean transitRun,
             int medianIdx, PointSet pointSet, List<Pt> dests, int maxTripMinutes,
-            boolean writeUnreachable) {
+            boolean writeUnreachable, boolean recordHistograms, int[] svcCutoffs) {
         RegionalTask task = baseTask(network, origin, job, percentiles, transitModes);
         task.destinationPointSets = new PointSet[]{pointSet};
-        int[][] transit = new TravelTimeComputer(task, network).computeTravelTimes().travelTimes.getValues();
+        if (recordHistograms) {
+            task.recordTravelTimeHistograms = true;
+        }
+        OneOriginResult oneOrigin = new TravelTimeComputer(task, network).computeTravelTimes();
+        int[][] transit = oneOrigin.travelTimes.getValues();
 
         int[] walkMedian = null;
         if (transitRun) {
@@ -359,12 +382,29 @@ public class EasyR5Runner {
         for (int d = 0; d < dests.size(); d++) {
             boolean anyReached = false;
             StringBuilder cells = new StringBuilder();
-            for (int p = 0; p < percentiles.length; p++) {
-                int tt = transit[p][d];
-                cells.append(',');
-                if (tt < Integer.MAX_VALUE && tt <= maxTripMinutes) {
-                    cells.append(tt);
-                    anyReached = true;
+            if (recordHistograms) {
+                int[] hist = oneOrigin.travelTimes.getHistogram(d);
+                for (int c : svcCutoffs) {
+                    int count = 0;
+                    if (hist != null) {
+                        int upTo = Math.min(c, hist.length - 1);
+                        for (int m = 0; m <= upTo; m++) {
+                            count += hist[m];
+                        }
+                    }
+                    cells.append(',').append(count);
+                    if (count > 0) {
+                        anyReached = true;
+                    }
+                }
+            } else {
+                for (int p = 0; p < percentiles.length; p++) {
+                    int tt = transit[p][d];
+                    cells.append(',');
+                    if (tt < Integer.MAX_VALUE && tt <= maxTripMinutes) {
+                        cells.append(tt);
+                        anyReached = true;
+                    }
                 }
             }
             if (anyReached || writeUnreachable) {

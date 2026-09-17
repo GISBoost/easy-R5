@@ -9,6 +9,7 @@ from .algorithms.generate_isochrones import GenerateIsochrones
 from .algorithms.population_overlay import PopulationOverlay
 from .algorithms.prepare_population_layer import PreparePopulationLayer
 from .algorithms.run_accessibility import RunAccessibility
+from .algorithms.run_service_minutes import RunServiceMinutes
 from .algorithms.run_travel_time_matrix import RunTravelTimeMatrix
 from .algorithms.test_r5_setup import TestR5Setup
 
@@ -30,6 +31,7 @@ class EasyR5Provider(QgsProcessingProvider):
         self.addAlgorithm(TestR5Setup())
         self.addAlgorithm(RunTravelTimeMatrix())
         self.addAlgorithm(RunAccessibility())
+        self.addAlgorithm(RunServiceMinutes())
         self.addAlgorithm(GenerateIsochrones())
         self.addAlgorithm(PreparePopulationLayer())
         self.addAlgorithm(PopulationOverlay())

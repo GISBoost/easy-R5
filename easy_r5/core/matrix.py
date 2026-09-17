@@ -167,3 +167,70 @@ def od_line_fields():
     for name in _META_FIELDS:
         fields.append(QgsField(name, QVariant.String))
     return fields
+
+
+_SVC_MIN_META_FIELDS = (
+    "r5_version",
+    "network_hash",
+    "run_date",
+    "departure_time",
+    "time_window",
+    "modes",
+    "transit_submodes",
+    "cutoffs",
+)
+
+
+def build_service_minute_lines(csv_path, origin_xy, dest_xy, meta, cutoffs, sink, to_crs=None):
+    """Add one straight OD line per service-minutes row to ``sink`` (optional output).
+
+    Same shape as ``build_od_lines``, but every ``svc_min_c<cutoff>`` column
+    becomes its own integer attribute (there is no single "the" travel-time
+    column here — see PR_easy-R5_v02_service-minutes.md §4).
+    """
+    from qgis.core import (
+        QgsFeature,
+        QgsFeatureSink,
+        QgsGeometry,
+        QgsPointXY,
+    )
+
+    cutoff_cols = ["svc_min_c{}".format(c) for c in cutoffs]
+    added = 0
+    with open(csv_path, newline="", encoding="utf-8") as fh:
+        reader = csv.DictReader(fh)
+        for row in reader:
+            o = origin_xy.get(row["from_id"])
+            d = dest_xy.get(row["to_id"])
+            if o is None or d is None:
+                continue
+            feat = QgsFeature()
+            geom = QgsGeometry.fromPolylineXY(
+                [QgsPointXY(o[0], o[1]), QgsPointXY(d[0], d[1])]
+            )
+            if to_crs is not None:
+                geom.transform(to_crs)
+            feat.setGeometry(geom)
+            feat.setAttributes(
+                [row["from_id"], row["to_id"]]
+                + [int(row[c]) if row.get(c) else 0 for c in cutoff_cols]
+                + [meta.get(key) for key in _SVC_MIN_META_FIELDS]
+            )
+            sink.addFeature(feat, QgsFeatureSink.Flag.FastInsert)
+            added += 1
+    return added
+
+
+def service_minute_line_fields(cutoffs):
+    """QgsFields for the optional service-minutes OD-line output layer."""
+    from qgis.core import QgsField, QgsFields
+    from qgis.PyQt.QtCore import QVariant
+
+    fields = QgsFields()
+    fields.append(QgsField("from_id", QVariant.String))
+    fields.append(QgsField("to_id", QVariant.String))
+    for c in cutoffs:
+        fields.append(QgsField("svc_min_c{}".format(c), QVariant.Int))
+    for name in _SVC_MIN_META_FIELDS:
+        fields.append(QgsField(name, QVariant.String))
+    return fields
