@@ -142,6 +142,16 @@ class RunCompetitiveAccessibility(MatrixBase, QgsProcessingAlgorithm):
             result = fca.two_step_fca(fca.read_matrix_pairs(matrix_csv, pct), population, capacity,
                                       catchment=catchment, decay=decay, per_population=per_pop)
 
+            if result["thin_supply"]:
+                feedback.pushWarning(self.tr(
+                    "{n} destination(s) are reached only by almost nobody (less than 1 resident in "
+                    "their whole catchment), so their capacity is divided by that handful and the "
+                    "few origins reaching them get extreme values (worst ratio {r:.3g} per person). "
+                    "This means the origins do not cover everyone competing for those destinations "
+                    "— usually destinations outside the study area. Either extend the origins "
+                    "beyond it, or clip the destinations to it. Examples: {e}").format(
+                        n=len(result["thin_supply"]), r=result["max_ratio"],
+                        e=", ".join(result["thin_supply"][:5])))
             if result["unserved_supply"]:
                 feedback.pushWarning(self.tr(
                     "{n} destination(s) with capacity have no population within {c} min — their "

@@ -128,8 +128,10 @@ Check transit data ─► Build R5 network ─► Run accessibility / Run compet
 > **Worked example.** All of this run end to end on the real Łódź network, with the QGIS project,
 > the layers and the numbers: [`tools/demo_v03_lodz/`](tools/demo_v03_lodz/README.md). Headline
 > results — 97.0% of residents reach at least one school within 30 minutes, one scenario tram line
-> brings 6 280 more people into that group (3.0% → 2.1% with no access), and 2SFCA shows only 25%
-> of residents have as many school places per capita as the city average.
+> brings 6 280 more people into that group (3.0% → 2.1% with no access), and 2SFCA shows that only
+> 44% of them have as many schools per capita as the city average (82% in the centre, 35% outside).
+> It also documents a 2SFCA trap worth knowing: destinations outside the origins' area divide their
+> capacity by almost nobody and explode the values — the algorithm now warns about it.
 
 ### Check transit data (GTFS) — *Diagnostics*
 
@@ -400,6 +402,17 @@ about facilities nobody reaches. The optional supply layer shows, per facility, 
 - Compare two runs (`fca` field) with *Compare scenarios*.
 
 **Pitfalls.**
+- **Destinations outside the origins' area blow the numbers up.** A facility that only a nearly
+  empty edge origin can reach divides its capacity by that handful of residents, so its ratio
+  explodes and every origin reaching it inherits an absurd value (in the worked example: 4902
+  schools per 1000 residents, from schools in a neighbouring town). The algorithm warns when a
+  facility has less than one resident in its whole catchment; the fix is to extend the origins
+  beyond your study area, or to clip the destinations to it.
+- **Population is only as good as its source.** *Population overlay* is areal interpolation: it
+  spreads a census precinct's residents evenly over its area, so hexes made of fields or forest get
+  phantom residents, and near-empty hexes are exactly where the 2SFCA blow-up above starts. For a
+  per-hex reading, redistribute onto building footprints instead — see
+  [`docs/notes/population-on-hex-areal-vs-dasymetric.md`](docs/notes/population-on-hex-areal-vs-dasymetric.md).
 - The result is on a **different scale** from *Run accessibility* — never compare the two numbers
   directly, and always say the catchment and percentile next to the number.
 - Changing `CATCHMENT_MINUTES` changes every value; it is a modelling choice, not a detail.

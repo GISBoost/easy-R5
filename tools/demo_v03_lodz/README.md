@@ -29,7 +29,8 @@ Wszystko pochodzi z wcześniejszych analiz w `tools/`, nic nie trzeba pobierać:
 - dane wejściowe z `tools/realtime_delay_lodz/delay_lodz.gpkg`:
   - `hex_centroids` — siatka 500 m z populacją (4101 heksów, 669 972 mieszkańców, GUS NSP 2021
     rozłożone dazymetrycznie — patrz `tools/realtime_delay_lodz/README.md`),
-  - `poi_targets` — 766 celów z OSM (311 szkół, 350 aptek, 47 uczelni, 58 galerii),
+  - `poi_targets` — 766 celów z OSM (311 szkół, 350 aptek, 47 uczelni, 58 galerii); warstwa
+    obejmuje także okolicę poza granicą Łodzi — patrz krok 7,
   - `boundary` — granica miasta.
 
 Wtyczka Easy-R5 włączona, silnik pobrany (*Setup → Download R5 engine and Java 21*).
@@ -80,6 +81,8 @@ kilku minut). Populację przenosimy sumą z siatki 500 m.
 6. **`native:centroids`** — `hex_centroids_1000m`, to są **źródła** analizy.
 7. **`native:extractbyexpression`** — `"category" = 'school'` na `poi_targets` → `poi_schools`
    (311 szkół, pole `srv_school = 1` to „pojemność": jedna placówka).
+8. **`native:extractbylocation`** (predykat *within*, `INTERSECT` = `boundary`) → `poi_schools_lodz`,
+   **230 szkół leżących w granicach miasta**. To są cele dla 2SFCA — dlaczego, patrz krok 7.
 
 Suma populacji na siatce 1000 m: **668 952** z 669 972 (0,15% wypada poza heksami przy granicy —
 akceptowalne, ale trzeba to wiedzieć, zanim poda się liczby bezwzględne).
@@ -189,7 +192,7 @@ szkołę między wszystkich, którzy do niej dojeżdżają.
 | Parametr | Wartość |
 |---|---|
 | `ORIGINS` / `POPULATION_FIELD` | `hex_centroids_1000m` / `pop_total` |
-| `DESTINATIONS` / `CAPACITY_FIELD` | `poi_schools` / `srv_school` (1 placówka) |
+| `DESTINATIONS` / `CAPACITY_FIELD` | `poi_schools_lodz` / `srv_school` (1 placówka) |
 | `CATCHMENT_MINUTES` | `30` |
 | `DECAY` | `STEP` (klasyczne 2SFCA) |
 | `PERCENTILES` | `50` (jedna wartość) |
@@ -198,22 +201,51 @@ szkołę między wszystkich, którzy do niej dojeżdżają.
 
 Wynik łączymy z heksami (`native:joinattributestable`, pole `fca`) → `fca_heksy`.
 
-**Wynik:** średnia miejska to 311 szkół / 668 952 mieszkańców = **0,465 szkoły na 1000 osób**.
-Podsumowanie równościowe na polu `fca` z progiem 0,465:
+**Wynik:** średnia miejska to 230 szkół / 668 952 mieszkańców = **0,344 szkoły na 1000 osób**.
+Podsumowanie równościowe na polu `fca` z tym progiem:
 
 | Miara | Wszyscy | Centrum | Obrzeża |
 |---|--:|--:|--:|
-| Udział mieszkańców z dostępem ≥ średnia miejska | **25,3%** | 54,8% | 18,2% |
-| Mediana (p50) szkół na 1000 osób | 0,33 | 0,49 | 0,29 |
-| Najgorsza dziesiąta część (p10) | 0,14 | 0,27 | 0,12 |
-| Gini | 0,322 | 0,175 | 0,342 |
+| Udział mieszkańców z dostępem ≥ średnia miejska | **44,0%** | 82,1% | 34,8% |
+| Mediana (p50) szkół na 1000 osób | 0,32 | 0,49 | 0,29 |
+| Najgorsza dziesiąta część (p10) | 0,13 | 0,27 | 0,12 |
+| Gini | 0,286 | 0,175 | 0,291 |
 
-Czyli: **prawie każdy dojedzie do jakiejś szkoły, ale tylko co czwarty mieszkaniec ma do dyspozycji
-tyle miejsc, ile wynosi średnia miejska** — i zależy to wyraźnie od tego, gdzie mieszka.
-Warstwa `fca_szkoly_obciazenie` pokazuje to od strony placówek: najbardziej oblegana szkoła ma
-w 30-minutowej zlewni **204 tys. mieszkańców**.
+Czyli: **prawie każdy dojedzie do jakiejś szkoły, ale mniej niż połowa mieszkańców ma do dyspozycji
+tyle placówek, ile wynosi średnia miejska** — i zależy to wyraźnie od tego, gdzie mieszka: w centrum
+82%, na obrzeżach 35%. Warstwa `fca_szkoly_obciazenie` pokazuje to od strony placówek: najbardziej
+oblegana szkoła ma w 30-minutowej zlewni **204 tys. mieszkańców**.
 
 To jest inna skala niż liczba szkół z kroku 3 — nie porównuj tych liczb wprost.
+
+### Pułapka, na którą natrafiliśmy: cele spoza obszaru źródeł
+
+Pierwszy przebieg liczył wszystkie 311 szkół z warstwy POI, także te w Aleksandrowie Łódzkim,
+Zgierzu i Pabianicach. Kilka heksów dostało wtedy absurdalne wartości — maksimum **4902 szkoły
+na 1000 mieszkańców**. To nie był błąd algorytmu, tylko znany artefakt 2SFCA:
+
+- szkoły w Aleksandrowie były w zasięgu 30 minut **wyłącznie** dla skrajnych, prawie pustych heksów
+  na granicy miasta — łącznie **1,02 mieszkańca** w całej zlewni;
+- krok 1 dzieli pojemność przez ten popyt: 1 szkoła / 1,02 osoby = 0,98 szkoły **na osobę**, czyli
+  980 na 1000;
+- heks `h0001` (1 mieszkaniec) dosięgał pięciu takich szkół → 5 × 980 = **4902**.
+
+Przyczyna: **źródła nie obejmowały wszystkich, którzy konkurują o te szkoły** — mieszkańcy
+Aleksandrowa i Zgierza nie byli w siatce, bo siatka kończy się na granicy Łodzi. Dwa poprawne
+wyjścia: rozszerzyć źródła poza granicę miasta (potrzebna populacja dla tamtych gmin) albo obciąć
+cele do obszaru źródeł. Wybraliśmy drugie — stąd `poi_schools_lodz` (230 szkół) i maksimum
+**2,67** zamiast 4902.
+
+Efekt na statystyki ważone populacją był zresztą znikomy (te 10 heksów zamieszkiwało łącznie
+190 osób, 0,03% miasta) — ale mapa była nie do pokazania, a liczba maksymalna nie do obrony.
+
+Od tej wersji wtyczka **sama to zgłasza**: gdy jakaś placówka ma w całej zlewni mniej niż jednego
+mieszkańca, *Run competitive accessibility* wypisuje ostrzeżenie z liczbą takich celów, najgorszym
+przelicznikiem i wskazówką (rozszerz źródła albo obetnij cele).
+
+Pozostałe ograniczenie, świadome: mieszkańcy przy granicy realnie korzystają też ze szkół poza
+miastem, a po obcięciu celów ich dostępność jest lekko zaniżona. Przy analizie do publikacji
+robi się to odwrotnie — rozszerza się siatkę źródeł na sąsiednie gminy.
 
 ---
 
@@ -225,7 +257,7 @@ To jest inna skala niż liczba szkół z kroku 3 — nie porównuj tych liczb wp
 00 Dane wejsciowe          granica, siatka 1000 m (populacja), centroidy, szkoły, linia scenariusza
 01 Kontrola GTFS           linie (nazwy do scenariusza), kursy na dzień  [raport: out/kontrola_gtfs.html]
 02 Dostepnosc: baseline vs scenariusz   porównanie heksów (styl: lepiej/gorzej), obie warstwy dostępności
-03 Dostepnosc konkurencyjna (2SFCA)     fca na heksach (kwantyle), obciążenie szkół
+03 Dostepnosc konkurencyjna (2SFCA)     fca na heksach (klasy wokół średniej miejskiej), obciążenie szkół
 04 Rownosc dostepu         trzy tabele podsumowań (baseline, scenariusz, 2SFCA)
 ```
 
@@ -242,3 +274,12 @@ scenariusz, wersja R5) — to jest to, co pozwala po miesiącu odtworzyć, skąd
 - Linia tramwajowa jest **schematyczna** (prosta, przystanki co 800 m, 20 km/h) — to test metody,
   nie projekt inwestycji.
 - Cele to szkoły z OSM, kompletność jak w OSM.
+- **Populacja jest ważona powierzchnią, nie budynkami.** `pop_total` powstało w
+  `tools/realtime_delay_lodz` przez *Population overlay*, czyli areal interpolation: ludność obwodu
+  spisowego GUS rozkłada się proporcjonalnie do **powierzchni** części obwodu w heksie, bez
+  uwzględnienia, gdzie stoją budynki. Obwody z ukrytą (NULL) populacją GUS są pominięte. Metoda
+  dazymetryczna (wagi z powierzchni zabudowy) dałaby inne wartości w heksach z dużym udziałem
+  lasów, pól i terenów przemysłowych — porównanie obu podejść jest w
+  [`docs/notes/population-on-hex-areal-vs-dasymetric.md`](../../docs/notes/population-on-hex-areal-vs-dasymetric.md).
+  Dlatego heksy na obrzeżach potrafią mieć populację rzędu 0–1 osoby: tam faktycznie prawie nikt nie
+  mieszka, a areal interpolation rozmazuje resztkę obwodu po dużej, niezabudowanej powierzchni.

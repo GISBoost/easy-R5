@@ -47,3 +47,17 @@ def test_read_matrix_pairs(tmp_path):
     assert list(read_matrix_pairs(p, 50)) == [("A", "X", 10)]
     with pytest.raises(ValueError):
         list(read_matrix_pairs(p, 85))
+
+
+def test_thin_supply_is_flagged():
+    # X is reachable only by a near-empty origin: its ratio explodes and must be reported.
+    pairs = [("A", "X", 10), ("B", "Y", 10)]
+    r = two_step_fca(pairs, {"A": 0.2, "B": 5000}, {"X": 1, "Y": 1}, catchment=30)
+    assert r["thin_supply"] == ["X"]
+    assert r["max_ratio"] == pytest.approx(5.0)
+    assert r["access"]["A"] == pytest.approx(5.0)  # 1 facility per 0.2 residents
+
+
+def test_no_thin_supply_when_demand_is_real():
+    r = two_step_fca(PAIRS, POP, CAP, catchment=30)
+    assert r["thin_supply"] == []
