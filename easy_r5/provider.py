@@ -3,7 +3,9 @@
 from qgis.core import QgsProcessingProvider
 
 from .algorithms.build_network import BuildNetwork
+from .algorithms.build_scenario import BuildScenario
 from .algorithms.check_transit_data import CheckTransitData
+from .algorithms.compare_scenarios import CompareScenarios
 from .algorithms.download_r5 import DownloadR5
 from .algorithms.download_realized_gtfs import DownloadRealizedGtfs
 from .algorithms.generate_isochrones import GenerateIsochrones
@@ -37,3 +39,5 @@ class EasyR5Provider(QgsProcessingProvider):
         self.addAlgorithm(GenerateIsochrones())
         self.addAlgorithm(PreparePopulationLayer())
         self.addAlgorithm(PopulationOverlay())
+        self.addAlgorithm(BuildScenario())
+        self.addAlgorithm(CompareScenarios())

@@ -152,6 +152,7 @@ _META_FIELDS = (
     "percentile",
     "modes",
     "transit_submodes",
+    "scenario",
 )
 
 
@@ -178,6 +179,7 @@ _SVC_MIN_META_FIELDS = (
     "modes",
     "transit_submodes",
     "cutoffs",
+    "scenario",
 )
 
 

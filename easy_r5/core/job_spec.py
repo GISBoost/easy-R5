@@ -126,6 +126,7 @@ def build_matrix_job(
     transit_modes,
     write_unreachable,
     out_csv,
+    scenario=None,
 ):
     """Build the ``matrix`` job: one-to-many travel times, PRD 3.2 shape.
 
@@ -134,6 +135,9 @@ def build_matrix_job(
     cap: a single walk leg longer than the whole trip budget cannot belong to a
     trip that fits the budget). The runner must never route with an unbounded
     walk radius (PRD 2.1, lesson 2).
+
+    ``scenario``, when given, is a scenario dict (``core/scenario.py``) the runner
+    applies to the network before routing (PR_easy-R5_v03.md R-1).
     """
     network = str(network or "").strip()
     origins_csv = str(origins_csv or "").strip()
@@ -169,7 +173,7 @@ def build_matrix_job(
     if rng is not None and (len(rng) != 2 or rng[0] < 0 or rng[1] < rng[0]):
         raise JobSpecError("origin_range must be [start, end] with 0 <= start <= end.")
 
-    return {
+    job = {
         "command": "matrix",
         "network": network,
         "origins": origins_csv,
@@ -192,6 +196,11 @@ def build_matrix_job(
         "write_unreachable": bool(write_unreachable),
         "out_csv": out_csv,
     }
+    if scenario is not None:
+        if not isinstance(scenario, dict) or not scenario.get("modifications"):
+            raise JobSpecError("scenario must be a dict with a non-empty 'modifications' list.")
+        job["scenario"] = scenario
+    return job
 
 
 def build_service_minutes_job(
@@ -216,6 +225,7 @@ def build_service_minutes_job(
     transit_modes,
     write_unreachable,
     out_csv,
+    scenario=None,
 ):
     """Build a ``matrix`` job in service-minutes mode (PR_easy-R5_v02_service-minutes.md §3).
 
@@ -264,6 +274,7 @@ def build_service_minutes_job(
         transit_modes=transit_modes,
         write_unreachable=write_unreachable,
         out_csv=out_csv,
+        scenario=scenario,
     )
     job["record_histograms"] = True
     job["service_minute_cutoffs"] = cutoffs

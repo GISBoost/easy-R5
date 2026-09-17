@@ -176,7 +176,7 @@ class GenerateIsochrones(MatrixBase, QgsProcessingAlgorithm):
 
             meta_values = [meta.get("departure_time"), meta.get("time_window"), percentile,
                            meta.get("r5_version"), meta.get("network_hash"),
-                           meta.get("run_date"), meta.get("modes")]
+                           meta.get("run_date"), meta.get("modes"), meta.get("scenario")]
             written = 0
             for origin_id in res["origin_ids"]:
                 per = times.get(origin_id, {})
@@ -377,4 +377,5 @@ class GenerateIsochrones(MatrixBase, QgsProcessingAlgorithm):
         f.append(QgsField("network_hash", QVariant.String))
         f.append(QgsField("run_date", QVariant.String))
         f.append(QgsField("modes", QVariant.String))
+        f.append(QgsField("scenario", QVariant.String))
         return f

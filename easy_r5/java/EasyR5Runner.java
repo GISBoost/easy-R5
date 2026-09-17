@@ -6,13 +6,17 @@ import com.conveyal.r5.analyst.FreeFormPointSet;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.TravelTimeComputer;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
+import com.conveyal.r5.analyst.scenario.Modification;
 import com.conveyal.r5.analyst.scenario.Scenario;
+import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.kryo.KryoNetworkSerializer;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.transit.DuplicateFeedException;
+import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransportNetwork;
+import com.conveyal.r5.transit.TripPattern;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -34,8 +38,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -240,7 +246,7 @@ public class EasyR5Runner {
             return;
         }
 
-        TransportNetwork network = loadNetwork(networkPath);
+        TransportNetwork network = applyScenarioIfAny(loadNetwork(networkPath), job.path("scenario"));
 
         List<Pt> origins = readPoints(Path.of(originsPath));
         List<Pt> dests = readPoints(Path.of(destsPath));
@@ -285,7 +291,7 @@ public class EasyR5Runner {
         // Fixed cost (JVM boot + network deserialize + point-set link) so the
         // Python time estimate can subtract it before extrapolating per-origin.
         Emit.result("setup_seconds",
-                String.format("%.3f", (System.nanoTime() - setupStartNanos) / 1e9));
+                String.format(Locale.ROOT, "%.3f", (System.nanoTime() - setupStartNanos) / 1e9));
         long routingStartNanos = System.nanoTime();
 
         int nThreads = Math.max(1, Math.min(total, Runtime.getRuntime().availableProcessors()));
@@ -346,10 +352,147 @@ public class EasyR5Runner {
         }
 
         Emit.result("routing_seconds",
-                String.format("%.3f", (System.nanoTime() - routingStartNanos) / 1e9));
+                String.format(Locale.ROOT, "%.3f", (System.nanoTime() - routingStartNanos) / 1e9));
         Emit.result("transit_used_pairs", Long.toString(transitUsedPairs));
         Emit.result("origins_done", Integer.toString(total));
         Emit.done(outCsv, rowsWritten);
+    }
+
+    // --- scenarios (PR_easy-R5_v03.md R-1) --------------------------------
+
+    /**
+     * Apply an optional R5 scenario to the loaded network, once per process.
+     *
+     * <p>The job's {@code scenario} is R5's own modification JSON plus three
+     * easy-R5 shorthands that only the runner can expand, because they need the
+     * network's route/pattern/trip ids: {@code easy-remove-routes},
+     * {@code easy-adjust-speed} and {@code easy-set-headway}. A route reference
+     * matches a full R5 id ({@code feed:route_id}), a GTFS {@code route_id} or a
+     * {@code route_short_name}. Verified 2026-09-17 against R5 7.6: the scenario
+     * must be read with {@code lenientObjectMapper} (the strict mapper rejects
+     * the visible {@code type} property), and {@code TravelTimeComputer} never
+     * applies {@code task.scenario} itself — it routes on the network it is given.
+     */
+    private static TransportNetwork applyScenarioIfAny(TransportNetwork base, JsonNode node) {
+        if (!node.isObject()) {
+            return base;
+        }
+        JsonNode mods = node.path("modifications");
+        if (!mods.isArray() || mods.size() == 0) {
+            Emit.error("SCENARIO_INVALID", "The scenario has no modifications.");
+        }
+        ArrayNode expanded = MAPPER.createArrayNode();
+        for (JsonNode m : mods) {
+            switch (m.path("type").asText("")) {
+                case "easy-remove-routes": {
+                    ObjectNode o = expanded.addObject();
+                    o.put("type", "remove-trips");
+                    o.set("routes", stringArray(resolveRoutes(base, m.path("routes"))));
+                    break;
+                }
+                case "easy-adjust-speed": {
+                    ObjectNode o = expanded.addObject();
+                    o.put("type", "adjust-speed");
+                    o.set("routes", stringArray(resolveRoutes(base, m.path("routes"))));
+                    o.put("scale", m.path("scale").asDouble(1.0));
+                    break;
+                }
+                case "easy-set-headway": {
+                    int headway = (int) Math.round(m.path("headway_minutes").asDouble(10) * 60);
+                    int start = secondsOfDay(m.path("start").asText("05:00"));
+                    int end = secondsOfDay(m.path("end").asText("23:00"));
+                    for (String route : resolveRoutes(base, m.path("routes"))) {
+                        ObjectNode o = expanded.addObject();
+                        o.put("type", "adjust-frequency");
+                        o.put("route", route);
+                        o.put("retainTripsOutsideFrequencyEntries", true);
+                        ArrayNode entries = o.putArray("entries");
+                        int k = 0;
+                        for (TripPattern p : base.transitLayer.tripPatterns) {
+                            if (!route.equals(p.routeId) || p.tripSchedules == null || p.tripSchedules.isEmpty()) {
+                                continue;
+                            }
+                            ObjectNode e = entries.addObject();
+                            e.put("entryId", route + "#" + k++);
+                            e.put("sourceTrip", p.tripSchedules.get(0).tripId);
+                            e.put("headwaySecs", headway);
+                            e.put("startTime", start);
+                            e.put("endTime", end);
+                            for (String day : new String[]{"monday", "tuesday", "wednesday", "thursday",
+                                    "friday", "saturday", "sunday"}) {
+                                e.put(day, true);
+                            }
+                        }
+                    }
+                    break;
+                }
+                default:
+                    expanded.add(m);
+            }
+        }
+
+        ObjectNode sn = MAPPER.createObjectNode();
+        sn.put("id", node.path("id").asText("easy-r5-scenario"));
+        sn.set("modifications", expanded);
+        Scenario scenario = null;
+        try {
+            scenario = JsonUtilities.lenientObjectMapper.treeToValue(sn, Scenario.class);
+        } catch (Exception e) {
+            Emit.error("SCENARIO_INVALID", "The scenario JSON could not be read: " + e.getMessage());
+        }
+        TransportNetwork modified = null;
+        try {
+            modified = scenario.applyToTransportNetwork(base);
+        } catch (Exception e) {
+            StringBuilder why = new StringBuilder();
+            for (Modification m : scenario.modifications) {
+                if (!m.errors.isEmpty()) {
+                    why.append(m.getClass().getSimpleName()).append(": ")
+                            .append(String.join("; ", m.errors)).append(". ");
+                }
+            }
+            Emit.error("SCENARIO_INVALID", why.length() > 0 ? why.toString().trim() : String.valueOf(e));
+        }
+        for (Modification m : scenario.modifications) {
+            for (String w : m.warnings) {
+                Emit.warn("SCENARIO", m.getClass().getSimpleName() + ": " + w);
+            }
+            for (String i : m.info) {
+                Emit.info("Scenario " + m.getClass().getSimpleName() + ": " + i);
+            }
+        }
+        Emit.result("scenario_modifications", Integer.toString(scenario.modifications.size()));
+        return modified;
+    }
+
+    /** Full R5 route ids (feed:route_id) for each reference; ERROR if one matches nothing. */
+    private static Set<String> resolveRoutes(TransportNetwork network, JsonNode refs) {
+        Set<String> out = new LinkedHashSet<>();
+        if (!refs.isArray() || refs.size() == 0) {
+            Emit.error("SCENARIO_INVALID", "A route modification lists no routes.");
+        }
+        for (JsonNode ref : refs) {
+            String want = ref.asText("").trim();
+            boolean found = false;
+            for (TripPattern p : network.transitLayer.tripPatterns) {
+                RouteInfo r = network.transitLayer.routes.get(p.routeIndex);
+                if (want.equals(p.routeId) || want.equals(r.route_id) || want.equals(r.route_short_name)) {
+                    out.add(p.routeId);
+                    found = true;
+                }
+            }
+            if (!found) {
+                Emit.error("SCENARIO_INVALID", "Route '" + want + "' not found in the network "
+                        + "(match by route_short_name, route_id or feed:route_id).");
+            }
+        }
+        return out;
+    }
+
+    private static ArrayNode stringArray(Set<String> values) {
+        ArrayNode a = MAPPER.createArrayNode();
+        values.forEach(a::add);
+        return a;
     }
 
     /** One origin's routing + row-building, run on a worker thread — see doMatrix's javadoc

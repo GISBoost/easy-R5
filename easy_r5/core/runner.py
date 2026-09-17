@@ -59,6 +59,11 @@ ERROR_MESSAGES = {
         "Internal error: the job sent to R5 was malformed ({text}). Please "
         "report this."
     ),
+    "SCENARIO_INVALID": (
+        "The scenario could not be applied to this network: {text} Check route "
+        "names against Check transit data's routes CSV, and that new-line stops "
+        "fall inside the network area."
+    ),
     "IO_ERROR": "R5 could not read or write a required file: {text}",
 }
 

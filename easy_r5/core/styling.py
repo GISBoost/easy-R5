@@ -35,3 +35,37 @@ def apply_style(context, dest_id, qml_name):
         context.layerToLoadOnCompletionDetails(dest_id).setPostProcessor(pp)
     except Exception:  # nosec B110 — styling is cosmetic, never fail the run for it
         pass
+
+
+def apply_categories(context, dest_id, field, categories):
+    """Categorized renderer on ``field``: ``categories`` = [(value, "#rrggbb", label), ...].
+
+    Built in code rather than a bundled QML because the symbol must match the
+    output's geometry type (points or hex polygons), which a static QML cannot.
+    """
+    if not dest_id:
+        return
+    try:
+        from qgis.PyQt.QtGui import QColor
+        from qgis.core import (
+            QgsCategorizedSymbolRenderer,
+            QgsProcessingLayerPostProcessorInterface,
+            QgsRendererCategory,
+            QgsSymbol,
+        )
+
+        class _CategoriesPP(QgsProcessingLayerPostProcessorInterface):
+            def postProcessLayer(self, layer, context, feedback):  # noqa: N802
+                cats = []
+                for value, color, label in categories:
+                    symbol = QgsSymbol.defaultSymbol(layer.geometryType())
+                    symbol.setColor(QColor(color))
+                    cats.append(QgsRendererCategory(value, symbol, label))
+                layer.setRenderer(QgsCategorizedSymbolRenderer(field, cats))
+                layer.triggerRepaint()
+
+        pp = _CategoriesPP()
+        _KEEPALIVE.append(pp)
+        context.layerToLoadOnCompletionDetails(dest_id).setPostProcessor(pp)
+    except Exception:  # nosec B110 — styling is cosmetic, never fail the run for it
+        pass

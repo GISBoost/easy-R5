@@ -33,7 +33,9 @@ from qgis.core import (
     QgsProcessingParameterString,
 )
 
-from ..core import job_spec, java_env, matrix, network_cache, pins, points, runner, settings
+from ..core import (
+    job_spec, java_env, matrix, network_cache, pins, points, runner, scenario, settings,
+)
 
 
 def _tr(string: str) -> str:
@@ -120,6 +122,7 @@ class MatrixBase:
     ESTIMATE_FIRST = "ESTIMATE_FIRST"
     ALLOW_NO_SERVICE = "ALLOW_NO_SERVICE"
     JAVA_HEAP_GB = "JAVA_HEAP_GB"
+    SCENARIO = "SCENARIO"
 
     # --- parameter wiring -------------------------------------------------
 
@@ -237,6 +240,12 @@ class MatrixBase:
             )
         )
         self._advanced(
+            QgsProcessingParameterFile(
+                self.SCENARIO, _tr("Scenario file (from Build scenario; blank = baseline network)"),
+                behavior=QgsProcessingParameterFile.Behavior.File, extension="json", optional=True,
+            )
+        )
+        self._advanced(
             QgsProcessingParameterNumber(
                 self.JAVA_HEAP_GB, _tr("Java heap (GB; blank = auto)"),
                 type=QgsProcessingParameterNumber.Type.Integer, optional=True, minValue=1,
@@ -247,7 +256,8 @@ class MatrixBase:
 
     def _run_matrix(self, parameters, context, feedback, *, tmp, matrix_csv,
                     walk_fallback, include_unreachable=False, dest_extra_fields=None,
-                    dests_source=None, dest_id_field="", service_minute_cutoffs=None):
+                    dests_source=None, dest_id_field="", service_minute_cutoffs=None,
+                    origin_extra_fields=None):
         """Export points, run the batched matrix, merge to ``matrix_csv``.
 
         ``walk_fallback`` is the value MAX_WALK_TIME takes when left blank
@@ -256,6 +266,8 @@ class MatrixBase:
         service-minutes mode (PR_easy-R5_v02_service-minutes.md): no
         PERCENTILES parameter is read, and Java emits ``svc_min_c<cutoff>``
         columns instead of ``travel_time_p<percentile>`` ones.
+        ``origin_extra_fields`` copies those numeric origin attributes into the
+        origins CSV (e.g. population for 2SFCA).
         Returns a dict: ``origin_ids``, ``dest_ids``, ``origins_csv``,
         ``dests_csv``, ``meta``, ``is_transit``, ``mode_label``.
         """
@@ -343,6 +355,20 @@ class MatrixBase:
                     "failure after the run.").format(date=date)
             )
 
+        scenario_file = ""
+        if parameters.get(self.SCENARIO) not in (None, ""):
+            scenario_file = self.parameterAsFile(parameters, self.SCENARIO, context)
+        scenario_data = None
+        scenario_meta = "baseline"
+        if scenario_file:
+            try:
+                scenario_data = scenario.load_scenario(scenario_file)
+                scenario_meta = scenario.scenario_label(scenario_file)
+            except scenario.ScenarioError as exc:
+                raise QgsProcessingException(str(exc))
+            feedback.pushInfo(_tr("Scenario: {s} ({n} modification(s)).").format(
+                s=scenario_meta, n=len(scenario_data["modifications"])))
+
         max_walk = self.parameterAsInt(parameters, self.MAX_WALK_TIME, context)
         if self.MAX_WALK_TIME not in parameters or parameters[self.MAX_WALK_TIME] in (None, ""):
             max_walk = walk_fallback
@@ -369,7 +395,8 @@ class MatrixBase:
         dests_csv = tmp / "destinations.csv"
         try:
             origin_ids, o_skipped = points.write_points_csv(
-                origins_src, context, feedback, origin_id_field, origins_csv, label="Origin"
+                origins_src, context, feedback, origin_id_field, origins_csv, label="Origin",
+                extra_fields=origin_extra_fields,
             )
             dest_ids, d_skipped = points.write_points_csv(
                 dests_src, context, feedback, dest_id_field, dests_csv, label="Destination",
@@ -397,6 +424,7 @@ class MatrixBase:
             monte_carlo_draws=monte_carlo, access_modes=[direct_mode],
             egress_modes=[direct_mode], direct_modes=[direct_mode],
             transit_modes=transit_modes, write_unreachable=include_unreachable,
+            scenario=scenario_data,
         )
         if service_minute_cutoffs is None:
             job_builder = job_spec.build_matrix_job
@@ -461,7 +489,12 @@ class MatrixBase:
         rows = matrix.merge_batch_csvs(batch_csvs, matrix_csv)
         feedback.pushInfo(_tr("Matrix: {n} reachable pairs.").format(n=rows))
 
-        if is_transit and transit_used == 0:
+        if is_transit and transit_used == 0 and scenario_data is not None:
+            # A scenario may legitimately remove transit; the date was already checked above.
+            feedback.pushWarning(_tr(
+                "Not one OD pair is faster by transit than on foot under this scenario — "
+                "the results are walk-only."))
+        elif is_transit and transit_used == 0:
             raise QgsProcessingException(
                 _tr(
                     "Not one OD pair is faster by transit than on foot — R5 returned "
@@ -490,6 +523,7 @@ class MatrixBase:
             "max_trip_duration_minutes": max_trip,
             "max_walk_time_minutes": max_walk,
             "monte_carlo_draws": monte_carlo,
+            "scenario": scenario_meta,
             "origins_sha256": java_env.sha256_file(origins_csv),
             "destinations_sha256": java_env.sha256_file(dests_csv),
         }

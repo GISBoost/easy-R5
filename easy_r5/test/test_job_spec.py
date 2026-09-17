@@ -259,3 +259,19 @@ def test_write_job_roundtrip(tmp_path):
     assert text.endswith("\n")
     assert json.loads(text) == job
     assert path.parent == tmp_path
+
+
+def test_matrix_job_without_scenario_has_no_key():
+    assert "scenario" not in build_matrix_job(**_matrix_kwargs())
+
+
+def test_matrix_and_service_minutes_jobs_carry_scenario():
+    sc = {"id": "s", "modifications": [{"type": "easy-remove-routes", "routes": ["86"]}]}
+    assert build_matrix_job(**_matrix_kwargs(scenario=sc))["scenario"] == sc
+    assert build_service_minutes_job(**_service_minutes_kwargs(scenario=sc))["scenario"] == sc
+
+
+@pytest.mark.parametrize("bad", [{}, {"modifications": []}, "file.json"])
+def test_matrix_job_bad_scenario_raises(bad):
+    with pytest.raises(JobSpecError, match="scenario"):
+        build_matrix_job(**_matrix_kwargs(scenario=bad))
