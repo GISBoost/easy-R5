@@ -208,11 +208,22 @@ The one rule: **every vertex you click is a stop**, in the order you click them.
 
 The drawn path between stops is **not** followed. Only the stop positions matter: the travel time
 between two consecutive stops is their straight-line distance divided by `SPEED_KMH`, plus
-`DWELL_SECONDS` at each stop. So `SPEED_KMH` should be a realistic speed *over straight-line
-distance* — a tram through a city is around 18–22 km/h, a fast bus corridor 20–25 km/h, a
-regional train far more. New stops are linked to the nearest street, and R5 computes walking
-transfers between them and the existing stops, so passengers can change between the new line
-and the existing network.
+`DWELL_SECONDS` at each stop. `SPEED_KMH` is therefore a speed *over straight-line distance* —
+roughly 10–20% below the timetable speed along the real track, because the track is longer than
+the straight line:
+
+| Mode | `SPEED_KMH` |
+|---|---|
+| Tram in a city | **18–22** (the default is 20) |
+| City bus in traffic | 15–20 |
+| Bus on its own lane / BRT | 20–25 |
+| Metro | 25–35 |
+| Regional rail | 45–60 |
+
+The log prints each line's end-to-end travel time — compare it with a similar existing line before
+trusting the result. New stops are linked to the nearest street, and R5 recomputes walking
+transfers between them and the existing stops, so passengers can change between the new line and
+the existing network.
 
 **2. Build the scenario file.** Open *Build scenario*:
 
@@ -281,6 +292,21 @@ differences that are the point of a comparison: date, network, scenario, transit
 `ALLOW_METHOD_MISMATCH` (*Advanced*) overrides the method check — only when you really mean to
 compare, say, P50 with P85.
 
+**Comparing on a hex grid.** *Compare scenarios* keeps layer A's geometry, whatever it is, so the
+result can be points or polygons. Accessibility runs need **point** origins, so a hex-grid study
+has two equally good routes to a filled hex map:
+
+- *Compare first, then join.* Run the comparison on the two accessibility outputs (hex centroids),
+  then **Processing → `native:joinattributestable`**: input = your hex polygons, field = the hex
+  id, input 2 = the comparison layer, field 2 = the same id. Style the joined hexes by `diff` or
+  `status`.
+- *Join first, then compare.* Join each accessibility output to a copy of the hex polygons, then
+  compare the two polygon layers directly — the output is already hexagonal and coloured by
+  `status`.
+
+Either way the hex id must be a real field on the origins (use it as `ORIGIN_ID_FIELD` in the
+analysis), not the QGIS feature id.
+
 It is also the tool for **timetable changes** and **scheduled vs realized** comparisons: run the
 same analysis on two networks and compare.
 
@@ -320,8 +346,58 @@ anyone can reach is distributed — no more, no less.
 7. Outputs: `OUTPUT_LAYER` (origins + `fca`), optional `OUTPUT_SUPPLY_LAYER` (facilities +
    `supply_ratio` and `demand_in_catchment` — which facilities are overloaded), `OUTPUT_CSV`.
 
-The result is on a **different scale** from *Run accessibility* — never compare the two numbers
-directly. Facilities no one can reach are reported in the log.
+#### Step by step: doctors per 1000 residents
+
+**1. Prepare the demand side (origins).** You need points that carry population.
+1. Build a hex grid over the study area and take its centroids (see *Hex grid* below), keeping a
+   unique `hexid` field.
+2. Get population onto them: *Prepare population layer* (a GUS NSP sheet joined to census-tract
+   geometry) → *Population overlay* (area-weighted population onto the hex grid) → centroids, or
+   any population field you already have.
+3. Make sure the grid covers **everyone who competes** for the facilities, not only the district
+   you want to map — otherwise a clinic looks less crowded than it is. A ring of roughly the
+   catchment's width beyond your area of interest is the usual compromise.
+
+**2. Prepare the supply side (destinations).** A point layer of facilities with a numeric capacity
+field: doctors, school places, hospital beds, counter positions. If you only have locations, add a
+field with `1` in each — the result is then "facilities per 1000 residents", which is still
+competitive, just coarser.
+
+**3. Run it.** *Run competitive accessibility (2SFCA)*:
+
+| Parameter | Value |
+|---|---|
+| `NETWORK` | your `network.dat` |
+| `ORIGINS` / `ORIGIN_ID_FIELD` | hex centroids / `hexid` |
+| `POPULATION_FIELD` | e.g. `pop_total` |
+| `DESTINATIONS` / `DEST_ID_FIELD` | clinics / their id |
+| `CAPACITY_FIELD` | e.g. `doctors` |
+| `DATE`, `DEPARTURE_TIME`, `TIME_WINDOW` | a served weekday, e.g. `2026-08-24`, `07:00`, `120` |
+| `CATCHMENT_MINUTES` | `30` |
+| `DECAY` | `STEP` (classic 2SFCA) |
+| `PERCENTILES` | `50` — exactly one value |
+| `PER_POPULATION` | `1000` |
+| `OUTPUT_LAYER` / `OUTPUT_SUPPLY_LAYER` / `OUTPUT_CSV` | files, not temporary layers, if you want to compare later |
+
+**4. Read the result.** The origins layer gets `fca`: capacity per 1000 residents available to the
+people living there, given the competition. A hex with `fca = 1.6` has 1.6 doctors per 1000
+residents within reach; the national or regional average is the natural yardstick. The log prints
+a check line — the supply distributed to origins equals the supply anyone can reach — and warns
+about facilities nobody reaches. The optional supply layer shows, per facility, `supply_ratio`
+(capacity per person) and `demand_in_catchment` (how many people can reach it): that is where
+"this clinic serves 40 000 people" comes from.
+
+**5. Take it further.**
+- Add `SCENARIO` to ask "does the new tram line change who can reach the hospital?".
+- Feed the output to *Summarize accessibility equity* to get "X% of residents have fewer than 1
+  doctor per 1000 within 30 minutes".
+- Compare two runs (`fca` field) with *Compare scenarios*.
+
+**Pitfalls.**
+- The result is on a **different scale** from *Run accessibility* — never compare the two numbers
+  directly, and always say the catchment and percentile next to the number.
+- Changing `CATCHMENT_MINUTES` changes every value; it is a modelling choice, not a detail.
+- A capacity field with zeros is fine; empty/negative counts as 0.
 
 ---
 
@@ -358,7 +434,48 @@ is skipped and counted in the log.
    acc_jobs_p50_c30 ≥ 500; 0.0% have none."*, and the run method recorded in the layer — percentile,
    date, scenario …).
 
-Run it on the baseline and on a scenario to report a change in people, not in hexagons.
+#### Step by step: "how many residents reach a hospital in 30 minutes?"
+
+**1. Get accessibility and population onto the same features.** The easiest path: run
+*Run accessibility* (or *Run competitive accessibility*) with `ORIGINS` = the population grid
+centroids, `ORIGIN_ID_FIELD` = the hex id, and the population field already on that layer — the
+output copies every origin attribute, so it carries both the population and `acc_*` fields.
+If your population lives in a different layer, join it first with `native:joinattributestable`.
+
+**2. Run the summary.** *Summarize accessibility equity*:
+
+| Parameter | Value |
+|---|---|
+| `INPUT` | the accessibility output layer |
+| `POPULATION_FIELD` | `pop_total` |
+| `ACCESSIBILITY_FIELDS` | e.g. `acc_hospitals_p50_c30` (pick several at once if you want) |
+| `THRESHOLD` | `1` — "at least one hospital". Use `500` for "at least 500 jobs", `1.0` for "at least 1 doctor per 1000" on a 2SFCA layer |
+| `GROUP_FIELD` | optional — a district name, a rural/urban flag, an income class |
+| `OUTPUT_TABLE`, `OUTPUT_REPORT` | the table and the HTML report |
+
+**3. Read the report.** The first line is the sentence you can quote: *"ALL: 52.6% of residents
+(15 000 of 28 500) have acc_jobs_p50_c30 ≥ 500; 0.0% have none."* Then the table:
+
+- `share_at_least` — the headline number, weighted by people.
+- `share_zero` — the group that has nothing at all, usually the politically relevant one.
+- `p10` — what the worst-served tenth of residents actually gets; `p50` the median resident.
+- `gini` — how unevenly access is spread: 0 means everyone has the same, higher means it is
+  concentrated in a few places. Useful *between* comparable runs (before vs after, city vs city),
+  not as an absolute grade.
+- With `GROUP_FIELD`, one row per district plus the `ALL` row: that is the "which district is worst
+  off" table.
+
+**4. Use it in a comparison.** Run the same summary on the baseline and on a scenario and quote the
+difference in people: "the new tram line brings 12 300 more residents within 30 minutes of a
+hospital, and the share with no access falls from 9% to 4%". That is the sentence a council reads;
+the map is the evidence next to it.
+
+**Pitfalls.**
+- An empty accessibility value counts as 0 — right for accessibility, wrong for a travel-time
+  field. Do not point this algorithm at travel times.
+- Features with empty or negative population are skipped; the count appears as a warning.
+- `gini` is left empty for a field that contains negative values (a `diff` field, for instance),
+  because the coefficient is not defined there.
 
 ---
 
@@ -382,17 +499,36 @@ and reference window. Do not compare the two.
 
 ---
 
-### Speed of scenario runs (Monte Carlo draws)
+### Monte Carlo draws — what they are, and the speed of scenario runs
 
-Some routes run "every N minutes" instead of at fixed times: every line added by *Build scenario*,
-every route given a new headway, and GTFS feeds with `frequencies.txt` (e.g. Warsaw). For those,
-the arrival time within the headway is random, so R5 samples several random timetables per
-departure minute — `MONTE_CARLO_DRAWS` (*Advanced*, default 5 per minute, as in r5r).
+**The problem they solve.** Easy-R5 never routes a single departure: it routes **every minute** of
+the departure window (120 by default) and reports percentiles over those minutes. For a route with
+a real timetable that is enough — departure 07:13 either catches the 07:15 bus or it does not.
+But some routes are published as *"every 10 minutes"* with no exact times: GTFS `frequencies.txt`
+(Warsaw, for example), every line you add with *Build scenario*, and every route you give a new
+headway. For those, "leaving at 07:13" has no defined answer — the next vehicle could come in 10
+seconds or in 10 minutes.
 
-Before 0.3.0 Easy-R5 passed this number to R5 the wrong way: R5 treats it as a total for the whole
-window, so the default gave about one sample per minute. Results for frequency routes were then
-noisy and could differ between two identical runs, which would make *Compare scenarios* show
-changes that are not there. 0.3.0 passes it correctly (identical runs now give identical results).
+**What R5 does.** For each departure minute it draws several random timetables consistent with the
+headway, routes each, and treats every draw as one observation. `MONTE_CARLO_DRAWS` (*Advanced*,
+default 5 per minute, the same default as r5r) says how many. So a 120-minute window with
+frequency routes is 600 routings per origin instead of 120.
+
+**Where it shows up.** The parameter sits on every matrix-based algorithm (travel time matrix,
+accessibility, service minutes, isochrones, 2SFCA) because they all share the same run, but it
+**only has an effect when the network actually contains frequency routes** — that is, when you use
+a scenario line or a new headway, or your GTFS has `frequencies.txt`. On a plain scheduled feed R5
+does one pass per minute whatever you set.
+
+More draws mean a more stable answer: with too few, two identical runs can disagree by a minute or
+two purely by luck, and a comparison would show "changes" that are noise. The defaults are chosen
+so that this does not happen.
+
+**The 0.3.0 fix.** Easy-R5 used to pass this number to R5 as-is, but R5 reads it as a total for the
+whole window — so the default gave about **one** sample per minute, not five. Results for frequency
+routes were noisy and two identical runs could differ, which would make *Compare scenarios* report
+changes that are not there. 0.3.0 passes it correctly, and identical runs now produce identical
+results.
 
 **What it costs.**
 - **Networks without frequency routes** (most Polish scheduled GTFS, with no scenario): no change

@@ -77,13 +77,27 @@ class BuildScenario(QgsProcessingAlgorithm):
             "matrix, Run accessibility, Run service minutes, Generate isochrones or Run "
             "competitive accessibility — R5 applies it to the network in memory, nothing is "
             "rebuilt. Then compare against the baseline run with Compare scenarios.\n\n"
-            "New lines: every vertex of a line feature is a stop, in drawing order. Travel "
-            "time between stops = straight-line distance / SPEED_KMH, so set a realistic "
-            "commercial speed. Each line runs every HEADWAY_MINUTES between SERVICE_START "
-            "and SERVICE_END on every day.\n\n"
-            "Routes are matched by short name (e.g. 86), GTFS route_id, or feed:route_id; "
-            "list them comma-separated. Check transit data writes the full route list. "
-            "SPEED_SCALE 0.8 = 20% slower, 1.25 = 25% faster."
+            "New lines: every vertex of a line feature is a stop, in drawing order — do not add "
+            "vertices for bends. Travel time between two stops = straight-line distance / "
+            "SPEED_KMH, plus DWELL_SECONDS at each stop; the drawn path itself is not followed. "
+            "Each line runs every HEADWAY_MINUTES between SERVICE_START and SERVICE_END, every "
+            "day, in both directions unless BIDIRECTIONAL is off.\n\n"
+            "Setting the fields:\n"
+            "  SPEED_KMH — speed over the straight line between stops, so roughly 10-20% below "
+            "the timetable speed along the real track. Tram in a city 18-22, city bus 15-20, bus "
+            "on its own lane 20-25, metro 25-35, regional rail 45-60. The log prints each line's "
+            "end-to-end time — compare it with a similar existing line.\n"
+            "  DWELL_SECONDS — stop time: 20-30 s at a tram or bus stop, more at a terminus.\n"
+            "  HEADWAY_MINUTES — how often it runs. This decides most of the benefit: a fast line "
+            "every 30 min is worth less than a slower one every 6.\n"
+            "  SERVICE_START / SERVICE_END — must cover the analysis departure time plus its "
+            "whole departure window.\n"
+            "  NEW_LINE_MODE — the GTFS mode, so TRANSIT_SUBMODES filters treat the new line like "
+            "any other tram / bus / rail route.\n\n"
+            "Routes are matched by short name (e.g. 86), GTFS route_id, or feed:route_id; list "
+            "them comma-separated. Check transit data writes the full route list. SPEED_SCALE 0.8 "
+            "= 20% slower, 1.25 = 25% faster. A new headway keeps each direction's busiest "
+            "variant and drops short-turn variants inside the window."
         )
 
     def _advanced(self, param):
@@ -100,8 +114,8 @@ class BuildScenario(QgsProcessingAlgorithm):
         self.addParameter(QgsProcessingParameterEnum(
             self.NEW_LINE_MODE, self.tr("New line mode"), options=_MODES, defaultValue=_MODES.index("BUS")))
         self.addParameter(QgsProcessingParameterNumber(
-            self.SPEED_KMH, self.tr("New line speed between stops (km/h)"),
-            type=QgsProcessingParameterNumber.Type.Double, defaultValue=25.0, minValue=1.0))
+            self.SPEED_KMH, self.tr("New line speed between stops (km/h, straight line)"),
+            type=QgsProcessingParameterNumber.Type.Double, defaultValue=20.0, minValue=1.0))
         self.addParameter(QgsProcessingParameterNumber(
             self.HEADWAY_MINUTES, self.tr("New line headway (minutes)"),
             type=QgsProcessingParameterNumber.Type.Double, defaultValue=10.0, minValue=0.5))
