@@ -26,6 +26,10 @@ network_settings.json
 _ci_work/
 *.mapdb
 *.mapdb.p
+# tram_failure_lodz/out/ is generated: R5 results, per-run sidecars, tables. Only the
+# published figures are worth versioning, and they are added deliberately at the end.
+tools/tram_failure_lodz/out/*
+!tools/tram_failure_lodz/out/figures/
 *_network_static/
 *_network_rt/
 network_static/
