@@ -194,12 +194,22 @@ jobs:
       - name: Unwrap the per-grid artifacts into out/<grid>/
         run: |
           set -euo pipefail
+          # combine runs with if: always(), so it also runs when every compute job failed
+          # and download-artifact left nothing behind. Make that a clear message rather
+          # than an "ls: cannot access 'out'" exit 2.
+          mkdir -p out
           for d in out/tram-failure-*; do
             [ -d "$d" ] || continue
             grid="${d#out/tram-failure-}"
             rm -rf "out/$grid"
             mv "$d" "out/$grid"
           done
+          found=$(find out -maxdepth 2 -name impact_by_case.csv | wc -l)
+          echo "grids with results: $found"
+          if [ "$found" -eq 0 ]; then
+            echo "::error::no grid produced impact_by_case.csv - nothing to combine"
+            exit 1
+          fi
           ls -la out
 
       - name: MAUP comparison across grids

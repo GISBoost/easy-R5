@@ -74,12 +74,21 @@ HEADLINE = ("baseline", "loo_5", "corridor", "bus", "all_trams",
 
 
 class Feedback:
-    """The tiny slice of QgsProcessingFeedback that core.runner actually calls."""
+    """A console stand-in for QgsProcessingFeedback.
+
+    The core modules each use a different slice of that class -- core.runner wants
+    isCanceled/pushInfo/pushWarning/reportError/pushDebugInfo, core.downloads also wants
+    setProgress -- so anything not implemented here falls through __getattr__ to a no-op
+    instead of raising. A missing progress callback must not be able to fail a two-hour
+    job: the first CI run died on exactly that, because the local smoke test had the jar
+    cached and never exercised the download path.
+    """
 
     def __init__(self, verbose=False):
         self.verbose = verbose
+        self._last_pct = -1
 
-    def isCanceled(self):        # noqa: N802 -- the name core.runner looks for
+    def isCanceled(self):        # noqa: N802
         return False
 
     def pushInfo(self, msg):     # noqa: N802
@@ -94,6 +103,23 @@ class Feedback:
     def pushDebugInfo(self, msg):    # noqa: N802
         if self.verbose:
             print("    .", msg, flush=True)
+
+    def setProgress(self, pct):  # noqa: N802
+        """Print at most one line per 10% so a 65 MB download is 10 lines, not 10 000."""
+        step = int(pct) // 10
+        if step != self._last_pct:
+            self._last_pct = step
+            print(f"    ... {int(pct)}%", flush=True)
+
+    def setProgressText(self, text):  # noqa: N802
+        print("   ", text, flush=True)
+
+    def __getattr__(self, name):
+        if name.startswith("_"):
+            raise AttributeError(name)
+        if self.verbose:
+            print(f"    . feedback.{name}() ignored", flush=True)
+        return lambda *a, **kw: None
 
 
 def sha256(path):
