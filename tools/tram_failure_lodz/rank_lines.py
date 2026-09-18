@@ -1,7 +1,7 @@
 """Rank Lodz tram lines ex ante: which one is "the biggest and most loaded"?
 
 This is the *selection* step and it runs before R5 sees anything. It writes
-out/tram_lines.csv and out/selection.json, which build_scenarios.py reads.
+inputs/tram_lines.csv and inputs/selection.json, which build_scenarios.py reads.
 
 The four criteria come from the brief, two of them reworded to be measurable:
 
@@ -36,7 +36,10 @@ from pathlib import Path
 import gtfs_lines as gl
 
 HERE = Path(__file__).resolve().parent
-OUT = HERE / "out"
+# These two define the run (which line was picked and why), so they live in inputs/
+# with the frozen grids rather than in out/: CI cannot regenerate them, because the
+# population side needs the GUS census gpkg, which is not public.
+OUT = HERE / "inputs"
 
 CORRIDOR_SHARE = 0.60   # a line sharing this much of the pick's stops is on its corridor
 

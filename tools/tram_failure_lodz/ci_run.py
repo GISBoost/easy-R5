@@ -222,14 +222,16 @@ def build_network(env, osm_path, gtfs_path, xmx, feedback):
 
 
 def cases():
-    """{case_id: scenario path or None}. baseline has no scenario file."""
-    meta = json.loads((OUT_ROOT / "scenarios.json").read_text(encoding="utf-8"))
+    """{case_id: scenario path or None}. baseline has no scenario file.
+
+    The files in scenarios/ are the source of truth, not a manifest listing them: one
+    fewer thing to keep in sync, and one fewer file that has to survive the trip into CI.
+    """
     out = {"baseline": None}
-    for case_id in meta["cases"]:
-        path = SCEN / f"{case_id}.json"
-        if not path.exists():
-            raise SystemExit(f"missing scenario file {path}")
-        out[case_id] = path
+    for path in sorted(SCEN.glob("*.json")):
+        out[path.stem] = path
+    if len(out) == 1:
+        raise SystemExit(f"no scenario files in {SCEN}")
     return out
 
 

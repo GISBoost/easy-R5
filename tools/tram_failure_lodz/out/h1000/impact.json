@@ -1,0 +1,27 @@
+{
+  "grid_id": "h1000",
+  "group_field": "single_par",
+  "group_tercile_cuts": [
+    24.3,
+    28.9
+  ],
+  "group_labels": {
+    "low": "najmniej samotnych rodziców",
+    "mid": "środek",
+    "high": "najwięcej samotnych rodziców"
+  },
+  "cases": 27,
+  "categories": [
+    "srv_school",
+    "srv_pharmacy",
+    "srv_university",
+    "srv_mall"
+  ],
+  "worst_lines": [
+    "5",
+    "15",
+    "6",
+    "2",
+    "45"
+  ]
+}

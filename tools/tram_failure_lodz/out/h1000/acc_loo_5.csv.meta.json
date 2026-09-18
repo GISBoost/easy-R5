@@ -1,0 +1,25 @@
+{
+  "grid": "h1000",
+  "case": "loo_5",
+  "metric": "acc",
+  "date": "2026-08-21",
+  "departure_time": "07:00",
+  "time_window": 120,
+  "percentiles": [
+    50
+  ],
+  "cutoffs": [
+    30
+  ],
+  "max_rides": 3,
+  "opportunity_fields": [
+    "srv_school",
+    "srv_pharmacy",
+    "srv_university",
+    "srv_mall"
+  ],
+  "origins_sha256": "40133f5dabf50c86d926526a626bcefd02e9513b5311c4c21820c8facacfc8ce",
+  "destinations_sha256": "90112af713d0476af5ea05223159e68c13fcade9c83c79175d0743fc14dd8623",
+  "scenario_sha256": "6ad2fe46908c076f1a84bc7f42a1819356013ec266118f51a5867730d0567377",
+  "r5_version": "7.6"
+}

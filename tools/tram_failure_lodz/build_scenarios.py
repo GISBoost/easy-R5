@@ -7,7 +7,7 @@ Three failure modes, because "the line went down" is not one thing:
   corridor  -- the track is closed, so *every* line using it stops, not just one. This
                is the realistic infrastructure failure, and the only one that actually
                takes the tram away from anyone: in Lodz no single tram line has a stop
-               that no other tram line serves (see out/tram_lines.csv, pop_exclusive).
+               that no other tram line serves (see inputs/tram_lines.csv, pop_exclusive).
                Removing those lines over their whole length overstates it -- in reality
                only the trips through the closed section stop -- so read it as an upper
                bound too.
@@ -36,7 +36,7 @@ import gtfs_lines as gl
 HERE = Path(__file__).resolve().parent
 GPKG = HERE / "grids" / "h1000.gpkg"   # tram_lines is the same in every grid
 SCEN = HERE / "scenarios"
-OUT = HERE / "out"
+OUT = HERE / "inputs"
 
 BUS_SPEED_FACTOR = 0.80   # replacement bus vs the tram's own between-stop speed
 BUS_DWELL_S = 25

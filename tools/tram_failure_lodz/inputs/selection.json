@@ -1,0 +1,52 @@
+{
+  "analysis_date": "2026-08-21",
+  "gtfs": "lodz_static_gtfs_2026-08-21.zip",
+  "centre_lon_lat": [
+    19.461574,
+    51.763135
+  ],
+  "tram_lines": 21,
+  "length_p75_km": 15.91,
+  "pick": {
+    "line": "5",
+    "route_id": "5",
+    "pop_500m": 203829,
+    "veh_km": 2542,
+    "length_km": 17.4,
+    "centre_slowdown_kmh": 4.6,
+    "score": 1.5
+  },
+  "corridor": [
+    {
+      "line": "16",
+      "route_id": "16",
+      "share": 0.699
+    }
+  ],
+  "population_total": 669995,
+  "population_near_any_tram": 470235,
+  "population_near_any_tram_share": 0.7018,
+  "all_lines": [
+    "5",
+    "4",
+    "8",
+    "10B",
+    "9",
+    "16",
+    "13",
+    "6",
+    "12",
+    "2",
+    "15",
+    "7",
+    "11",
+    "45",
+    "10A",
+    "41",
+    "1",
+    "14",
+    "Z1",
+    "Z2",
+    "3"
+  ]
+}

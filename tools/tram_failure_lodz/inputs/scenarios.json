@@ -1,0 +1,202 @@
+{
+  "pick": "5",
+  "corridor": [
+    "5",
+    "16"
+  ],
+  "cases": {
+    "loo_5": {
+      "kind": "removal",
+      "lines": [
+        "5"
+      ]
+    },
+    "loo_4": {
+      "kind": "removal",
+      "lines": [
+        "4"
+      ]
+    },
+    "loo_8": {
+      "kind": "removal",
+      "lines": [
+        "8"
+      ]
+    },
+    "loo_10B": {
+      "kind": "removal",
+      "lines": [
+        "10B"
+      ]
+    },
+    "loo_9": {
+      "kind": "removal",
+      "lines": [
+        "9"
+      ]
+    },
+    "loo_16": {
+      "kind": "removal",
+      "lines": [
+        "16"
+      ]
+    },
+    "loo_13": {
+      "kind": "removal",
+      "lines": [
+        "13"
+      ]
+    },
+    "loo_6": {
+      "kind": "removal",
+      "lines": [
+        "6"
+      ]
+    },
+    "loo_12": {
+      "kind": "removal",
+      "lines": [
+        "12"
+      ]
+    },
+    "loo_2": {
+      "kind": "removal",
+      "lines": [
+        "2"
+      ]
+    },
+    "loo_15": {
+      "kind": "removal",
+      "lines": [
+        "15"
+      ]
+    },
+    "loo_7": {
+      "kind": "removal",
+      "lines": [
+        "7"
+      ]
+    },
+    "loo_11": {
+      "kind": "removal",
+      "lines": [
+        "11"
+      ]
+    },
+    "loo_45": {
+      "kind": "removal",
+      "lines": [
+        "45"
+      ]
+    },
+    "loo_10A": {
+      "kind": "removal",
+      "lines": [
+        "10A"
+      ]
+    },
+    "loo_41": {
+      "kind": "removal",
+      "lines": [
+        "41"
+      ]
+    },
+    "loo_1": {
+      "kind": "removal",
+      "lines": [
+        "1"
+      ]
+    },
+    "loo_14": {
+      "kind": "removal",
+      "lines": [
+        "14"
+      ]
+    },
+    "loo_Z1": {
+      "kind": "removal",
+      "lines": [
+        "Z1"
+      ]
+    },
+    "loo_Z2": {
+      "kind": "removal",
+      "lines": [
+        "Z2"
+      ]
+    },
+    "loo_3": {
+      "kind": "removal",
+      "lines": [
+        "3"
+      ]
+    },
+    "corridor": {
+      "kind": "corridor",
+      "lines": [
+        "5",
+        "16"
+      ]
+    },
+    "all_trams": {
+      "kind": "removal",
+      "lines": [
+        "5",
+        "4",
+        "8",
+        "10B",
+        "9",
+        "16",
+        "13",
+        "6",
+        "12",
+        "2",
+        "15",
+        "7",
+        "11",
+        "45",
+        "10A",
+        "41",
+        "1",
+        "14",
+        "Z1",
+        "Z2",
+        "3"
+      ]
+    },
+    "bus": {
+      "kind": "bus",
+      "lines": [
+        "5"
+      ],
+      "tram_kmh": 15.5,
+      "bus_kmh": 12.4,
+      "headway_min": 7.5
+    },
+    "cascade_top2": {
+      "kind": "cascade",
+      "lines": [
+        "5",
+        "15"
+      ]
+    },
+    "cascade_top3": {
+      "kind": "cascade",
+      "lines": [
+        "5",
+        "15",
+        "6"
+      ]
+    },
+    "cascade_top5": {
+      "kind": "cascade",
+      "lines": [
+        "5",
+        "15",
+        "6",
+        "2",
+        "10B"
+      ]
+    }
+  }
+}

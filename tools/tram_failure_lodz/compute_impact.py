@@ -257,7 +257,7 @@ def main(grid_id="h1000"):
             w.writerow(summaries[case])
 
     ranking = impact.rank_leave_one_out(summaries)
-    ex_ante_path = OUT_ROOT / "tram_lines.csv"
+    ex_ante_path = INPUTS / "tram_lines.csv"
     ex_ante = ({r["line"]: r for r in csv.DictReader(open(ex_ante_path, encoding="utf-8"))}
                if ex_ante_path.is_file() else {})
     with open(out / "loo_ranking.csv", "w", newline="", encoding="utf-8") as fh:

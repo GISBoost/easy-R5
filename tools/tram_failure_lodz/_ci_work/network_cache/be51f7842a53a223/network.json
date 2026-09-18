@@ -1,0 +1,17 @@
+{
+  "r5_version" : "7.6",
+  "network_format_version" : "nv5",
+  "built_at" : "2026-09-18T18:05:54",
+  "timezone" : "Europe/Warsaw",
+  "feeds" : [ "lodz_static_gtfs_2026-08-21" ],
+  "stops" : 2382,
+  "trip_patterns" : 855,
+  "routes" : 138,
+  "street_vertices" : 297738,
+  "bounds" : {
+    "min_lon" : 19.1525735,
+    "min_lat" : 51.6180187,
+    "max_lon" : 19.7506009,
+    "max_lat" : 51.9047586
+  }
+}

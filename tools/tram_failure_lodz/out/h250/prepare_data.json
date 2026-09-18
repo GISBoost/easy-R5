@@ -1,0 +1,18 @@
+{
+  "grid_id": "h250",
+  "hex_spacing_m": 250,
+  "offset_m": [
+    0.0,
+    0.0
+  ],
+  "hexagons": 5665,
+  "hexagons_with_population": 5633,
+  "population": 670270,
+  "poi_targets": 766,
+  "osiedla": 36,
+  "centre_lon_lat": [
+    19.461577,
+    51.763148
+  ],
+  "crs": "EPSG:2180"
+}

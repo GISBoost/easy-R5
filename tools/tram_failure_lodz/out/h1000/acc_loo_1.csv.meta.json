@@ -1,0 +1,19 @@
+{
+  "r5_version": "7.6",
+  "network_hash": "be51f7842a53a223",
+  "run_date": "2026-08-21",
+  "departure_time": "07:00",
+  "time_window": 120,
+  "percentile": "50",
+  "modes": "TRANSIT + WALK",
+  "transit_submodes": "ALL",
+  "walk_speed_kmh": 3.6,
+  "max_rides": 3,
+  "max_trip_duration_minutes": 90,
+  "max_walk_time_minutes": 30,
+  "monte_carlo_draws": 5,
+  "scenario": "loo_1.json:e46e1290",
+  "origins_sha256": "5d9449a1ac8ba0c4b13b372ab3ff1a92a2749685ed49b448703984d4f44c1a42",
+  "destinations_sha256": "871450594799e4f789a924b6756232260e97298f8410b4b9491153784fbb594c",
+  "decay": "STEP"
+}

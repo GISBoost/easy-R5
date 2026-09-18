@@ -1,0 +1,25 @@
+{
+  "grids": {
+    "h250": "250 m",
+    "h500": "500 m",
+    "h1000": "1000 m",
+    "h500off": "500 m przesunięta"
+  },
+  "case_examined": "loo_5",
+  "city_mean_net_by_grid": {
+    "h1000": -2.1744874861275187
+  },
+  "city_share_losing_by_grid": {
+    "h1000": 0.396
+  },
+  "city_mean_relative_by_grid": {
+    "h1000": -0.020456543984502303
+  },
+  "ranking_spearman_scale": [],
+  "ranking_spearman_zoning": [],
+  "same_worst_line_everywhere": true,
+  "top5_shared_min": null,
+  "osiedla_compared": 0,
+  "osiedla_share_spread_scale_median": null,
+  "osiedla_share_spread_zoning_median": null
+}
