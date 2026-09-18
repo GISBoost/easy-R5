@@ -22,6 +22,10 @@
 *.jar
 network.dat
 network_settings.json
+# ci_run.py's scratch dir: R5 jar, built network, mapdb spill files, compiled runner
+_ci_work/
+*.mapdb
+*.mapdb.p
 *_network_static/
 *_network_rt/
 network_static/
