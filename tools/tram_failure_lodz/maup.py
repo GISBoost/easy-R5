@@ -160,6 +160,15 @@ def osiedla_stability(per_osiedle, key="share_losing"):
     return rows
 
 
+def _pct(rows, key, q):
+    """Quantile of a spread column, or None when nothing is comparable."""
+    vals = sorted(r[key] for r in rows if r.get(key) is not None)
+    if not vals:
+        return None
+    i = min(len(vals) - 1, int(round(q * (len(vals) - 1))))
+    return round(vals[i], 4)
+
+
 def main(case="loo_5"):
     MAUP.mkdir(parents=True, exist_ok=True)
 
@@ -220,12 +229,16 @@ def main(case="loo_5"):
         "same_worst_line_everywhere": all(p["same_worst_line"] for p in agreement),
         "top5_shared_min": min((p["top5_shared"] for p in agreement), default=None),
         "osiedla_compared": len(stability),
-        "osiedla_share_spread_scale_median": (
-            round(statistics.median(r["spread_scale"] for r in stability
-                                    if r["spread_scale"] is not None), 4) if stability else None),
-        "osiedla_share_spread_zoning_median": (
-            round(statistics.median(r["spread_zoning"] for r in stability
-                                    if r["spread_zoning"] is not None), 4) if stability else None),
+        # Median and p90 together: the median alone reads as reassuring while a handful
+        # of small osiedla swing by most of their population, because one 1000 m hexagon
+        # can cover half of them. The tail is the part that decides whether a
+        # neighbourhood statement is safe to quote.
+        "osiedla_share_spread_scale_median": _pct(stability, "spread_scale", 0.5),
+        "osiedla_share_spread_scale_p90": _pct(stability, "spread_scale", 0.9),
+        "osiedla_share_spread_zoning_median": _pct(stability, "spread_zoning", 0.5),
+        "osiedla_share_spread_zoning_p90": _pct(stability, "spread_zoning", 0.9),
+        "osiedla_stable_within_5pp_scale": sum(
+            1 for r in stability if (r["spread_scale"] or 0) <= 0.05),
     }
     (MAUP / "summary.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False) + "\n",
                                        encoding="utf-8")
