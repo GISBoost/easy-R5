@@ -1,0 +1,11 @@
+{
+  "id": "loo_10A",
+  "modifications": [
+    {
+      "type": "easy-remove-routes",
+      "routes": [
+        "10A"
+      ]
+    }
+  ]
+}

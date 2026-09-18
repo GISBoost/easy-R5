@@ -13,6 +13,10 @@
 !tools/**/*_hex_origins*.csv
 !tools/**/*_hex_ses.csv
 !tools/isochrones_lodz/benchmark_summary.csv
+# tools/tram_failure_lodz/inputs/ is the frozen grid the GitHub Actions run reads: the
+# census polygons behind it are not public, so CI cannot rebuild it. Same reasoning as
+# the two rules above -- these files define a run, so they are code, not data.
+!tools/tram_failure_lodz/inputs/*.csv
 
 # --- R5 runtime artifacts ---
 *.jar

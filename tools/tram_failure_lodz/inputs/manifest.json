@@ -1,0 +1,27 @@
+{
+  "grids": {
+    "h250": {
+      "origins": 5665,
+      "hexagons": 5665
+    },
+    "h500": {
+      "origins": 1477,
+      "hexagons": 1477
+    },
+    "h1000": {
+      "origins": 396,
+      "hexagons": 396
+    },
+    "h500off": {
+      "origins": 1479,
+      "hexagons": 1479
+    }
+  },
+  "opportunity_fields": [
+    "srv_school",
+    "srv_pharmacy",
+    "srv_university",
+    "srv_mall"
+  ],
+  "destinations": 766
+}

@@ -1,0 +1,230 @@
+name: tram-failure — Lodz tram line failure, 4 grids (MAUP)
+
+# One-off / on-demand research tool, NOT a recurring pipeline: workflow_dispatch only.
+# Moves tools/tram_failure_lodz's R5 sweep off the local machine. Locally the four grids
+# run one after another inside QGIS and the whole thing takes hours; here each grid is its
+# own job, so they run in parallel and the wall time is the slowest grid (h250) alone.
+#
+# No QGIS on the runner. Every module under easy_r5/core/ imports without PyQGIS, so
+# ci_run.py drives R5 through the plugin's own job_spec / java_env / runner /
+# accessibility code and compute_impact.py does the tables with core.equity. Verified
+# locally: CI output for a case is byte-identical to what the Processing algorithms wrote.
+#
+# The grids themselves cannot be rebuilt here -- they come from GUS census polygons that
+# are not public -- so they are frozen into tools/tram_failure_lodz/inputs/*.csv by
+# export_inputs.py inside QGIS and committed, following the same convention as
+# tools/accessibility_cities/<city>/<city>_hex_{origins,ses}.csv.
+on:
+  workflow_dispatch:
+    inputs:
+      grids:
+        description: 'Comma-separated grids (blank = all four: h250,h500,h1000,h500off)'
+        required: false
+        default: ''
+      metrics:
+        description: 'Comma-separated metrics per grid (blank = acc for the MAUP controls, acc,centre,direct for h250/h1000)'
+        required: false
+        default: ''
+      gtfs_date:
+        description: 'GTFS date; must match ci_run.ANALYSIS_DATE and have an easy-GTFS-RT release'
+        required: false
+        default: '2026-08-21'
+      osm_release:
+        description: 'Optional easy-R5 release tag holding a pre-clipped lodz.osm.pbf. Blank = clip from Geofabrik (a slightly different extract than the local one, so the network hash will differ)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.gen.outputs.matrix }}
+    steps:
+      - id: gen
+        shell: bash
+        run: |
+          set -euo pipefail
+          grids="${{ github.event.inputs.grids }}"
+          metrics="${{ github.event.inputs.metrics }}"
+          [ -z "$grids" ] && grids="h250,h500,h1000,h500off"
+          IFS=',' read -ra LIST <<< "$grids"
+          entries=()
+          for g in "${LIST[@]}"; do
+            g="$(echo "$g" | xargs)"
+            if [ -n "$metrics" ]; then
+              m="$metrics"
+            elif [ "$g" = "h500" ] || [ "$g" = "h500off" ]; then
+              # The zoning/scale controls only need the leave-one-out ranking, which is
+              # the acc metric; centre and direct are for the headline cases and would
+              # double their cost for nothing.
+              m="acc"
+            else
+              m="acc,centre,direct"
+            fi
+            entries+=("{\"grid\":\"$g\",\"metrics\":\"$m\"}")
+          done
+          matrix="{\"include\":[$(IFS=,; echo "${entries[*]}")]}"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "planned: $matrix"
+
+  compute:
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
+    runs-on: ubuntu-latest
+    # h250 is 5665 origins x 44 runs; locally that measured ~25 s/run once the network
+    # was in the page cache, so ~40 min plus the network build. 180 leaves room for a
+    # cold cache and a slower runner, well under GitHub's 360 min job cap.
+    timeout-minutes: 180
+    defaults:
+      run:
+        working-directory: tools/tram_failure_lodz
+        shell: bash
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GRID: ${{ matrix.grid }}
+      METRICS: ${{ matrix.metrics }}
+      GTFS_DATE: ${{ github.event.inputs.gtfs_date || '2026-08-21' }}
+      OSM_RELEASE: ${{ github.event.inputs.osm_release }}
+      # 16 GB runner: leave ~5 GB for the OS, Python and GTFS parsing. R5's memory need
+      # scales with origins x network complexity, and h250 is the demanding one.
+      HEAP_GB: '11'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'      # ADR-0002 pins the engine to Temurin 21
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache the pinned R5 jar
+        uses: actions/cache@v4
+        with:
+          path: tools/tram_failure_lodz/_ci_work/r5-v7.6-all.jar
+          # Keyed by the pinned filename: a version bump in easy_r5/core/pins.py changes
+          # the name, so a stale jar can never be reused. ci_run.py re-checks the SHA-256
+          # regardless, and re-downloads on a mismatch.
+          key: r5-jar-v7.6
+
+      - name: Install osmosis
+        if: env.OSM_RELEASE == ''
+        run: sudo apt-get update -y && sudo apt-get install -y osmosis
+
+      - name: Get the OSM extract
+        run: |
+          set -euo pipefail
+          if [ -n "$OSM_RELEASE" ]; then
+            gh release download "$OSM_RELEASE" --repo GISBoost/easy-R5 \
+              --pattern "lodz.osm.pbf" --output lodz.osm.pbf --clobber
+          else
+            # Same bbox the local extract covers: the origins+destinations envelope
+            # (19.2172 51.6348 19.6904 51.8842) grown by ~5 km, so walking legs and
+            # park-and-ride links near the edge are not cut off. completeWays=yes is
+            # required -- a plain bbox clip leaves dangling node refs that crash R5's
+            # network builder (hit live on Krakow in the isochrones workflow).
+            curl -fL -o region.osm.pbf \
+              https://download.geofabrik.de/europe/poland/lodzkie-latest.osm.pbf
+            osmosis --read-pbf file=region.osm.pbf \
+              --bounding-box left=19.1672 bottom=51.6035 right=19.7404 top=51.9155 \
+                completeWays=yes \
+              --write-pbf file=lodz.osm.pbf
+            rm -f region.osm.pbf
+          fi
+          ls -la lodz.osm.pbf
+
+      - name: Get the static GTFS for the analysis date
+        run: |
+          set -euo pipefail
+          gh release download "lodz-realized-${GTFS_DATE}-phone" --repo GISBoost/easy-GTFS-RT \
+            --pattern "lodz_static_gtfs_${GTFS_DATE}.zip" --dir . --clobber
+          ls -la "lodz_static_gtfs_${GTFS_DATE}.zip"
+
+      - name: Run R5 for every scenario on this grid
+        run: |
+          set -euo pipefail
+          python ci_run.py \
+            --grid "$GRID" \
+            --metrics "$METRICS" \
+            --osm lodz.osm.pbf \
+            --gtfs "lodz_static_gtfs_${GTFS_DATE}.zip" \
+            --heap-gb "$HEAP_GB"
+
+      - name: Impact tables, neighbourhoods and equity
+        run: python compute_impact.py --grid "$GRID"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tram-failure-${{ matrix.grid }}
+          path: tools/tram_failure_lodz/out/${{ matrix.grid }}/
+          retention-days: 14
+
+  combine:
+    needs: compute
+    if: always() && !cancelled()
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tools/tram_failure_lodz
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: matplotlib for the charts
+        run: pip install matplotlib
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: tram-failure-*
+          path: tools/tram_failure_lodz/out
+      - name: Unwrap the per-grid artifacts into out/<grid>/
+        run: |
+          set -euo pipefail
+          for d in out/tram-failure-*; do
+            [ -d "$d" ] || continue
+            grid="${d#out/tram-failure-}"
+            rm -rf "out/$grid"
+            mv "$d" "out/$grid"
+          done
+          ls -la out
+
+      - name: MAUP comparison across grids
+        run: python maup.py
+
+      - name: Charts
+        # main_all draws the per-grid figures for every grid that produced tables, then
+        # the three cross-grid MAUP figures.
+        run: python -c "import charts; charts.main_all()"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tram-failure-figures
+          path: |
+            tools/tram_failure_lodz/out/figures/
+            tools/tram_failure_lodz/out/maup/
+          retention-days: 14
+
+      - name: Summary
+        run: |
+          set -euo pipefail
+          {
+            echo "## Awaria linii tramwajowej — Łódź"
+            echo
+            echo '```'
+            cat out/maup/summary.json 2>/dev/null || echo "brak summary.json"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

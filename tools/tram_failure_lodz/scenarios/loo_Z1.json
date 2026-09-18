@@ -1,0 +1,11 @@
+{
+  "id": "loo_Z1",
+  "modifications": [
+    {
+      "type": "easy-remove-routes",
+      "routes": [
+        "Z1"
+      ]
+    }
+  ]
+}

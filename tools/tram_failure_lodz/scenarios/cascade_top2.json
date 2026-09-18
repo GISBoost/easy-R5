@@ -1,0 +1,12 @@
+{
+  "id": "cascade_top2",
+  "modifications": [
+    {
+      "type": "easy-remove-routes",
+      "routes": [
+        "5",
+        "15"
+      ]
+    }
+  ]
+}
