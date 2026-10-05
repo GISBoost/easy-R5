@@ -1,7 +1,7 @@
 name: apartment-finder — OD matrices (M5)
 
 # On-demand, NOT a recurring pipeline: workflow_dispatch only. Moves the long R5 computation of
-# tools/apartment_finder (5 days x 4 times of day x 12 transit scenarios, ~2.2 min each locally) off the
+# tools/apartment_finder (5 days x 3 times of day x 12 transit scenarios, ~2.2 min each locally) off the
 # local machine: one job per (day, window), all in parallel, so the wall time is one job (~1.5-2 h) instead of ~10 h.
 #
 # No QGIS on the runner: scripts/ci_matrices.py drives R5 through easy_r5/core (same pattern as
@@ -16,7 +16,7 @@ on:
         required: false
         default: ''
       windows:
-        description: 'Comma-separated windows (blank = morning,midday,afternoon,allday)'
+        description: 'Comma-separated windows (blank = all windows in config/time_windows.yaml)'
         required: false
         default: ''
       osm_release:
@@ -44,7 +44,7 @@ jobs:
           days = [d for d in os.environ.get("DAYS", "").replace(" ", "").split(",") if d] or \
                  yaml.safe_load(open("tools/apartment_finder/config/days.yaml", encoding="utf-8"))["days"]
           wins = [w for w in os.environ.get("WINDOWS", "").replace(" ", "").split(",") if w] or \
-                 ["morning", "midday", "afternoon", "allday"]
+                 list(yaml.safe_load(open("tools/apartment_finder/config/time_windows.yaml", encoding="utf-8"))["windows"])
           m = {"include": [{"day": d, "window": w} for d in days for w in wins]}
           open(os.environ["GITHUB_OUTPUT"], "a").write("matrix=" + json.dumps(m) + "\n")
           print(m)

@@ -3,6 +3,7 @@
 Status: szkic do zatwierdzenia przez Michała przed startem Claude Code.
 Robocza nazwa: „Gdzie mieszkać w Łodzi" (decyzja D1).
 Miejsce w repo: `docs/prd/PR_easy-R5_apartment-finder.md`. Prompt startowy: `docs/prompts/easy-R5_apartment-finder_prompt.md`.
+**Bieżący stan prac (co zrobione, co nie, jak wznowić): [`docs/notes/apartment-finder-progress.md`](../notes/apartment-finder-progress.md)** — czytaj najpierw. Raport M0: `docs/notes/apartment-finder-m0.md`. Pipeline: `tools/apartment_finder/README.md`.
 
 ---
 
@@ -58,6 +59,11 @@ Usługi codzienne pieszo, MPZP i ryzyka planistyczne, jakość powietrza, gminy 
 | 15 | Punktacja trzywarstwowa (twarde / miękkie z wagami / minimalny wynik) | Michał |
 | 17 | Cztery pory dnia, w tym popołudniowy szczyt 15–18 | Michał, 2026-10-05 |
 | 18 | Rano domyślnie „do celu" (analiza §5.2a) | Michał, 2026-10-05 |
+| 19 | Podkład mapy: kafle OSM jak na innych stronach `mapy-analizy` (wyjątek od zakazu hotlinkowania z promptu; CARTO wymaga klucza) | Michał, 2026-10-05 |
+| 20 | Obliczenia M5 w GitHub Actions (workflow `apartment-finder-matrices.yml`), pieszo/rower/auto lokalnie | Michał, 2026-10-05 |
+| 21 | I1: naruszenia na granicy limitu marszu naprawiane monotonicznie w `aggregate.py` (twardy limit 1e-6 par) | Michał, 2026-10-05 |
+| 22 | Czasy w macierzach: obcięcie do 60 min, kwantyzacja 2 min, kodowanie różnicowe względem scenariusza bazowego okna | Claude Code (propozycja, do zatwierdzenia) |
+| 23 | O3: zapisywany percentyl okna = P50 (P85 okna pominięty, żeby nie mylić z wariantem zmierzonym P85) | Claude Code (propozycja, do zatwierdzenia) |
 | 16 | Dni: 5 ostatnich roboczych z kompletem danych Łódź + ŁKA (static, P50, P85); lista do zatwierdzenia przez Michała | Michał |
 
 ## 5. Funkcje
@@ -91,7 +97,7 @@ Pytanie: czy rano domyślnie „do celu" (odjazd z heksa w oknie 07–09, cel = 
 
 Globalne przełączniki:
 
-- **Pora dnia (4):** rano / południe / popołudnie / cały dzień. Propozycja okien: poranny szczyt 07:00–09:00, południe 11:00–14:00, **popołudniowy szczyt 15:00–18:00 (decyzja Michała, dodany)**, cały dzień 06:00–22:00 (okno z artykułu Kaczorowski & Wróblewski). Popołudniowy szczyt ma największe odchylenia od rozkładu, więc jest kluczowy dla wyróżnika P50/P85. Okna w `config/`, do zatwierdzenia po M0.
+- **Pora dnia (4 → 3, „cały dzień" porzucony 2026-10-05 decyzją Michała: okno 06–22 zbyt szerokie):** rano / południe / popołudnie / cały dzień. Propozycja okien: poranny szczyt 07:00–09:00, południe 11:00–14:00, **popołudniowy szczyt 15:00–18:00 (decyzja Michała, dodany)**, cały dzień 06:00–22:00 (okno z artykułu Kaczorowski & Wróblewski). Popołudniowy szczyt ma największe odchylenia od rozkładu, więc jest kluczowy dla wyróżnika P50/P85. Okna w `config/`, do zatwierdzenia po M0.
 - **Typ czasu:** rozkładowy (statyczny GTFS tego samego dnia) / zmierzony P50 / zmierzony P85. Nazewnictwo w interfejsie: „zmierzony (rekonstrukcja GTFS-RT)", bo nie ma prawdy referencyjnej, rekonstrukcja to też model.
 - **Przesiadki:** bez limitu / maks. 1.
 - **ŁKA:** wł. / wył.
@@ -173,7 +179,7 @@ Per heks: odległości pieszo po sieci (przystanki tramwajowe, autobusowe, ziele
 
 ## 8. Format danych i budżet rozmiaru
 
-Przybliżony rachunek (do zmierzenia w M0/M4): 29 mln par × 1 bajt (czas w minutach, obcięty do limitu) ≈ 29 MB na scenariusz i kierunek. Przy ok. 54 scenariuszach to ok. 1,6 GB surowo na jeden układ, a potrzebny jest też układ transponowany (kolumny celu). Limit GitHub Pages to 1 GB na stronę.
+Przybliżony rachunek (do zmierzenia w M0/M4): 29 mln par × 1 bajt (czas w minutach, obcięty do limitu) ≈ 29 MB na scenariusz i kierunek. Przy ok. 54 scenariuszach (po porzuceniu „cały dzień": 41 plików, 245 MB po cap i kwantyzacji) to ok. 1,6 GB surowo na jeden układ, a potrzebny jest też układ transponowany (kolumny celu). Limit GitHub Pages to 1 GB na stronę.
 
 Do rozważenia przez Claude Code:
 

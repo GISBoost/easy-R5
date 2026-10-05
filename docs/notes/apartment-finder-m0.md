@@ -1,6 +1,6 @@
 # Apartment finder — M0 report (2026-10-05)
 
-Status: M0 zamknięte. Przechodzę do M1 (zgoda Michała w czacie 2026-10-05: oba repo, bez zatrzymań między kamieniami).
+Status: M0 zamknięte. Bieżący postęp: [`apartment-finder-progress.md`](apartment-finder-progress.md); PRD: `../prd/PR_easy-R5_apartment-finder.md`. Przechodzę do M1 (zgoda Michała w czacie 2026-10-05: oba repo, bez zatrzymań między kamieniami).
 
 ## Liczby (zmierzone)
 - **Siatka:** własna hex 250 m, środek w granicach miasta: **5662 heksów**, 32,1 mln par O–D. Odstęp środków 250,0 m. (`tools/apartment_finder/scripts/make_grid.py`, `config/grid.yaml`, `hex250-v1`.)

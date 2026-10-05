@@ -185,6 +185,12 @@ dist_g = walk_matrix(cent, gp, "green")
 for h in hexes:
     v = list(dist_g.get(h, {}).values())
     out[h]["d_green_m"] = min(v) if v else None
+# A hex whose centre lies INSIDE a green area has access 0 m: the boundary vertices above are the entrances for
+# everyone outside, but would give someone living in the middle of Las Lagiewnicki the distance to its edge.
+inside_ids = {f["hex_id"] for f in processing.run("native:extractbylocation", {
+    "INPUT": cent, "PREDICATE": [6], "INTERSECT": g, "OUTPUT": "memory:"})["OUTPUT"].getFeatures()}
+for h in inside_ids:
+    out[h]["d_green_m"] = 0.0
 
 cols = ["hex_id", "d_tram_m", "d_bus_m", "d_green_m"] + [
     "freq_%s_%s" % (m, w) for m in ("tram", "bus") for w in tw]
@@ -196,6 +202,6 @@ with open(out_dir / "static_layers.csv", "w", newline="", encoding="utf-8") as f
 meta = {"layers_version": cfg["layers_version"],
         "grid_version": json.load(open(HERE + "/data/grid.meta.json"))["grid_version"],
         "day": day, "active_trips": len(trips), "stops": len(sid), "green_polygons": n_green,
-        "green_points": gp.featureCount(), "walk_resolution_m": cfg["walk"]["speed_kmh"] * 1000 / 60}
+        "green_points": gp.featureCount(), "hexes_centre_inside_green": len(inside_ids), "walk_resolution_m": cfg["walk"]["speed_kmh"] * 1000 / 60}
 json.dump(meta, open(out_dir / "static_layers.meta.json", "w"), indent=1)
 print(json.dumps(meta))

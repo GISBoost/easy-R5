@@ -61,7 +61,7 @@ def main(day, window):
                            "newly_reached": int(((N("static", "unlimited", 0) == NR) & (N("static", "unlimited", 1) != NR)).sum())}
     ok &= rep["I3_lka_probe"]["pairs_improved"] > 0
     # I4
-    w = load(d, "%s_walk" % window)
+    w = load(d.parent / "2026-10-02", "morning_walk")   # walking is day- and window-independent; computed once
     m = (w != NR) & (w.T != NR)
     diff = np.abs(w.astype(int) - w.T.astype(int))[m]
     rep["I4_walk_symmetry"] = {"pairs": int(m.sum()), "abs_diff_le_1min_share": round(float((diff <= 1).mean()), 4),

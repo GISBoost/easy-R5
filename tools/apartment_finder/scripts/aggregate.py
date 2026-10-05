@@ -58,13 +58,15 @@ def load(day, name):
 def main():
     names = sorted(p.stem for p in (HERE / "data/matrices" / days[-1]).glob("*.npz"))
     report = {}
+    missing = []
     for name in names:
         have = [d for d in days if (HERE / "data/matrices" / d / (name + ".npz")).exists()]
         if len(have) < len(days):
             if len(have) == 1 and have[0] == days[-1]:  # once-only scenario (walk, bike, car)
                 np.save(OUT / (name + ".npy"), load(days[-1], name))
                 continue
-            print("skip (missing days)", name, file=sys.stderr)
+            missing.append(name)
+            print("MISSING DAYS", name, file=sys.stderr)
             continue
         stack = np.stack([load(d, name) for d in days])          # (days, n, n) uint8
         med = np.sort(stack, axis=0)[len(days) // 2]
@@ -82,6 +84,8 @@ def main():
     report["_i1_repaired_pairs_total"] = int(sum(repaired_pairs.values()))
     report["_i1_repaired_pairs_by_scenario_day"] = {"%s|%s" % k: v for k, v in repaired_pairs.items() if v}
     json.dump(report, open(OUT / "i5_report.json", "w", encoding="utf-8"), indent=1)
+    if missing:
+        raise SystemExit("scenarios missing some days (not aggregated): %s" % ", ".join(missing))
 
 
 if __name__ == "__main__":

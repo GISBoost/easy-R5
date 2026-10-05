@@ -137,6 +137,8 @@ def main():
             nets[variant] = (dat, meta)
         return nets[variant]
 
+    if a.window not in tw:
+        raise SystemExit("unknown window %r; config/time_windows.yaml has: %s" % (a.window, ", ".join(tw)))
     w = tw[a.window]
     h1, m1 = map(int, w["start"].split(":"))
     h2, m2 = map(int, w["end"].split(":"))

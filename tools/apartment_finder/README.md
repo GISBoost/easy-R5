@@ -14,11 +14,11 @@ Każdy plik wynikowy niesie wersje w metadanych (`*.meta.json`, `data/matrices/<
 |---|---|---|
 | Siatka hex 250 m (5662 heksów, środek w granicach miasta) | `scripts/make_grid.py` | `data/grid.gpkg` |
 | Przystanki (tram/bus), częstotliwość per pora dnia, zieleń | `scripts/static_layers.py` | `data/static/static_layers.csv` |
-| Hałas (udział powierzchni heksa ≥ N dB; droga, tramwaj, kolej, przemysł; Lden i Ln) | `scripts/fetch_noise.py`, `scripts/noise_layers.py` | `data/noise/noise_layers.csv` |
+| Hałas (udział powierzchni heksa ≥ N dB; droga, tramwaj, kolej, przemysł; Lden i Ln; rasteryzacja 10 m) | `scripts/fetch_noise.py`, `scripts/noise_layers.py` (systemowy Python) | `data/noise/noise_layers.csv` |
 | Auto: współczynniki zwolnienia z autobusów → kopie OSM z `maxspeed` per pora | `scripts/car_speeds.py` | `data/car/lodz_car_<pora>.osm.pbf` |
 | Macierze czasów O–D (R5) | `scripts/run_matrices.py`, `scripts/run_all.sh` | `data/matrices/<dzień>/<scenariusz>.npz` |
 | Niezmienniki I1–I4 | `scripts/check_invariants.py` | `data/matrices/<dzień>/invariants_<pora>.json` |
-| Eksport dla strony | `scripts/export_web.py` | `mapy-analizy/gdzie-mieszkac-lodz/data/` |
+| Eksport dla strony | `scripts/export_web.py` | `<easy>/gdzie-mieszkac-lodz-data/` (osobne repo danych, patrz niżej) |
 
 Wszystkie parametry (okna czasowe, dni, progi, krzywe, promienie wygładzania) są w `config/*.yaml`.
 
@@ -31,10 +31,25 @@ Pozostałe: systemowy Python (`py`; numpy, pandas, shapely, pyproj, pyyaml).
 1. Dane wejściowe (nie są wersjonowane): `data/raw/lodz.osm.pbf`; GTFS dni z `config/days.yaml`:
    `py scripts/prepare_gtfs.py` (pobiera z release'ów `GISBoost/easy-GTFS-RT`; statyczny feed ŁKA jest filtrowany do
    kursów ŁKA, bo release zawiera krajowy feed kolejowy).
-2. Siatka i warstwy: `make_grid.py`, `static_layers.py`, `fetch_noise.py` → `noise_layers.py`.
+2. Siatka i warstwy: `make_grid.py`, `static_layers.py` (QGIS), `fetch_noise.py` → `noise_layers.py`.
 3. Auto: osmosis (pbf → xml → `car_speeds.py` → xml → pbf per pora), patrz nagłówek `car_speeds.py`.
-4. Macierze: `bash scripts/run_all.sh` (wznawialne; ok. 2,2 min na scenariusz, ok. 250 scenariuszy).
-5. `py scripts/aggregate.py` (mediana po dniach, I5) i `py scripts/export_web.py`.
+4. Macierze tranzytowe: workflow GitHub Actions `apartment-finder-matrices.yml` (15 jobów dzień × pora, ok. 2 h;
+   `gh workflow run apartment-finder-matrices.yml`, wyniki: `gh run download <id>` do `data/matrices/`). Lokalnie
+   to samo robi `bash scripts/run_all.sh` (wznawialne; ok. 2,2 min na scenariusz, ok. 10 h). Pieszo/rower/auto
+   (nie zależą od dnia i GTFS): `bash scripts/run_nontransit.sh`.
+5. `py scripts/check_invariants.py <dzień> <pora>` (I1–I4), `py scripts/aggregate.py` (mediana po dniach, naprawa I1,
+   raport I5) i `py scripts/export_web.py`.
+
+## Publikacja danych (osobne repo, bez historii)
+
+Kod strony jest w `mapy-analizy`, dane (ok. 245 MB) w `GISBoost/gdzie-mieszkac-lodz-data` (Pages z gałęzi `gh-pages`,
+ten sam origin, więc bez CORS). Każda regeneracja to ok. 250 MB niekompresowalnych binariów, więc **gałąź jest
+jednokomitowa i nadpisywana `--force`** (orphan commit): repo ma rozmiar bieżących danych, nie sumy wersji.
+Limity Pages: serwis ≤ 1 GB, 10 buildów/h, ok. 100 GB/mies. transferu (miękki); zapytanie o cel czyta jeden wiersz
+przez `Range` (kilka KB), więc transfer to głównie `hex.json` + `layers.json` (ok. 2 MB). Nie publikować częściej
+niż potrzeba i nie dokładać `data/m` do `mapy-analizy`. Publikacja: `bash scripts/publish_data.sh` (próba bez
+pushowania) i `--push` (nadpisuje gałąź). Wariant 2 na przyszłość, gdyby odświeżanie stało się częste: zip danych jako
+Release asset + workflow Actions z `upload-pages-artifact`/`deploy-pages`, wtedy w gicie leży tylko kod.
 
 ## Ograniczenia i zastrzeżenia metody
 
@@ -48,7 +63,7 @@ Pozostałe: systemowy Python (`py`; numpy, pandas, shapely, pyproj, pyyaml).
   liczone od środka heksa. Powyżej 2 km: brak wartości (strona traktuje jako „daleko").
 - Czasy w macierzach są obcięte do 60 min i kwantyzowane co 2 min (błąd ≤ 1 min) — patrz `config/export.yaml`.
 - Cena: brak danych w tej wersji (pusty slot). Rejestr cen nie ma otwartego API.
-- Hałas: mapa akustyczna Łodzi (UMŁ, InterSIT, pomiary 2022). **Licencja do potwierdzenia przed publikacją.**
+- Hałas: mapa akustyczna Łodzi (UMŁ, InterSIT, pomiary 2022). Licencja: informacja publiczna wg autora (2026-10-05).
   Progi dopuszczalne z rozporządzenia nie są założone w pipeline; strona stosuje próg wybrany przez użytkownika.
 
 ## Źródła danych

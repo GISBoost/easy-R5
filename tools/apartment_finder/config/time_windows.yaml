@@ -4,9 +4,8 @@ windows:
   morning:   {start: "07:00", end: "09:00"}
   midday:    {start: "11:00", end: "14:00"}
   afternoon: {start: "15:00", end: "18:00"}   # added 2026-10-05 (return commute)
-  allday:    {start: "06:00", end: "22:00"}
+  # allday (06-22) dropped 2026-10-05 by Michal: a 16 h window mixes peak, night and evening, the median means little.
 default_direction:                              # PRD 5.2a
   morning: to_target
   midday: to_target
   afternoon: from_target
-  allday: to_target

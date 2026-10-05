@@ -1,6 +1,6 @@
-"""Export the web app's data into mapy-analizy/gdzie-mieszkac-lodz/data (PRD 8).
+"""Export the web app's data into <easy>/gdzie-mieszkac-lodz-data, the working copy of the data repo (PRD 8).
 
-  py scripts/export_web.py [--agg data/agg] [--out ../../../mapy-analizy/gdzie-mieszkac-lodz/data] [--only name,...]
+  py scripts/export_web.py [--agg data/agg] [--out ../../../gdzie-mieszkac-lodz-data] [--only name,...]
 
 Writes manifest.json, hex.json, layers.json and m/<scenario>.{r,c}.bin. Each matrix is capped
 (config/export.yaml: cap_min), quantised (scale_min minutes per unit) and stored one DEFLATE-raw block per
@@ -149,7 +149,11 @@ def write_hxm(path, u):
     return offs[-1]
 
 
+ALIAS = {"walk": "morning_walk", "bike": "morning_bike"}   # window-free modes are computed once, under the morning name
+
+
 def load_matrix(agg, name):
+    name = ALIAS.get(name, name)
     f = agg / (name + ".npy")
     if f.exists():
         return np.load(f)
@@ -159,6 +163,8 @@ def load_matrix(agg, name):
 def base_of(name):
     """Transit scenarios are stored as differences against the window's scheduled / unlimited / no-LKA matrix."""
     parts = name.split("_")
+    if len(parts) == 2 and parts[1] == "car" and parts[0] != "morning":
+        return "morning_car"                         # car differs between windows only slightly: store as a difference
     if len(parts) == 4 and parts[1] in ("static", "p50", "p85"):
         return "%s_static_unlimited_nolka" % parts[0]
     return None
@@ -178,7 +184,7 @@ def scenario_names():
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--agg", default=str(HERE / "data/agg"))
-    ap.add_argument("--out", default=str((HERE / "../../../mapy-analizy/gdzie-mieszkac-lodz/data").resolve()))
+    ap.add_argument("--out", default=str((HERE / "../../../gdzie-mieszkac-lodz-data").resolve()))
     ap.add_argument("--only", default="")
     a = ap.parse_args()
     out, agg = Path(a.out), Path(a.agg)
@@ -207,6 +213,9 @@ def main():
         files[name] = sz
         total += sz
         print(name, round(sz / 1e6, 2), "MB", file=sys.stderr)
+    # the manifest describes everything present in out/m, not only what this run (e.g. --only) wrote
+    present = sorted(f.name[:-6] for f in (out / "m").glob("*.r.bin"))
+    bases = {n: base_of(n) for n in present if base_of(n) and base_of(n) != n}
     manifest = {
         "method_version": "apt-v1 (grid %s, layers %s, noise %s, car %s, curves %s)" % (
             grid_meta["grid_version"], "static-v1", noise_cfg["layers_version"], "car-v1", curves["curves_version"]),
@@ -215,7 +224,7 @@ def main():
         "default_dir": {k: ("to" if v == "to_target" else "from") for k, v in tw["default_direction"].items()},
         "curves": {k: v for k, v in curves.items() if k != "curves_version"},
         "noise_steps": noise_cfg["thresholds"],
-        "matrix": {"scale": CFG["scale_min"], "cap": CFG["cap_min"], "scenarios": sorted(files), "base": bases},
+        "matrix": {"scale": CFG["scale_min"], "cap": CFG["cap_min"], "scenarios": present, "base": bases},
         "layer_columns": cols,
         "basemap": CFG["basemap"],
         "days": yaml.safe_load(open(HERE / "config/days.yaml", encoding="utf-8"))["days"],

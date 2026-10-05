@@ -1,13 +1,13 @@
 #!/bin/bash
 # M5: full computation, resumable (every step skips finished work).
 #   scripts/run_all.sh            # all days from config/days.yaml
-# Per day: GTFS folders -> 6 transit networks -> 4 windows x 3 ttypes x 2 rides x 2 lka = 48 matrices.
+# Per day: GTFS folders -> 6 transit networks -> 3 windows x 3 ttypes x 2 rides x 2 lka = 36 matrices.
 # Once (not per day): walk, bike, car per window (they do not depend on GTFS or day).
 cd "$(dirname "$0")/.."
 Q="/c/Program Files/QGIS 3.40.4/bin/python-qgis-ltr.bat"
 PY=py
 DAYS=$($PY -c "import yaml;print(' '.join(yaml.safe_load(open('config/days.yaml',encoding='utf-8'))['days']))")
-WINDOWS="morning midday afternoon allday"
+WINDOWS="morning midday afternoon"
 PBF="$(pwd -W)/data/raw/lodz.osm.pbf"
 for D in $DAYS; do
   $PY scripts/prepare_gtfs.py $D || exit 1

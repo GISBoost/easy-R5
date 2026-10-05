@@ -1,6 +1,7 @@
 # Noise layers (PRD 5.4, M2). Bump layers_version on any change.
 layers_version: "noise-v1"
-source_note: "Strategiczna mapa hałasu Łodzi (UMŁ, InterSIT, pomiary 2022), warstwy imisji; licencja do potwierdzenia"
+cell_m: 10             # raster cell used to aggregate the bands to hexagons (hex area ~54 000 m2 = ~540 cells)
+source_note: "Strategiczna mapa hałasu Łodzi (UMŁ, InterSIT, pomiary 2022), warstwy imisji; informacja publiczna wg autora"
 sources: [road, tram, rail, industry]
 # Share of hex area at/above each step is stored; the app applies the user's limit. The map's own
 # bands are 5 dB wide starting at 45 dB. Regulatory limits (O13) are NOT assumed here.

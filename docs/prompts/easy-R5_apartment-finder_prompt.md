@@ -2,6 +2,8 @@
 
 Wklej w całości jako pierwszą wiadomość w sesji Claude Code uruchomionej w repo `easy-R5`.
 
+> **Wznawiasz pracę?** Najpierw przeczytaj [`docs/notes/apartment-finder-progress.md`](../notes/apartment-finder-progress.md) (stan kamieni, decyzje, co zostało), potem PRD (`docs/prd/PR_easy-R5_apartment-finder.md`). Ten prompt opisuje zasady pracy; nie powtarza stanu.
+
 ---
 
 ## Cel
