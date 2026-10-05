@@ -107,3 +107,26 @@ raporty „do jakiego etapu przechodzisz" zamiast zatrzymań po każdym kamieniu
 matrices, agg), `_ci_work/` (gitignored). `.github/workflows/apartment-finder-matrices.yml`.
 `mapy-analizy/gdzie-mieszkac-lodz/`: `index.html`, `app.js`, `score.js`, `score.test.js`, `i18n.js`, `styles.css`,
 `README.md`, `data/` (generowane).
+
+## Poprawki po testach Michała (2026-10-05, wieczór) — zrobione lokalnie, NIE wypchnięte
+
+- **Hałas (UI i punktacja):** suwak = *ważność ciszy* (opis przy suwakach), ocena stopniowana z trzech progów
+  (kara 1/3 przy L, 2/3 przy L+5, pełna przy L+10 dB; `noisePenalty` w `score.js`), jeden blok na źródło
+  (ważność + próg komfortu + wymaganie twarde z **wpisywanym %** i wyborem dB w krokach 5 dB mapy źródłowej),
+  szyny i przemysł zwinięte w „Pozostałe źródła". Heksy poza zasięgiem modelu akustycznego (14) = brak danych
+  (`noise_layers.py`, wymaga ponownej publikacji `layers.json`). Stan w hashu: klucz `nc`.
+- **Dochodzenie „P50 i ŁKA nic nie zmieniają":** aplikacja działa poprawnie (dekodowanie zgodne z danymi, liczby na stronie
+  = liczby z macierzy). Przyczyny: bez celów czas przejazdu nie wchodzi do wyniku (dodano komunikat); P50 ≈ rozkład
+  (średnio +0,3 min rano, +0,8 popołudniu; P85: +4,5/+5,5 min i 7–8% par traci dostępność); ŁKA zmienia czas
+  tylko dla części par (do Pl. Wolności: +5 z 5662 heksów w limicie 45 min; do CKD przy Czechosłowackiej: +92).
+  Dodano przy celu informację „ŁKA zmienia czas do tego celu o ≥ 2 min dla N heksów".
+- **Usługi codzienne:** tylko zaplanowane (wersja 3: 5 kryteriów „co najmniej X placówek w Y min", jeden tryb na kryterium; hybryda dokładny R5 + skrót na macierzach; testy wykonalności zrobione), patrz [`apartment-finder-uslugi-plan.md`](apartment-finder-uslugi-plan.md).
+
+## Usługi codzienne (2026-10-05, wieczór) — wdrożone lokalnie
+
+5 kryteriów „co najmniej X placówek w ≤ Y min”, jeden tryb na kryterium; **dokładna metoda** (R5: środek heksa → współrzędne
+placówki, także do 1,2 km za granicą miasta). Skrypty: `service_pois.py` (OSM → `inputs/service_pois.csv`, 1837 punktów),
+`service_counts.py` + `count_services.py` + `run_services.sh` (walk, bike, car×3 pory, TP × pora × rozkład/P50/P85 × ŁKA × 5 dni;
+przesiadki bez limitu), `export_services.py` (mediana po dniach → `gdzie-mieszkac-lodz-data/services/`). Frontend: sekcja „Usługi
+w zasięgu” (`app.js`, `score.js`: `serviceScore`, test w `score.test.js`), stan w hashu `sv`. **Po zmianie danych:** `export_services.py`,
+potem `publish_data.sh --push` (za zgodą). Szczegóły i uzasadnienie wyboru metody: [`apartment-finder-uslugi-plan.md`](apartment-finder-uslugi-plan.md).

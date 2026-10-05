@@ -18,6 +18,9 @@ Każdy plik wynikowy niesie wersje w metadanych (`*.meta.json`, `data/matrices/<
 | Auto: współczynniki zwolnienia z autobusów → kopie OSM z `maxspeed` per pora | `scripts/car_speeds.py` | `data/car/lodz_car_<pora>.osm.pbf` |
 | Macierze czasów O–D (R5) | `scripts/run_matrices.py`, `scripts/run_all.sh` | `data/matrices/<dzień>/<scenariusz>.npz` |
 | Niezmienniki I1–I4 | `scripts/check_invariants.py` | `data/matrices/<dzień>/invariants_<pora>.json` |
+| Usługi: placówki OSM (5 kryteriów, z buforem 1,2 km) | `scripts/service_pois.py` (QGIS) | `data/services/poi.gpkg`, `inputs/service_pois.csv` |
+| Usługi: liczba placówek w Y min, **dokładnie** (R5: środek heksa → współrzędne placówki) | `scripts/service_counts.py`, `scripts/count_services.py`, `scripts/run_services.sh` | `data/services/<dzień>/<scenariusz>.npz` |
+| Eksport usług (mediana po dniach dla TP) | `scripts/export_services.py` | `<easy>/gdzie-mieszkac-lodz-data/services/*.json` |
 | Eksport dla strony | `scripts/export_web.py` | `<easy>/gdzie-mieszkac-lodz-data/` (osobne repo danych, patrz niżej) |
 
 Wszystkie parametry (okna czasowe, dni, progi, krzywe, promienie wygładzania) są w `config/*.yaml`.

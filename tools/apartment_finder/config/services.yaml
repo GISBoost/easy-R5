@@ -1,0 +1,47 @@
+# Daily services (PRD 12.1; decisions of Michal 2026-10-05): ~20 OSM facility types grouped into 4 broad META-CATEGORIES
+# (the four groups of the competition brief, docs/lodzkie-na-mapach-2026-metodologia.md). Criterion = at least X facilities
+# of the meta-category within Y minutes, one transport mode per criterion. The pipeline counts every FINE type separately
+# (so the grouping can change without a new routing run); export_services.py sums them per meta-category.
+# Bump services_version on any change.
+services_version: "services-v2"
+buffer_m: 1200          # facilities up to this far outside the city boundary still count (exact R5 method)
+types:                  # fine type -> OSM tags [key, value]; tags of one type are alternatives (OR)
+  przedszkole:      [[amenity, kindergarten]]
+  szkola:           [[amenity, school]]
+  uczelnia:         [[amenity, university], [amenity, college]]
+  przychodnia:      [[amenity, clinic], [amenity, doctors], [healthcare, doctor], [healthcare, clinic]]
+  szpital:          [[amenity, hospital]]
+  apteka:           [[amenity, pharmacy]]
+  supermarket:      [[shop, supermarket]]
+  sklep_osiedlowy:  [[shop, convenience], [shop, grocery]]
+  centrum_handlowe: [[shop, mall]]
+  targowisko:       [[amenity, marketplace]]
+  poczta:           [[amenity, post_office]]
+  urzad:            [[office, government], [amenity, townhall]]
+  biblioteka:       [[amenity, library]]
+  dom_kultury:      [[amenity, community_centre]]
+  kino:             [[amenity, cinema]]
+  teatr:            [[amenity, theatre]]
+  muzeum:           [[tourism, museum]]
+  plac_zabaw:       [[leisure, playground]]
+  silownia:         [[leisure, fitness_centre]]
+  basen:            [[leisure, swimming_pool]]
+  boisko:           [[leisure, pitch], [leisure, sports_centre]]
+# Parks are NOT counted here (large parks would count once per boundary point); green space has its own criterion.
+meta:
+  edukacja:          [przedszkole, szkola, uczelnia]
+  zdrowie:           [przychodnia, szpital, apteka]
+  handel_uslugi:     [supermarket, sklep_osiedlowy, centrum_handlowe, targowisko, poczta, urzad]
+  kultura_rekreacja: [biblioteka, dom_kultury, kino, teatr, muzeum, plac_zabaw, silownia, basen, boisko]
+# R5 runs (hex centre -> exact facility coordinates). max_min caps the search; levels = Y values offered in the UI.
+modes:
+  walk:    {mode: 1, max_min: 20, levels: [5, 10, 15, 20]}
+  bike:    {mode: 2, max_min: 30, levels: [5, 10, 15, 20, 30]}
+  car:     {mode: 3, max_min: 20, levels: [5, 10, 15, 20]}      # one scenario per time of day (own OSM copy)
+  transit: {mode: 0, max_min: 45, levels: [15, 30, 45]}         # window x ttype x ŁKA; transfers unlimited
+# UI defaults: mode, Y [min], X [count] (to be tuned after looking at the distributions)
+defaults:
+  edukacja:          {mode: walk, y: 15, x: 3}
+  zdrowie:           {mode: walk, y: 15, x: 3}
+  handel_uslugi:     {mode: walk, y: 15, x: 5}
+  kultura_rekreacja: {mode: walk, y: 15, x: 5}

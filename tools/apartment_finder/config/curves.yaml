@@ -16,7 +16,7 @@ frequency:             # departures/h of tram+bus lines within walking reach, sa
 green:
   full_m: 200
   zero_at_m: 1000
-noise:                 # soft score = 1 - (share of hex area at/above this level)
+noise:                 # soft score = 1 - graded penalty from shares at soft_db, +5, +10 dB (score.js noisePenalty); soft_db = comfort limit
   road:     {indicator: lden, soft_db: 60, hard_db: 65, hard_max_share: 0.25}
   rail:     {indicator: lden, soft_db: 60, hard_db: 65, hard_max_share: 0.25}   # tram + rail
   industry: {indicator: lden, soft_db: 55, hard_db: 60, hard_max_share: 0.25}

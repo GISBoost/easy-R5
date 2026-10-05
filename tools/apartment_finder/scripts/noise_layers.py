@@ -33,6 +33,7 @@ ymin = min(p.bounds[1] for p in polys) - RES
 xmax = max(p.bounds[2] for p in polys) + RES
 ymax = max(p.bounds[3] for p in polys) + RES
 W, H = int(np.ceil((xmax - xmin) / RES)), int(np.ceil((ymax - ymin) / RES))
+COVER = [float("inf"), float("inf"), float("-inf"), float("-inf")]   # bbox of all band polygons = modelled area
 px = lambda ring: [((x - xmin) / RES, (ymax - y) / RES) for x, y in ring]
 
 
@@ -56,6 +57,9 @@ def band_raster(path):
     lowest = min(f["attributes"]["LMIN"] for f in feats)
     arr = np.zeros((H, W), np.uint8)
     for f in feats:
+        for r in f["geometry"]["rings"]:
+            a = np.asarray(r)
+            COVER[:] = [min(COVER[0], a[:, 0].min()), min(COVER[1], a[:, 1].min()), max(COVER[2], a[:, 0].max()), max(COVER[3], a[:, 1].max())]
         rings = [px(r) for r in f["geometry"]["rings"]]
         xs = [x for r in rings for x, _ in r]
         ys = [y for r in rings for _, y in r]
@@ -95,6 +99,11 @@ def main(dump_rasters=False):
                 cnt = np.bincount(hid[inside & (r >= t)], minlength=len(polys))
                 share = np.round(cnt / np.maximum(cells, 1), 4)
                 table["%s_%s_ge%d" % (src, ind, t)] = share if t >= lowest[src] else np.full(len(polys), np.nan)
+    # hexes whose centre lies outside the area the acoustic model covers: "no data", not "quiet"
+    outside = np.array([not (COVER[0] <= p.centroid.x <= COVER[2] and COVER[1] <= p.centroid.y <= COVER[3]) for p in polys])
+    for k in table:
+        table[k] = np.where(outside, np.nan, table[k])
+    print("hexes outside the modelled area (no data):", int(outside.sum()), file=sys.stderr)
     cols = sorted(table)
     with open(out_dir / "noise_layers.csv", "w", newline="", encoding="utf-8") as fh:
         w = csv.writer(fh)

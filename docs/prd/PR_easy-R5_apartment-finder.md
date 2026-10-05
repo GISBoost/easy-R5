@@ -252,7 +252,7 @@ Dla Claude Code (do rozstrzygnięcia w M0 i zaproponowania):
 
 Kolejność orientacyjna, do przeglądu po wdrożeniu MVP.
 
-1. **Usługi codzienne pieszo:** sklep, apteka, przychodnia, szkoła, przedszkole (czas pieszo po sieci, osobne kryteria).
+1. ~~Usługi codzienne pieszo~~ — **wszedł 2026-10-05** w innej postaci: 5 kryteriów (sklepy spożywcze, apteki, przychodnie i lekarze, przedszkola, szkoły) jako „co najmniej X placówek w ≤ Y min”, jeden tryb na kryterium (pieszo/rower/auto/TP), liczone dokładnie przez R5 do współrzędnych placówek (decyzje Michała). Patrz `docs/notes/apartment-finder-uslugi-plan.md`.
 2. ~~Popołudniowy szczyt~~ — wszedł do MVP.
 3. **Filtr cenowy** (max zł/m²), rozróżnienie rynku pierwotnego i wtórnego, wyższa jakość agregacji ceny.
 4. **Para / rodzina:** osobne cele dla dwóch osób, agregacja „maksimum z czasów" lub suma.
