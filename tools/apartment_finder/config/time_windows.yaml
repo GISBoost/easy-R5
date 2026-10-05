@@ -1,0 +1,12 @@
+# Times of day (PRD 5.3). Departure windows in local time; approved by Michal in chat 2026-10-05
+# (window edges are to be confirmed after M0).
+windows:
+  morning:   {start: "07:00", end: "09:00"}
+  midday:    {start: "11:00", end: "14:00"}
+  afternoon: {start: "15:00", end: "18:00"}   # added 2026-10-05 (return commute)
+  allday:    {start: "06:00", end: "22:00"}
+default_direction:                              # PRD 5.2a
+  morning: to_target
+  midday: to_target
+  afternoon: from_target
+  allday: to_target

@@ -1,0 +1,15 @@
+# Scenario axes (PRD 5.3). A scenario = (window, ttype, rides, lka) for transit, plus walk/bike/car.
+scenarios_version: "scn-v1"
+time_windows_file: time_windows.yaml
+ttypes: [static, p50, p85]          # static = scheduled GTFS of the same day; p50/p85 = reconstructed GTFS-RT
+rides: {unlimited: 8, max1transfer: 2}   # MAX_RIDES = transfers + 1
+lka: [false, true]
+r5:
+  max_trip_minutes: 90
+  max_walk_minutes: 20              # lossless cap at the largest cut-off (CLAUDE.md gotcha)
+  percentiles: "50"                 # O3: window P50 only; window-P85 would be confused with the measured-P85 variant
+  monte_carlo_draws: 5
+non_transit:
+  walk: {mode: 1}
+  bike: {mode: 2}
+  car:  {mode: 3}                   # per time-of-day OSM copy, see car.yaml

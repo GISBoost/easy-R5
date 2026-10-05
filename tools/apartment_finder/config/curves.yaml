@@ -1,0 +1,30 @@
+# Criterion curves and defaults (PRD 5.4/5.5). Exported to the web app's config.json by export_web.py.
+# DEFAULTS PROPOSED BY CLAUDE CODE -- to be approved by Michal (PRD 5.4).
+curves_version: "curves-v1"
+travel:                # decreasing: 1 at <= ideal_min, 0 at the target's max_min
+  default_ideal_min: 10
+  default_max_min: 45
+tram_stop:             # distance on foot to the nearest tram stop, ideal BAND (too close = noise)
+  near_zero_score: 0.6 # score at 0 m
+  ideal_m: [150, 400]
+  zero_at_m: 1200
+bus_stop:
+  full_m: 150
+  zero_at_m: 800
+frequency:             # departures/h of tram+bus lines within walking reach, saturating
+  scale_per_h: 12      # s = 1 - exp(-f / scale)
+green:
+  full_m: 200
+  zero_at_m: 1000
+noise:                 # soft score = 1 - (share of hex area at/above this level)
+  road:     {indicator: lden, soft_db: 60, hard_db: 65, hard_max_share: 0.25}
+  rail:     {indicator: lden, soft_db: 60, hard_db: 65, hard_max_share: 0.25}   # tram + rail
+  industry: {indicator: lden, soft_db: 55, hard_db: 60, hard_max_share: 0.25}
+  bedroom_mode_indicator: ln                                                 # "sypialnia" switch
+  bedroom_db_shift: -10                                                      # Ln thresholds = Lden - 10
+price:
+  enabled: false       # PRD D10: empty slot until data is supplied
+defaults:
+  weights: {tram_stop: 0, bus_stop: 2, frequency: 2, green: 2, noise_road: 3, noise_rail: 2, noise_industry: 1, price: 0}
+  min_score: 0
+max_targets: 5

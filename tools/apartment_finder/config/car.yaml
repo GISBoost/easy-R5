@@ -1,0 +1,48 @@
+# Car speeds from bus segments (PRD 7.3, M3). Bump car_version on any change.
+car_version: "car-v1"
+days: ["2026-09-28", "2026-09-29", "2026-09-30", "2026-10-01", "2026-10-02"]
+drivable: [motorway, motorway_link, trunk, trunk_link, primary, primary_link, secondary, secondary_link,
+           tertiary, tertiary_link, unclassified, residential, living_street]
+# Used when a way has no numeric maxspeed tag (km/h).
+default_speed_kmh:
+  motorway: 90
+  motorway_link: 60
+  trunk: 70
+  trunk_link: 50
+  primary: 50
+  primary_link: 40
+  secondary: 50
+  secondary_link: 40
+  tertiary: 40
+  tertiary_link: 30
+  unclassified: 40
+  residential: 30
+  living_street: 15
+# Class groups used to borrow a factor from similar roads (smoothing).
+class_group:
+  motorway: major
+  motorway_link: major
+  trunk: major
+  trunk_link: major
+  primary: major
+  primary_link: major
+  secondary: major
+  secondary_link: major
+  tertiary: minor
+  tertiary_link: minor
+  unclassified: minor
+  residential: minor
+  living_street: minor
+match:
+  corridor_m: 35            # edge midpoint must lie this close to the stop-to-stop line
+  max_angle_deg: 30         # and its bearing must be this close to the segment bearing (undirected)
+  min_obs: 5                # observations per (segment, time of day) to use it
+  max_speed_kmh: 90         # observed segment speeds above this are discarded
+smoothing:
+  radius_m: 1000            # ways without data borrow the median factor of same-group ways within this radius
+factor:
+  # Relative slowdown = free-flow time / observed time of the SAME segment, so stop dwell time
+  # (which inflates bus times) cancels out. Free-flow = this percentile of the segment's own times.
+  free_flow_percentile: 15
+  min: 0.3
+  max: 1.0

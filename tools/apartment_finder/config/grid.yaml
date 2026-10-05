@@ -1,0 +1,5 @@
+# Hex grid for the apartment finder (PRD 5.1). Method version bumps on any change here.
+grid_version: "hex250-v1"
+crs: "EPSG:2180"
+spacing_m: 250          # native:creategrid hexagon HSPACING/VSPACING
+boundary_source: "../realtime_delay_lodz/delay_lodz.gpkg|layername=boundary"

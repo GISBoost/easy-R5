@@ -1,0 +1,17 @@
+# Per-hex static layers (PRD 5.4 / 7.4, milestone M1). Bump layers_version on any change.
+layers_version: "static-v1"
+pilot_day: "2026-10-02"          # a weekday with static+P50+P85 for Lodz; final = median over config/days.yaml
+# Network walking distance trick: R5 reports whole minutes, so walk at 1.2 km/h => 1 min = 20 m.
+walk:
+  speed_kmh: 1.2
+  max_minutes: 100               # => 2000 m cap, distances beyond are NULL ("> 2000 m")
+transit:
+  tram_route_types: [0]
+  bus_route_types: [3, 700, 702, 704]
+frequency:
+  radius_m: 400                  # stops within this network distance count
+  # per (route, direction) only the nearest stop counts, so one line is not counted at every stop
+green:
+  min_area_ha: 1.0
+  boundary_spacing_m: 100        # entrance proxy: vertices of the densified boundary
+  osm_filter: "leisure IN ('park','recreation_ground') OR landuse IN ('forest','recreation_ground','village_green') OR \"natural\" = 'wood'"

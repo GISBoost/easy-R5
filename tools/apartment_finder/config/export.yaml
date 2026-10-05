@@ -1,0 +1,11 @@
+# Web export (PRD 8). Matrix values are capped and quantised to keep the deployment small.
+export_version: "export-v1"
+cap_min: 60          # times above this are "not reached" in the app (target max_min is limited to it)
+scale_min: 2         # minutes per stored unit (quantisation error <= 1 min)
+# Basemap: same OSM standard tiles as the other mapy-analizy pages (Michal's decision, chat 2026-10-05; the
+# kickoff prompt said not to hot-link OSM tiles, so that is a conscious exception to be revisited if traffic grows).
+# CARTO tiles were tried and now require an API key. url "" switches to the own vector context (context.json).
+basemap:
+  url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+  subdomains: "abc"
+  attribution: "&copy; OpenStreetMap contributors"
