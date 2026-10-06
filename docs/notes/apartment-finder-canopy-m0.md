@@ -38,3 +38,11 @@ Odstępstwo od filmu: film = klasy 3+4+5 (zieleń „ogólna"); rekomendowane = 
 
 ## Czego nie zrobiono / zastrzeżenia
 Nie pobierano reszty miasta (czeka na zgodę). Brak kontroli na ortofotomapie GUGiK, a RGB z chmury (stan z nalotu 2021). Pilotaż nDSM tylko na jednym kaflu; rozkład dla całego miasta dopiero w M-C1. Liczba punktów w rastrach `count` PDAL wyszła wyższa niż liczba punktów pliku, więc używam wyłącznie obecności (≥1), nie liczności.
+
+## M-C1/M-C2 (2026-10-06): pełne miasto, metoda NMPT−NMT (decyzja Michała)
+- Pipeline (system Python, wznawialny, parametry w `config/canopy.yaml`, wersja `canopy-v1`): `canopy_tiles.py` (960 kafli NMPT+NMT 2021 → kody wysokości 0,5 m; 33 min, 87 MB wyników, ASC kasowane po każdym kaflu) → `canopy_mask.py` (próg 3 m, minus BDOT10k: budynki, zbiorniki, wieże, urządzenia techniczne, obiekty sportowe z buforem 1 m, mosty 3 m, maszty 2–3 m; otwarcie 1 m usuwa słupy/latarnie/druty; plamy < 10 m² odpadają; 100 s) → `canopy_hex.py` (QGIS, udział w heksie i w heksie + bufor 150 m).
+- BDOT10k: `1061_GPKG.zip` (schemat 2021, powiat Łódź, 37,7 MB) z opendata.geoportal.gov.pl; budynków BUBD_A: 97 517.
+- Walidacja na kaflu pilotażowym: pokrycie 30,9%; 99% pikseli korony ma w chmurze punkty klasy 5 (wysoka roślinność), tylko 5,8% leży w komórkach klasy 6 (budynki); IoU z klasą 5: 0,63 (0,70 poza komórkami budynków). Bez BDOT (tylko OSM) wskaźnik wynosił ok. 37%.
+- Wynik miasta (5662 heksów, wszystkie pokryte danymi w 100%): średnia 27,8%, mediana 21,5%, percentyle 5/25/75/95 = 1,9/12,5/35,0/86,0%, max 99,7%; bufor 150 m: średnia 27,8%, mediana 22,8%; korelacja heks–bufor 0,93. 552 heksów < 5%, 1149 > 40% (lasy i parki na obrzeżach).
+- Mianownik = cała powierzchnia heksa (budynki i drogi w mianowniku, jak „tree canopy cover"), inaczej niż w filmie (tam pole minus budynki).
+- Do zrobienia: kontrola wizualna (Michał, QGIS), wpięcie kolumn do `layers.json` i kryterium (M-C3/M-C4), README i PRD (M-C5). Znane ograniczenia: korona nad dachem w buforze 1 m od budynku przepada (lekkie niedoszacowanie), szerokie wiaty spoza BDOT10k mogą zostać w masce, nalot kwiecień 2021 (stan sprzed 5 lat).
