@@ -16,6 +16,9 @@ frequency:             # departures/h of tram+bus lines within walking reach, sa
 green:
   full_m: 200
   zero_at_m: 1000
+canopy:                # tree-canopy cover of the hex (share of its area, canopy-v2 from LiDAR nDSM >= 3 m); rising, saturating
+  full_share: 0.40     # score 1 at >= 40 % of the area under canopy (about the 80th percentile of Lodz hexes); linear below
+  default_hard_min: 0.15   # pre-filled value of the optional requirement "at least X % canopy" (about the 25th percentile)
 noise:                 # soft score = 1 - graded penalty from shares at soft_db, +5, +10 dB (score.js noisePenalty); soft_db = comfort limit
   road:     {indicator: lden, soft_db: 60, hard_db: 65, hard_max_share: 0.25}
   rail:     {indicator: lden, soft_db: 60, hard_db: 65, hard_max_share: 0.25}   # tram + rail
@@ -25,6 +28,6 @@ noise:                 # soft score = 1 - graded penalty from shares at soft_db,
 price:
   enabled: false       # PRD D10: empty slot until data is supplied
 defaults:
-  weights: {tram_stop: 0, bus_stop: 2, frequency: 2, green: 2, noise_road: 3, noise_rail: 2, noise_industry: 1, price: 0}
+  weights: {tram_stop: 0, bus_stop: 2, frequency: 2, green: 2, canopy: 2, noise_road: 3, noise_rail: 2, noise_industry: 1, price: 0}
   min_score: 0
 max_targets: 5

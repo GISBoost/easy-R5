@@ -79,8 +79,25 @@ def export_layers(out):
     nz = HERE / "data/noise/noise_layers.csv"
     if nz.exists():
         cols.update(read_csv_cols(nz))
+    cv = HERE / "data/canopy/canopy_hex.csv"
+    if cv.exists():
+        c = read_csv_cols(cv)
+        assert all(v is not None and 0 <= v <= 1 for v in c["canopy_hex"]) and min(c["cover_hex"]) >= 0.99, "canopy layer incomplete"
+        cols["canopy"] = [round(v, 3) for v in c["canopy_hex"]]   # share of the hex area under canopy (canopy-v2), 0..1
     json.dump(cols, open(out / "layers.json", "w"), separators=(",", ":"))
     return sorted(cols)
+
+
+def canopy_manifest(out):
+    """Canopy block of the manifest: method, data year and the optional preview image (canopy_overlay.py writes it)."""
+    mp = HERE / "data/canopy/canopy_hex.meta.json"
+    if not mp.exists():
+        return None
+    c = json.load(open(mp))
+    cc = yaml.safe_load(open(HERE / "config/canopy.yaml", encoding="utf-8"))
+    ov = out / "canopy_overlay.json"
+    return {"version": c["canopy_version"], "year": c["year"], "height_m": c["height_m"], "scan_date": "2021-04",
+            "overlay": json.load(open(ov)) if ov.exists() and (out / "canopy.webp").exists() else None}
 
 
 def export_context(out):
@@ -217,8 +234,10 @@ def main():
     present = sorted(f.name[:-6] for f in (out / "m").glob("*.r.bin"))
     bases = {n: base_of(n) for n in present if base_of(n) and base_of(n) != n}
     manifest = {
-        "method_version": "apt-v1 (grid %s, layers %s, noise %s, car %s, curves %s)" % (
-            grid_meta["grid_version"], "static-v1", noise_cfg["layers_version"], "car-v1", curves["curves_version"]),
+        "method_version": "apt-v1 (grid %s, layers %s, noise %s, canopy %s, car %s, curves %s)" % (
+            grid_meta["grid_version"], "static-v1", noise_cfg["layers_version"], (canopy_manifest(out) or {}).get("version", "none"),
+            "car-v1", curves["curves_version"]),
+        "canopy": canopy_manifest(out),
         "n": n, "bounds": bounds,
         "windows": {k: {"start": v["start"], "end": v["end"]} for k, v in tw["windows"].items()},
         "default_dir": {k: ("to" if v == "to_target" else "from") for k, v in tw["default_direction"].items()},

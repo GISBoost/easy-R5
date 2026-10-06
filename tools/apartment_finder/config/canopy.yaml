@@ -24,3 +24,5 @@ smooth:                          # flat tall surfaces (viaduct decks, flat roofs
   min_area_m2: 30.0              # a smooth tall patch at least this big is a structure
   dilate_m: 2.5                  # structure edges (parapets, eaves) are steep and rough: grow the structure by this much
 min_patch_m2: 10.0               # removes patches smaller than this
+overlay_res_m: 8.0                # preview image resolution (web mercator metres per pixel), see canopy_overlay.py
+overlay_quality: 60

@@ -160,3 +160,8 @@ Lokalnie gotowe: `data/services/2026-10-02/{walk,bike,car_morning,car_midday,car
 - Test lokalny: TP p85+ŁKA, południe, zdrowie ≥3 w 30 min = 2962 heksów, zgodne z danymi.
 - Review: poprawiono twarde „Wymagaj" bez danych (pomijane zamiast odrzucać wszystko); niski priorytet, nie zrobione: stałe N=5662 w `count_services.py`.
 - Zostaje: EN/telefon, publikacja (`publish_data.sh --push` + push mapy-analizy, tylko za zgodą), `sitemap.xml`.
+
+## 2026-10-06 — moduł „Korony drzew" (M-C0..M-C4 zrobione, M-C5 zostaje)
+- Pipeline (`tools/apartment_finder/scripts/canopy_tiles.py` → `canopy_mask.py` → `canopy_hex.py`, `canopy_overlay.py`; config `config/canopy.yaml`, `canopy-v2`): NMPT−NMT 2021 ≥ 3 m, minus BDOT10k, filtr gładkości (wiadukty/dachy) i cienkości (słupy). Szczegóły i liczby: [`apartment-finder-canopy-m0.md`](apartment-finder-canopy-m0.md). Dane robocze w `tools/apartment_finder/data/canopy/` (poza gitem; `final_v2/`, `canopy_hex.csv`).
+- Aplikacja: kolumna `canopy` w `layers.json`, krzywa `canopy` w `curves.yaml` (`full_share` 0,40, domyślne „wymagaj" 15%, waga domyślna 2), kryterium miękkie + wymaganie twarde + podgląd maski (`canopy.webp`, 2,7 MB, ładowany dopiero po włączeniu) + wpis w karcie + PL/EN + „Jak to działa". Lokalnie przetestowane (twarde 15% = 3833 heksów zgodnie z danymi).
+- Znane: pojedyncze fałszywe korony (Michał: ok. 1–2% zbioru, nie poprawiane), korona nad dachem w buforze 1 m od budynku przepada, stan z kwietnia 2021. Do zrobienia M-C5: README (opis kroków), aktualizacja PRD (pozycja „wielkość zieleni" częściowo pokryta), licencja GUGiK do potwierdzenia, ewentualna kontrola ortofotomapą, publikacja `canopy.webp` w repo danych (za zgodą).
