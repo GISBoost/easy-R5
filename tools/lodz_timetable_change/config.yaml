@@ -66,3 +66,9 @@ pairs:
 
 # A hex-POI pair is "transit" on a day when R5 reaches it and the time beats walking (or walking is impossible);
 # pairs are compared only if they are transit on BOTH days (no walk-only trips, as requested). R5 times are whole minutes.
+
+# Second run: hex-to-hex matrix (destinations = the same 250 m hexes). Pairs are compared on the same models/pairs as above.
+hexmatrix:
+  dest: inputs/hex250_origins.csv
+  distance_classes_km: [0, 3, 6, 10]   # straight-line origin-destination distance; the last class is open ("across the city")
+  min_dest_per_origin: 20              # a hex gets a map value only if it has at least this many comparable destinations

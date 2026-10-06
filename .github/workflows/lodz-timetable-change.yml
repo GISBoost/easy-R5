@@ -1,4 +1,4 @@
-name: lodz-timetable-change — R5 hex 250 m to nearest POIs (realized P50, Mondays)
+name: lodz-timetable-change — R5 hex 250 m to POIs or to hexes (realized P50, Mondays)
 
 # On-demand (workflow_dispatch only). tools/lodz_timetable_change/poi_tt.py on the realized P50 GTFS of each Monday
 # (config.yaml -> cases): R5 p50 travel times from every 250 m hex to the frozen nearest pharmacies / schools / clinics
@@ -18,6 +18,10 @@ on:
         description: 'Comma-separated bands (blank = all: am_peak,midday,pm_peak,evening)'
         required: false
         default: ''
+      dest:
+        description: 'Destinations: poi (3 nearest POIs per category) or hex (full hex-to-hex 250 m matrix, one job per case and band)'
+        required: false
+        default: 'poi'
 
 permissions:
   contents: read
@@ -38,13 +42,21 @@ jobs:
           import json, os, yaml
           cfg = yaml.safe_load(open("tools/lodz_timetable_change/config.yaml", encoding="utf-8"))
           want = [c for c in os.environ["CASES"].replace(" ", "").split(",") if c]
-          inc = [{"kind": "tt", "case": c, "day": cfg["cases"][c]["date"]} for c in want]
-          inc.append({"kind": "walk", "case": want[0], "day": cfg["cases"][want[0]]["date"]})
+          bands = [b for b in os.environ["BANDS"].replace(" ", "").split(",") if b] or list(cfg["bands"])
+          day = lambda c: cfg["cases"][c]["date"]
+          inc = []
+          for c in want:
+              # hex-to-hex is 28x heavier per band than the POI run, so every band is its own job
+              for b in (bands if os.environ["DEST"] == "hex" else [""]):
+                  inc.append({"kind": "tt", "case": c, "band": b, "day": day(c)})
+          inc.append({"kind": "walk", "case": want[0], "band": "", "day": day(want[0])})
           open(os.environ["GITHUB_OUTPUT"], "a").write("matrix=" + json.dumps({"include": inc}) + "\n")
           print(inc)
           PY
         env:
           CASES: ${{ github.event.inputs.cases || 'ctrl,before' }}
+          BANDS: ${{ github.event.inputs.bands }}
+          DEST: ${{ github.event.inputs.dest || 'poi' }}
 
   prepare:
     runs-on: ubuntu-latest
@@ -93,6 +105,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       HEAP_GB: '11'      # 16 GB runner, as in tram-failure-lodz.yml
       BANDS: ${{ github.event.inputs.bands }}
+      DEST: ${{ github.event.inputs.dest || 'poi' }}
       S3_DATA_DIR: ${{ github.workspace }}/_s3data
     steps:
       - uses: actions/checkout@v4
@@ -131,17 +144,16 @@ jobs:
       - name: Run R5
         run: |
           set -euo pipefail
+          B="${{ matrix.band }}"; B="${B:-$BANDS}"
           case "${{ matrix.kind }}" in
-            tt)   python poi_tt.py --osm lodz.osm.pbf --gtfs-dir gtfs --skip-walk \
-                    --cases "${{ matrix.case }}" --bands "$BANDS" --heap-gb "$HEAP_GB" ;;
-            walk) python poi_tt.py --osm lodz.osm.pbf --gtfs-dir gtfs --walk-only \
-                    --cases "${{ matrix.case }}" --heap-gb "$HEAP_GB" ;;
+            tt)   python poi_tt.py --dest "$DEST" --osm lodz.osm.pbf --gtfs-dir gtfs --skip-walk                     --cases "${{ matrix.case }}" --bands "$B" --heap-gb "$HEAP_GB" ;;
+            walk) python poi_tt.py --dest "$DEST" --osm lodz.osm.pbf --gtfs-dir gtfs --walk-only                     --cases "${{ matrix.case }}" --heap-gb "$HEAP_GB" ;;
           esac
 
       - uses: actions/upload-artifact@v4
         with:
-          name: poi-tt-${{ matrix.kind }}-${{ matrix.case }}
+          name: ${{ env.DEST }}-tt-${{ matrix.kind }}-${{ matrix.case }}-${{ matrix.band }}
           path: |
-            ${{ github.workspace }}/_s3data/poi_tt/${{ matrix.case }}/
-            ${{ github.workspace }}/_s3data/poi_tt/walk.npz
+            ${{ github.workspace }}/_s3data/${{ env.DEST }}_tt/${{ matrix.case }}/${{ matrix.band }}*.npz
+            ${{ github.workspace }}/_s3data/${{ env.DEST }}_tt/walk.npz
           retention-days: 30

@@ -5,10 +5,11 @@ the script runs on a laptop and on a GitHub Actions runner.
 
     py poi_tt.py --osm lodz.osm.pbf --gtfs-dir <dir with lodz_realized_<day>_p50.zip>
         [--cases before,after] [--bands am_peak] [--heap-gb 8] [--limit-origins N]
-        [--walk-only | --skip-walk] [--jdk-home ...] [--jar ...]
+        [--walk-only | --skip-walk] [--dest poi|hex] [--jdk-home ...] [--jar ...]
 
 Writes <data_dir>/poi_tt/<case>/<band>.npz (int16 minutes, -1 = not reached, rows = inputs/hex250_origins.csv,
 columns = inputs/poi_dest.csv) and <data_dir>/poi_tt/walk.npz (walk-only, same shape). CI sets S3_DATA_DIR.
+With --dest hex the destinations are the origin hexes themselves (full 250 m matrix) and the output goes to hex_tt/.
 """
 
 from __future__ import annotations
@@ -37,6 +38,7 @@ from easy_r5.core import downloads, java_env, job_spec, network_cache, pins, run
 CFG = yaml.safe_load((HERE / "config.yaml").read_text(encoding="utf-8"))
 P, R5, BANDS = CFG["poi"], CFG["r5"], CFG["bands"]
 OUT = Path(os.environ.get("S3_DATA_DIR") or CFG["data_dir"]) / "poi_tt"
+DEST_CSV = HERE / P["pois"]
 WORK = HERE / "_ci_work"
 TRANSIT_MODES = ["TRAM", "SUBWAY", "RAIL", "BUS", "FERRY", "CABLE_CAR", "GONDOLA", "FUNICULAR"]
 WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
@@ -133,7 +135,7 @@ def run_matrix(env, dat, origins_csv, ids, dest_ids, date, band, transit, xmx, f
     shutil.rmtree(tmp, ignore_errors=True)
     tmp.mkdir(parents=True)
     job = job_spec.build_matrix_job(
-        network=str(dat), origins_csv=str(origins_csv), destinations_csv=str(HERE / P["pois"]), origin_range=None,
+        network=str(dat), origins_csv=str(origins_csv), destinations_csv=str(DEST_CSV), origin_range=None,
         date=date, departure_time=band["departure"], time_window_minutes=band["window_min"],
         percentiles=R5["percentiles"], max_trip_duration_minutes=R5["max_trip_duration_min"],
         max_walk_time_minutes=R5["max_walk_time_min"] if transit else R5["walk_only_max_walk_min"],
@@ -166,10 +168,13 @@ def main():
     ap.add_argument("--jar", default=None)
     ap.add_argument("--skip-walk", action="store_true", help="CI: the walk matrix is its own job")
     ap.add_argument("--walk-only", action="store_true")
+    ap.add_argument("--dest", default="poi", choices=["poi", "hex"], help="hex = hex-to-hex matrix")
     ap.add_argument("--limit-origins", type=int, default=0, help="smoke only; writes to poi_tt_smoke")
     a = ap.parse_args()
 
-    global OUT
+    global OUT, DEST_CSV
+    if a.dest == "hex":
+        OUT, DEST_CSV = OUT.parent / "hex_tt", HERE / CFG["hexmatrix"]["dest"]
     fb = Feedback()
     env = ensure_env(fb, a.jdk_home, a.jar)
     xmx = f"-Xmx{int(float(a.heap_gb) * 1024)}m"
@@ -178,9 +183,9 @@ def main():
     origins_csv = HERE / P["origins"]
     rows = list(csv.DictReader(open(origins_csv, encoding="utf-8")))
     ids = [r["id"] for r in rows]
-    dest_ids = [r["id"] for r in csv.DictReader(open(HERE / P["pois"], encoding="utf-8"))]
+    dest_ids = [r["id"] for r in csv.DictReader(open(DEST_CSV, encoding="utf-8"))]
     if a.limit_origins:
-        OUT = OUT.parent / "poi_tt_smoke"
+        OUT = OUT.parent / f"{OUT.name}_smoke"
         step = max(1, len(rows) // a.limit_origins)
         rows = rows[::step][: a.limit_origins]
         ids = [r["id"] for r in rows]
