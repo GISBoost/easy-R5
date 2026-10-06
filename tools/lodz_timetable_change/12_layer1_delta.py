@@ -21,6 +21,13 @@ CFG = yaml.safe_load((HERE / "config.yaml").read_text(encoding="utf-8"))["layer1
 SRC, DST = HERE / "out" / "layer1", HERE / "out" / "layer1_delta"
 
 
+def set_grid(name):
+    global SRC, DST
+    CFG.update(CFG["grids"][name])
+    sfx = "" if name == "h500" else f"_{name}"
+    SRC, DST = HERE / "out" / f"layer1{sfx}", HERE / "out" / f"layer1_delta{sfx}"
+
+
 def load(case, band, metric):
     path = SRC / case / f"{band}_{metric}.csv"
     if not path.is_file():
@@ -37,7 +44,9 @@ def hex_pop():
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--pairs", default="")
+    ap.add_argument("--grid", default="h500", choices=["h500", "h250"])
     args = ap.parse_args()
+    set_grid(args.grid)
     pairs = [p for p in args.pairs.split(",") if p] or list(CFG["pairs"])
     pop = hex_pop()
     D = CFG["delta"]

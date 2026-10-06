@@ -19,9 +19,11 @@ from qgis.PyQt.QtCore import QVariant
 from qgis.PyQt.QtGui import QColor
 
 HERE = Path(r"C:/Users/Michal/Desktop/easy/easy-R5/tools/lodz_timetable_change")
-GRID = HERE.parent / "tram_failure_lodz" / "grids" / "h500.gpkg"
+GRID_NAME = globals().get("GRID_NAME", "h500")   # set before exec() for the 250 m maps
+SFX = "" if GRID_NAME == "h500" else f"_{GRID_NAME}"
+GRID = HERE.parent / "tram_failure_lodz" / "grids" / f"{GRID_NAME}.gpkg"
 BANDS = ["am_peak", "midday", "pm_peak", "evening"]
-OUT_GPKG = HERE / "out" / "s3_layer1.gpkg"
+OUT_GPKG = HERE / "out" / f"s3_layer1{SFX}.gpkg"
 
 
 def read(path):
@@ -30,11 +32,11 @@ def read(path):
 
 
 values = {}  # hex_id -> {field: value}
-for r in read(HERE / "out" / "layer1_delta" / "main" / "delta_hex.csv"):
+for r in read(HERE / "out" / f"layer1_delta{SFX}" / "main" / "delta_hex.csv"):
     if r["metric"] == "acc" and r["opportunity"] == "pop" and r["cutoff"] in ("30", "60"):
         values.setdefault(r["hex_id"], {})[f"dpop{r['cutoff']}_{r['band']}"] = float(r["delta"])
 for pair, tag in (("main", "tt"), ("placebo", "ttplc")):
-    for r in read(HERE / "out" / "layer1_tt" / pair / "hex.csv"):
+    for r in read(HERE / "out" / f"layer1_tt{SFX}" / pair / "hex.csv"):
         values.setdefault(r["hex_id"], {})[f"{tag}_{r['band']}"] = float(r["mean_delta_min"])
 
 fields = [f"dpop30_{b}" for b in BANDS] + [f"dpop60_{b}" for b in BANDS] + \
@@ -94,7 +96,7 @@ REACH_LABELS = ["≤ -5000", "-5000 … -1000", "-1000 … ~0", "no change", "~0
 TT_LABELS = ["≤ -3 min (faster)", "-3 … -1", "-1 … -0.25", "≈ no change", "0.25 … 1", "1 … 3", "≥ 3 min (slower)"]
 
 proj = QgsProject.instance()
-for ln in ("S3 tt Δ am_peak", "S3 tt Δ pm_peak", "S3 reach30 Δ am_peak", "S3 reach30 Δ pm_peak", "S3 PLACEBO tt Δ am_peak"):
+for ln in tuple(f"{n}{SFX}" for n in ("S3 tt Δ am_peak", "S3 tt Δ pm_peak", "S3 reach30 Δ am_peak", "S3 reach30 Δ pm_peak", "S3 PLACEBO tt Δ am_peak")):
     for old in proj.mapLayersByName(ln):
         proj.removeMapLayer(old.id())
 
@@ -107,10 +109,11 @@ specs = [
 ]
 root = proj.layerTreeRoot()
 for name, field, edges, neg_better, labels in specs:
+    name = f"{name}{SFX}"
     lyr = QgsVectorLayer(f"{OUT_GPKG.as_posix()}|layername=hex_delta", name, "ogr")
     # no fill for NULL: a graduated renderer simply draws nothing for features outside every range
     style(lyr, field, edges, neg_better, labels)
     proj.addMapLayer(lyr)
     node = root.findLayer(lyr.id())
-    node.setItemVisibilityChecked(name == "S3 tt Δ am_peak")
-print("layers added:", [s[0] for s in specs])
+    node.setItemVisibilityChecked(name == f"S3 tt Δ am_peak{SFX}")
+print("layers added:", [f"{s[0]}{SFX}" for s in specs])

@@ -25,6 +25,13 @@ OUT = HERE / "out" / "layer1_tt"
 CUTS = [10, 20, 30, 45]  # ponytail: trip-length classes by the "before" time; move to config.yaml if reused
 
 
+def set_grid(name):
+    global SRC, OUT
+    L1.update(L1["grids"][name])
+    sfx = "" if name == "h500" else f"_{name}"
+    SRC, OUT = Path(CFG["data_dir"]) / f"layer1_tt{sfx}", HERE / "out" / f"layer1_tt{sfx}"
+
+
 def wquantile(x, w, q):
     o = np.argsort(x)
     x, w = x[o], w[o]
@@ -37,11 +44,18 @@ def transit_mask(m, walk):
 
 
 def main():
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--grid", default="h500", choices=["h500", "h250"])
+    set_grid(ap.parse_args().grid)
     walk = np.load(SRC / "walk.npz")["m"]
     ids = [r["id"] for r in csv.DictReader(open(HERE / L1["origins"], encoding="utf-8"))]
+    dest_ids = [r["id"] for r in csv.DictReader(open(HERE / TT["destinations"], encoding="utf-8"))]
     pop = {r["id"]: float(r["pop"]) for r in csv.DictReader(open(HERE / L1["destinations"], encoding="utf-8"))}
+    pop500 = {r["id"]: float(r["pop"]) for r in csv.DictReader(open(HERE / L1["grids"]["h500"]["destinations"], encoding="utf-8"))}
     p = np.array([pop[i] for i in ids])
-    W = np.outer(p, p)
+    W = np.outer(p, np.array([pop500[i] for i in dest_ids]))
+    square = ids == dest_ids   # self-pairs only exist when origins and destinations are the same grid
     for name, pr in TT["pairs"].items():
         out = OUT / name
         out.mkdir(parents=True, exist_ok=True)
@@ -53,8 +67,9 @@ def main():
                 continue
             a, b = np.load(fa)["m"], np.load(fb)["m"]
             ta, tb = transit_mask(a, walk), transit_mask(b, walk)
-            np.fill_diagonal(ta, False)
-            np.fill_diagonal(tb, False)
+            if square:
+                np.fill_diagonal(ta, False)
+                np.fill_diagonal(tb, False)
             both = ta & tb
             d = (b.astype(np.int32) - a.astype(np.int32))
             x, w, ba = d[both].astype(float), W[both], a[both]

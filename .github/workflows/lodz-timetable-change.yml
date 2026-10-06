@@ -61,6 +61,12 @@ jobs:
   prepare:
     runs-on: ubuntu-latest
     steps:
+      # osmosis' jars are class-file version 65 (Java 21); the runner's default Java 17 fails with UnsupportedClassVersionError.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
       - name: Install osmosis
         run: sudo apt-get update -y && sudo apt-get install -y osmosis
 
