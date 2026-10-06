@@ -1,0 +1,165 @@
+name: lodz-timetable-change — S3 layer 1 (R5 before/after, Mondays)
+
+# On-demand (workflow_dispatch only). Layer 1 of tools/lodz_timetable_change on the static GTFS of each case
+# (config.yaml -> layer1.cases): accessibility per departure band (layer1_r5.py) and transit travel-time matrices
+# (layer1_tt.py) from the chosen origin grid. At 500 m a full run is ~12 + ~10 min locally; at 250 m (5665 origins)
+# it is over an hour on one machine, so every (kind, case) is its own job here and they run in parallel.
+#
+# One `prepare` job clips the OSM extract ONCE and every job downloads that same artifact, so before and after are
+# routed on the same OSM snapshot. No QGIS on the runner: both scripts drive R5 through easy_r5/core, as in
+# tram-failure-lodz.yml. Download with `gh run download <id>`; put layer1-acc-* into tools/lodz_timetable_change/out/layer1_<grid>/
+# and layer1-tt-*/walk into <data_dir>/layer1_tt_<grid>/, then run 12/13/14 with --grid.
+on:
+  workflow_dispatch:
+    inputs:
+      grid:
+        description: 'Origin grid: h250 or h500'
+        required: false
+        default: 'h250'
+      cases:
+        description: 'Comma-separated cases (blank = before_clean,before_near,after)'
+        required: false
+        default: ''
+      bands:
+        description: 'Comma-separated bands (blank = all: am_peak,midday,pm_peak,evening)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.gen.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: gen
+        shell: bash
+        run: |
+          set -euo pipefail
+          pip install pyyaml
+          python - <<'PY'
+          import json, os, yaml
+          cfg = yaml.safe_load(open("tools/lodz_timetable_change/config.yaml", encoding="utf-8"))
+          static = {c: v["static_day"] for c, v in cfg["layer1"]["cases"].items()}
+          want = [c for c in os.environ.get("CASES", "").replace(" ", "").split(",") if c] or cfg["tt"]["cases"]
+          inc = []
+          for c in want:
+              inc.append({"kind": "acc", "case": c, "static_day": static[c]})
+              inc.append({"kind": "tt", "case": c, "static_day": static[c]})
+          first = want[0]
+          inc.append({"kind": "walk", "case": first, "static_day": static[first]})
+          m = {"include": inc}
+          open(os.environ["GITHUB_OUTPUT"], "a").write("matrix=" + json.dumps(m) + "\n")
+          print(m)
+          PY
+        env:
+          CASES: ${{ github.event.inputs.cases }}
+
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install osmosis
+        run: sudo apt-get update -y && sudo apt-get install -y osmosis
+
+      - name: Clip the Lodz OSM extract once
+        run: |
+          set -euo pipefail
+          curl -fL -o region.osm.pbf https://download.geofabrik.de/europe/poland/lodzkie-latest.osm.pbf
+          # City bbox + ~5 km margin; completeWays=yes is required (dangling node refs crash R5's builder).
+          osmosis --read-pbf file=region.osm.pbf \
+            --bounding-box left=19.1672 bottom=51.6035 right=19.7404 top=51.9155 completeWays=yes \
+            --write-pbf file=lodz.osm.pbf
+          sha256sum lodz.osm.pbf | tee lodz.osm.pbf.sha256
+          ls -la lodz.osm.pbf
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lodz-osm
+          path: |
+            lodz.osm.pbf
+            lodz.osm.pbf.sha256
+          retention-days: 14
+
+  compute:
+    needs: [plan, prepare]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
+    runs-on: ubuntu-latest
+    # 250 m, per case: tt = 4 bands x ~3.7 min locally (12 threads), acc ~ 4 bands x 2 modes x ~1 min; a 4-core runner
+    # is ~3x slower. 240 leaves room and stays under GitHub's 360 min job cap.
+    timeout-minutes: 240
+    defaults:
+      run:
+        working-directory: tools/lodz_timetable_change
+        shell: bash
+    env:
+      GH_TOKEN: ${{ github.token }}
+      HEAP_GB: '11'      # 16 GB runner, as in tram-failure-lodz.yml
+      GRID: ${{ github.event.inputs.grid || 'h250' }}
+      BANDS: ${{ github.event.inputs.bands }}
+      S3_DATA_DIR: ${{ github.workspace }}/_s3data
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'      # ADR-0002
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - run: pip install pyyaml numpy
+
+      - name: Cache the pinned R5 jar
+        uses: actions/cache@v4
+        with:
+          path: tools/lodz_timetable_change/_ci_work/r5-v7.6-all.jar
+          key: r5-jar-v7.6
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: lodz-osm
+          path: tools/lodz_timetable_change
+
+      - name: Get the static GTFS for this case
+        run: |
+          set -euo pipefail
+          D="${{ matrix.static_day }}"
+          mkdir -p gtfs
+          gh release download "lodz-realized-${D}-phone" --repo GISBoost/easy-GTFS-RT \
+            --pattern "lodz_static_gtfs_${D}.zip" --dir gtfs --clobber
+          ls -la gtfs
+
+      - name: Run R5
+        run: |
+          set -euo pipefail
+          case "${{ matrix.kind }}" in
+            acc)  python layer1_r5.py --grid "$GRID" --osm lodz.osm.pbf --gtfs-dir gtfs \
+                    --cases "${{ matrix.case }}" --bands "$BANDS" --heap-gb "$HEAP_GB" ;;
+            tt)   python layer1_tt.py --grid "$GRID" --osm lodz.osm.pbf --gtfs-dir gtfs --skip-walk \
+                    --cases "${{ matrix.case }}" --bands "$BANDS" --heap-gb "$HEAP_GB" ;;
+            walk) python layer1_tt.py --grid "$GRID" --osm lodz.osm.pbf --gtfs-dir gtfs --walk-only \
+                    --cases "${{ matrix.case }}" --heap-gb "$HEAP_GB" ;;
+          esac
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.kind == 'acc'
+        with:
+          name: layer1-acc-${{ matrix.case }}
+          path: tools/lodz_timetable_change/out/layer1*/${{ matrix.case }}/
+          retention-days: 30
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.kind != 'acc'
+        with:
+          name: layer1-${{ matrix.kind }}-${{ matrix.case }}
+          path: |
+            ${{ github.workspace }}/_s3data/layer1_tt*/${{ matrix.case }}/
+            ${{ github.workspace }}/_s3data/layer1_tt*/walk.npz
+          retention-days: 30

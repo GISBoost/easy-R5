@@ -1,0 +1,74 @@
+# The only place for numbers and paths (no magic numbers in the scripts). Spec: ../../docs/prompts/easy-R5_S3_lodz-timetable-change.md
+# Data lives outside git and outside C: (see repo CLAUDE.md "Dane").
+data_dir: "G:/easy_data/lodz_timetable_change"
+
+source:
+  repo: "GISBoost/easy-GTFS-RT"      # public release assets, no GitHub API
+  city: lodz
+  # Same asset pattern as transit-index/reference/fetch_release_assets.py (verified 2026-10-06).
+  tag: "{city}-realized-{date}-phone"
+  assets:
+    tidy: "{city}_tidy_{date}.csv.gz"
+    static: "{city}_static_gtfs_{date}.zip"
+
+fetch:
+  from: "2026-09-01"                 # statics for every day (needed for the static diff)
+  tidy_weekdays_from: "2026-09-07"   # tidy for weekdays only, from the placebo window onwards
+  to: null                           # null = last day that has a release tag
+  retries: 3
+  timeout_s: 120
+
+# Layer 1 (R5 on static GTFS). Hex 500 m origins + destinations (population per hex + OSM service POIs as control)
+# are frozen from tools/tram_failure_lodz/inputs (census polygons are not public; same convention as there).
+layer1:
+  origins: inputs/hex500_origins.csv
+  destinations: inputs/destinations.csv
+  grids:                               # selected with --grid (default h500); outputs of non-default grids get a _<grid> suffix
+    h500: {origins: inputs/hex500_origins.csv, destinations: inputs/destinations.csv}
+    h250: {origins: inputs/hex250_origins.csv, destinations: inputs/destinations250.csv}
+  opportunity_fields: [pop, srv_school, srv_pharmacy, srv_university, srv_mall]
+  # case -> analysis date and the static GTFS (published on static_day) to route on. Mondays only (owner, 2026-10-06).
+  # The 2026-10-02 static is a multi-version feed that already carries the post-5.10 timetable (verified by 01_static_diff.py).
+  cases:
+    before_clean: {date: "2026-09-14", static_day: "2026-09-14"}   # 129 lines, 10272 trips, before the late-Sept emergency changes
+    before_near:  {date: "2026-09-28", static_day: "2026-09-28"}   # last Monday before the change
+    after:        {date: "2026-10-12", static_day: "2026-10-02"}   # first full Monday after
+    after_first:  {date: "2026-10-05", static_day: "2026-10-02"}   # day of the change (adaptation day), swap static when 10-05 is published
+  # Bands are DEPARTURE windows, aligned with transit-index config/metrics.yaml (am 7-8, midday 9-13, pm 14-17, evening 18-21).
+  bands:
+    am_peak: {departure: "07:00", window_min: 120}
+    midday:  {departure: "09:00", window_min: 300}
+    pm_peak: {departure: "14:00", window_min: 240}
+    evening: {departure: "18:00", window_min: 240}
+  r5:
+    cutoffs: [30, 45, 60]
+    percentiles: [50]
+    max_trip_duration_min: 60        # = largest cutoff, lossless; also < 120 (histogram limit)
+    max_walk_time_min: 30            # same in every case, so it cancels in the before/after delta
+    walk_speed_kmh: 3.6
+    max_rides: 3
+    monte_carlo_draws: 5
+  # Comparisons (b - a). before_clean -> before_near is a placebo: both are before the change.
+  pairs:
+    main:     {a: before_clean, b: after}
+    near:     {a: before_near,  b: after}
+    placebo:  {a: before_clean, b: before_near}
+    adaptation: {a: after_first, b: after}
+  delta:
+    metrics: [acc, svcacc]           # acc = p50 accessibility; svcacc = accessibility averaged over departure minutes
+    opportunities: [pop, srv_school, srv_pharmacy, srv_university, srv_mall]
+    top_n: 15
+    min_baseline: 0                  # hexes with baseline == 0 and result == 0 are NULL, not "no change"
+
+# Transit travel-time metric (no walk-only trips): R5 p50 door-to-door time between hex centroids, kept only where
+# transit beats walking (transit time < walk-only time, or walking is not possible within the cap). Matrices live in data_dir.
+tt:
+  destinations: inputs/hex500_origins.csv    # travel-time destinations stay the 500 m centroids for every origin grid
+  cases: [before_clean, before_near, after]    # after_first shares the static of `after`
+  max_trip_duration_min: 120
+  max_walk_time_min: 30
+  walk_only_max_walk_min: 120                  # walk-only matrix: wide cap so "walking is faster" is judged correctly
+  pairs:
+    main:    {a: before_clean, b: after}       # one Monday vs one Monday
+    near:    {a: before_near,  b: after}
+    placebo: {a: before_clean, b: before_near}

@@ -17,6 +17,8 @@
 # census polygons behind it are not public, so CI cannot rebuild it. Same reasoning as
 # the two rules above -- these files define a run, so they are code, not data.
 !tools/tram_failure_lodz/inputs/*.csv
+# tools/lodz_timetable_change/inputs/ is the frozen hex-500 grid + destinations the S3 workflow reads (same reasoning).
+!tools/lodz_timetable_change/inputs/*.csv
 
 # --- R5 runtime artifacts ---
 *.jar
