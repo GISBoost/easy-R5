@@ -1,23 +1,36 @@
-# lodz_timetable_change — S3: skutki zmiany tras/rozkładu z 2026-10-05 (Łódź)
+# lodz_timetable_change — S3: jak zmienił się czas dojazdu po zmianie tras z 2026-10-05 (Łódź)
 
 Prompt: [`../../docs/prompts/easy-R5_S3_lodz-timetable-change.md`](../../docs/prompts/easy-R5_S3_lodz-timetable-change.md).
-Ramowanie (decyzja Michała 2026-10-06): **eksperyment objazdowy**, nie „nowa siatka” — 5.10 to zmiana
-tras 23 linii (tramwaje wracają na pl. Reymonta, remont przechodzi na pl. Niepodległości) i rozkładów 10 linii.
-Wynik komunikacyjny (nota + wpis), bez przypinania metody do doktoratu. Produkt dla radnego: „najwolniejsze
-odcinki”, nie „zatory”.
+Ramowanie: **eksperyment objazdowy**, nie „nowa siatka”. Wynik komunikacyjny, bez przypinania metody do doktoratu.
 
-Dane poza gitem: `G:/easy_data/lodz_timetable_change/` (ścieżka w `config.yaml`).
+## Co liczymy (wersja z 2026-10-06, zastępuje analizę hex→hex na statykach)
+Różnicę **czasu dojazdu transportem** z każdego hexa 250 m do **3 najbliższych** obiektów każdej kategorii
+(apteki, szkoły, przychodnie, supermarkety), między dwoma poniedziałkami:
+
+* **model dnia** = zrealizowany GTFS P50 z release'u `easy-GTFS-RT` (`lodz_realized_<data>_p50.zip`), czyli rozkład
+  poprawiony pomiarem GTFS-RT; osobny model na każdy poniedziałek,
+* **„najbliższe”** = najmniejsza odległość w linii prostej, wybrana **raz** (`prepare_poi.py` → `inputs/nearest.csv`),
+  te same punkty w każdym modelu; zmienia się tylko czas dojazdu do nich,
+* czas = mediana R5 (p50) po odjazdach w oknie pasma, od drzwi do drzwi; pary porównujemy tylko tam, gdzie
+  transport jest szybszy niż pójście pieszo **w obu dniach** (bez tras pieszych); drugi wariant („od drzwi do drzwi”)
+  jest liczony obok,
+* Δ = później − wcześniej, minuty; ujemne = późniejszy poniedziałek jest szybszy.
+
+Przypadki (`config.yaml`): `ctrl` 21.09, `before` 28.09, `after` 5.10. Pary: `main` = 5.10 vs 28.09, `placebo` =
+28.09 vs 21.09 (oba przed zmianą: pokazuje, ile różnicy robi sam dzień).
 
 ## Kolejność
-1. `py -I 00_fetch_freeze.py` — pobranie tidy + statyk z release'ów `easy-GTFS-RT`, SHA-256, manifest, luki.
-2. `py -I 01_static_diff.py` — diff statyk (hash, calendar, linie, kursy aktywne w dniu, look-ahead 10 dni).
+1. `py -I 00_fetch_freeze.py` — pobranie tidy i statyków z release'ów (surowe dane, poza gitem).
+2. `py -I prepare_poi.py` — jednorazowo, lokalnie (potrzebuje `../lodzkie_na_mapach_2026/lodzkie_base.gpkg`);
+   wynik w `inputs/` jest w repo.
+3. GitHub Actions: `lodz-timetable-change.yml` (workflow_dispatch, `cases=ctrl,before,after`) → `poi_tt.py`.
+   `gh run download <id>` do `<data_dir>/poi_tt/` (po jednym katalogu na przypadek + `walk.npz`).
+4. `py -I poi_delta.py` → `out/poi_delta/<para>/` (`sentences.txt`, `summary_pairs.csv`, `summary_hex.csv`, `hex.csv`).
+5. W QGIS: `exec(open("poi_qgis.py").read())` → mapy hex 250 m (niebieski = krócej, czerwony = dłużej).
 
-## Krok 0 — wyniki (2026-10-06, dni do 2026-10-04)
-- Łódź: 0 dni bez tagu w 2026-09-01…10-04, 0 brakujących assetów (brak tagu tylko 08-27, poza oknem).
-- 13 unikalnych statyków. Warianty ~16 MB (17–20.09 i od 2.10) to feedy z **kilkoma scalonymi wersjami**
-  (`feed_info`: 11501_11510_11511; 11519_11521_11522) i ~75 tys. kursów zamiast ~50 tys. — niosą dni z przyszłości.
-- **Statyk z 2.10 już zawiera rozkład po 5.10**: od 5.10 linie 17 i 19 dochodzą, Z2 i Z11 znikają (zgodnie
-  z komunikatem MPK), dzień roboczy ma 10 207 kursów i 129 linii (vs 10 275 / 128 w 28–30.09 i 10 471 / 129 w 1–2.10).
-  Warstwa 1 nie musi czekać na dane „po”.
-- Dni robocze „przed”: identyczny zestaw linii i 10 272 kursów w 7–18.09; 21–24.09 128 linii / 10 271 kursów;
-  28–30.09 10 275. 25.09 (10 645 kursów) i 1–2.10 (10 471) są wyjątkowe.
+## Zastrzeżenia
+* Czas to p50 z 5 losowań w oknie odjazdów, w pełnych minutach; „to samo” = ta sama minuta.
+* Model = rozkład + pomiar z jednego dnia; różnice między poniedziałkami obejmują też zwykłą zmienność dnia
+  (stąd para placebo) i zmiany z końca września/1.10, nie tylko zmianę z 5.10.
+* Kategorie POI to wybór roboczy (zmiana w `config.yaml` → `poi.categories`, potem `prepare_poi.py`).
+* Release `lodz-realized-2026-10-05-phone` wymaga udanego buildu w `easy-GTFS-RT` (run z 5.10 został anulowany).
