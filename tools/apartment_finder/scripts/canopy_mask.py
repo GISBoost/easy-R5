@@ -4,8 +4,10 @@ For each `data/canopy/codes/<godlo>.tif`:
   1. canopy candidate = code >= number of thresholds up to config `height_m`;
   2. minus BDOT10k structures (config `exclude`: buildings, tanks, towers, technical devices, sport structures as buffered
      polygons; bridges as buffered lines; masts/technical devices as buffered points), rasterised at 0.5 m;
-  3. morphological opening (config `open_radius_m`) removes objects thinner than ~2 m (poles, lamp arms, wires, fences);
-  4. patches smaller than `min_patch_m2` are dropped.
+  3. minus smooth tall structures (band 2 = local roughness): connected patches of height >= height_m and std <= smooth.max_std_m
+     that are >= smooth.min_area_m2 (viaduct decks, flat roofs), grown by smooth.dilate_m to take their rough edges too;
+  4. morphological opening (config `open_radius_m`) removes objects thinner than ~2 m (poles, lamp arms, wires, fences);
+  5. patches smaller than `min_patch_m2` are dropped.
 Output `data/canopy/final/<godlo>.tif`: uint8, 1 = canopy, 0 = other, 255 = no data. Run after canopy_tiles.py (system Python).
 
   py scripts/canopy_mask.py [--only GODLO ...] [--tag NAME]     (--tag writes to final_<NAME>/ for experiments)
@@ -92,14 +94,28 @@ def clean(mask):
     return m
 
 
+def structures(cand, std_cm):
+    """Large smooth tall patches, grown by `dilate_m` (only the candidate pixels are ever removed)."""
+    sm = cfg["smooth"]
+    smooth = cand & (std_cm <= sm["max_std_m"] * 100)
+    lab, n = ndi.label(smooth, structure=np.ones((3, 3)))
+    if not n:
+        return smooth
+    sizes = ndi.sum(smooth, lab, index=np.arange(1, n + 1))
+    core = np.concatenate([[False], sizes * PX * PX >= sm["min_area_m2"]])[lab]
+    return ndi.binary_dilation(core, structure=disk(int(round(sm["dilate_m"] / PX)))) & cand
+
+
 def process(src, dst):
     ds = gdal.Open(str(src))
     gt, w, h = ds.GetGeoTransform(), ds.RasterXSize, ds.RasterYSize
-    code = ds.ReadAsArray()
+    code = ds.GetRasterBand(1).ReadAsArray()
+    std_cm = ds.GetRasterBand(2).ReadAsArray()
     nodata = code == 255
     cand = (code >= NEED) & ~nodata
     ex = exclusion(gt, w, h)
-    final = clean(cand & ~ex)
+    st = structures(cand & ~ex, std_cm)
+    final = clean(cand & ~ex & ~st)
     out = final.astype(np.uint8)
     out[nodata] = 255
     tmp = str(dst) + ".part"
@@ -111,7 +127,7 @@ def process(src, dst):
     o = ds = None
     Path(tmp).replace(dst)
     valid = ~nodata
-    return {"raw": float(cand.sum() / max(1, valid.sum())), "excluded_part": float((cand & ex).sum() / max(1, cand.sum())),
+    return {"raw": float(cand.sum() / max(1, valid.sum())), "excluded_part": float((cand & ex).sum() / max(1, cand.sum())), "smooth_part": float(st.sum() / max(1, cand.sum())),
             "final": float(final.sum() / max(1, valid.sum())), "nodata": float(nodata.mean())}
 
 

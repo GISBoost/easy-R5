@@ -1,9 +1,9 @@
-"""Canopy stage 3: canopy mask tiles -> share of canopy per hex and per hex + neighbourhood buffer (QGIS interpreter).
+"""Canopy stage 3: canopy mask tiles -> share of canopy per hex (QGIS interpreter).
 
 Reads `data/canopy/final/*.tif` (1 = canopy, 0 = other, 255 = no data; 0.5 m, EPSG:2177), builds a VRT, runs zonal
-statistics on the hexes and on the hexes buffered by `neighbourhood_buffer_m`, and writes `data/canopy/canopy_hex.csv`:
-hex_id, canopy_hex, canopy_buf (shares in [0, 1] of the whole area, buildings and roads included in the denominator),
-cover_hex, cover_buf (fraction of the zone covered by valid pixels; must be ~1), method version and data year in meta.
+statistics on the hexes and writes `data/canopy/canopy_hex.csv`: hex_id, canopy_hex (share in [0, 1] of the whole hex area,
+buildings and roads included in the denominator), cover_hex (fraction covered by valid pixels; must be ~1); method version and
+data year go to canopy_hex.meta.json.
 
   python-qgis-ltr.bat scripts/canopy_hex.py [final_dir_name]
 """
@@ -32,7 +32,6 @@ gdal.BuildVRT(str(vrt), [str(p) for p in tiles], srcNodata=255, VRTNodata=255)
 rl = QgsRasterLayer(str(vrt), "canopy")
 grid = QgsVectorLayer(str(HERE / "data/grid.gpkg") + "|layername=hex_grid", "g", "ogr")
 hexes = processing.run("native:reprojectlayer", {"INPUT": grid, "TARGET_CRS": rl.crs(), "OUTPUT": "memory:"})["OUTPUT"]
-buf = processing.run("native:buffer", {"INPUT": hexes, "DISTANCE": cfg["neighbourhood_buffer_m"], "SEGMENTS": 8, "OUTPUT": "memory:"})["OUTPUT"]
 
 
 def zs(layer, prefix):
@@ -40,24 +39,19 @@ def zs(layer, prefix):
                                                       "STATISTICS": [0, 2], "OUTPUT": "memory:"})["OUTPUT"]   # count, mean (valid pixels only)
 
 
-zh, zb = zs(hexes, "h_"), zs(buf, "b_")
-bf = {f["hex_id"]: f for f in zb.getFeatures()}
+zh = zs(hexes, "h_")
 PX2 = 0.25
 rows = []
 for f in zh.getFeatures():
-    g, b = f.geometry(), bf[f["hex_id"]]
-    gb = b.geometry()
+    g = f.geometry()
     rows.append({"hex_id": f["hex_id"],
                  "canopy_hex": round(f["h_mean"], 4) if f["h_mean"] is not None else "",
-                 "canopy_buf": round(b["b_mean"], 4) if b["b_mean"] is not None else "",
-                 "cover_hex": round((f["h_count"] or 0) * PX2 / g.area(), 4),
-                 "cover_buf": round((b["b_count"] or 0) * PX2 / gb.area(), 4)})
+                 "cover_hex": round((f["h_count"] or 0) * PX2 / g.area(), 4)})
 rows.sort(key=lambda r: r["hex_id"])
 with open(OUT / "canopy_hex.csv", "w", newline="", encoding="utf-8") as fh:
     w = csv.DictWriter(fh, fieldnames=list(rows[0]))
     w.writeheader()
     w.writerows(rows)
-json.dump({"canopy_version": cfg["canopy_version"], "year": cfg["source"]["year"], "height_m": cfg["height_m"], "tiles": len(tiles),
-           "buffer_m": cfg["neighbourhood_buffer_m"]}, open(OUT / "canopy_hex.meta.json", "w"))
-low = [r["hex_id"] for r in rows if r["cover_hex"] < 0.99 or r["cover_buf"] < 0.99]
+json.dump({"canopy_version": cfg["canopy_version"], "year": cfg["source"]["year"], "height_m": cfg["height_m"], "tiles": len(tiles)}, open(OUT / "canopy_hex.meta.json", "w"))
+low = [r["hex_id"] for r in rows if r["cover_hex"] < 0.99]
 print("hexes", len(rows), "tiles", len(tiles), "hexes with <99% coverage:", len(low), low[:10])

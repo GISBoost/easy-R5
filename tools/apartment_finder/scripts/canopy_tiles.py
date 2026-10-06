@@ -1,8 +1,8 @@
 """Canopy stage 1: per-tile nDSM height codes from GUGiK NMPT and NMT (streamed, resumable, idempotent).
 
 For every 800x500 m tile covering the city + buffer: download NMPT.asc and NMT.asc (0.5 m, ~11 MB each), compute
-nDSM = NMPT - NMT, store a small uint8 GeoTIFF `data/canopy/codes/<godlo>.tif` (code = number of config `height_codes_m`
-thresholds reached, 0 = below the lowest or above `max_height_m`, 255 = no data) and delete the ASC files.
+nDSM = NMPT - NMT, store a small uint8 GeoTIFF `data/canopy/codes/<godlo>.tif` (band 1: code = number of config `height_codes_m`
+thresholds reached, 0 = below the lowest or above `max_height_m`, 255 = no data; band 2: local std of NMPT in cm) and delete the ASC files.
 Buildings/poles are handled in stage 2 (canopy_mask.py). System Python (osgeo + numpy), no QGIS needed.
 
   py scripts/canopy_tiles.py [--workers 4] [--limit N]
@@ -20,6 +20,7 @@ from pathlib import Path
 import numpy as np
 import yaml
 from osgeo import gdal, ogr, osr
+from scipy import ndimage as ndi
 
 gdal.UseExceptions()
 ogr.UseExceptions()
@@ -119,13 +120,19 @@ def process(t):
             code += (h >= thr).astype(np.uint8)
         code[h > cfg["max_height_m"]] = 0
         code[bad] = 255
+        w = cfg["smooth"]["window_px"]
+        z = np.where(bad, np.nan, s).astype(np.float64)
+        z = np.nan_to_num(z - np.nanmean(z), nan=0.0)             # centred: avoids cancellation in the variance
+        var = ndi.uniform_filter(z * z, w) - ndi.uniform_filter(z, w) ** 2
+        std_cm = np.clip(np.sqrt(np.maximum(var, 0)) * 100, 0, 254).astype(np.uint8)
         drv = gdal.GetDriverByName("GTiff")
         tmp = str(out) + ".part"
-        o = drv.Create(tmp, code.shape[1], code.shape[0], 1, gdal.GDT_Byte, ["COMPRESS=DEFLATE", "TILED=YES"])
+        o = drv.Create(tmp, code.shape[1], code.shape[0], 2, gdal.GDT_Byte, ["COMPRESS=DEFLATE", "TILED=YES"])
         o.SetGeoTransform(gt)
         o.SetProjection(CRS2177.ExportToWkt())
         o.GetRasterBand(1).SetNoDataValue(255)
         o.GetRasterBand(1).WriteArray(code)
+        o.GetRasterBand(2).WriteArray(std_cm)
         o = None
         Path(tmp).replace(out)
         return t["godlo"], "ok"

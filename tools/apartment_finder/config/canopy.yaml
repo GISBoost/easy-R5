@@ -1,6 +1,6 @@
 # Tree-canopy cover per hex (canopy module, docs/notes/apartment-finder-canopy-m0.md). Method: nDSM = NMPT - NMT (GUGiK 2021, 0.5 m)
 # minus buildings and other structures (BDOT10k), morphological clean-up, aggregated to hexes. Bump canopy_version on any change.
-canopy_version: "canopy-v1"
+canopy_version: "canopy-v2"
 source:
   year: 2021                     # airborne laser scanning, April 2021 (leaf-off), 25 pts/m2, PL-2000 zone 6 (EPSG:2177), EVRF2007
   nmpt_wfs: "https://mapy.geoportal.gov.pl/wss/service/PZGIK/NumerycznyModelPokryciaTerenuEVRF2007/WFS/Skorowidze"
@@ -18,5 +18,9 @@ exclude:                         # BDOT10k layers whose footprint is NOT canopy;
   lines:    {BUIN_L: 3.0}                                                         # bridges, viaducts
   points:   {BUWT_P: 3.0, BUIT_P: 2.0, BUZT_P: 3.0}                               # masts, technical devices, tanks
 open_radius_m: 1.0               # removes objects thinner than ~2 m (poles, lamp arms, wires, fences)
+smooth:                          # flat tall surfaces (viaduct decks, flat roofs missing from BDOT10k) are not canopy: crowns are rough
+  window_px: 5                   # local standard deviation of NMPT in a 5 x 5 px (2.5 x 2.5 m) window, stored per pixel in cm (band 2)
+  max_std_m: 0.12                # <= this = smooth
+  min_area_m2: 30.0              # a smooth tall patch at least this big is a structure
+  dilate_m: 2.5                  # structure edges (parapets, eaves) are steep and rough: grow the structure by this much
 min_patch_m2: 10.0               # removes patches smaller than this
-neighbourhood_buffer_m: 150      # second indicator: share within the hex buffered by this distance

@@ -46,3 +46,9 @@ Nie pobierano reszty miasta (czeka na zgodę). Brak kontroli na ortofotomapie GU
 - Wynik miasta (5662 heksów, wszystkie pokryte danymi w 100%): średnia 27,8%, mediana 21,5%, percentyle 5/25/75/95 = 1,9/12,5/35,0/86,0%, max 99,7%; bufor 150 m: średnia 27,8%, mediana 22,8%; korelacja heks–bufor 0,93. 552 heksów < 5%, 1149 > 40% (lasy i parki na obrzeżach).
 - Mianownik = cała powierzchnia heksa (budynki i drogi w mianowniku, jak „tree canopy cover"), inaczej niż w filmie (tam pole minus budynki).
 - Do zrobienia: kontrola wizualna (Michał, QGIS), wpięcie kolumn do `layers.json` i kryterium (M-C3/M-C4), README i PRD (M-C5). Znane ograniczenia: korona nad dachem w buforze 1 m od budynku przepada (lekkie niedoszacowanie), szerokie wiaty spoza BDOT10k mogą zostać w masce, nalot kwiecień 2021 (stan sprzed 5 lat).
+
+## canopy-v2 (2026-10-06, po uwagach Michała z kontroli wiaduktów)
+- Wiadukty (BDOT10k ma je tylko jako linie osi) zostawiały pasy krawędzi z barierkami. Dodano filtr gładkości (`smooth` w `config/canopy.yaml`): gładkie (odchylenie NMPT w oknie 2,5 m ≤ 0,12 m), wysokie (≥ 3 m) płaty ≥ 30 m² to konstrukcje (jezdnie wiaduktów, płaskie dachy), wycinane z poszerzeniem 2,5 m (krawędzie). Test na kaflu 6.163.33.17.2: wiadukt B −85% pikseli korony, A −31%, korony obok bez zmian; mapa KMKD (mapadrzew.com) nie pokazuje koron na wiadukcie w punkcie A.
+- Bufor 150 m usunięty (korelacja z heksem 0,93, brak wpływu); w pipeline'ie zostaje tylko `canopy_hex`.
+- Etap 1 zapisuje teraz 2 pasma (kod wysokości, chropowatość w cm); wynik maski w `data/canopy/final_v2/`.
+- Wynik (5662 heksów, pokrycie danymi 100%): średnia 27,5%, mediana 21,3%, percentyle 5/25/75/95: 1,8/12,3/34,8/86,0%; 583 heksy < 5%, 1139 > 40%. Filtr gładkości zdejmuje średnio 1,7% kandydatów na kafel, BDOT10k 17,7%.
