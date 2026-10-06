@@ -63,6 +63,7 @@ r5:
 pairs:
   main:    {later: after,  earlier: before}   # 5 Oct vs 28 Sep
   placebo: {later: before, earlier: ctrl}     # 28 Sep vs 21 Sep, both before the change
+  alt:     {later: after,  earlier: ctrl}     # 5 Oct vs 21 Sep: the same change against the other pre-change Monday
 
 # A hex-POI pair is "transit" on a day when R5 reaches it and the time beats walking (or walking is impossible);
 # pairs are compared only if they are transit on BOTH days (no walk-only trips, as requested). R5 times are whole minutes.

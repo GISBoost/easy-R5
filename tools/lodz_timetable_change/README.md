@@ -34,3 +34,15 @@ Przypadki (`config.yaml`): `ctrl` 21.09, `before` 28.09, `after` 5.10. Pary: `ma
   (stąd para placebo) i zmiany z końca września/1.10, nie tylko zmianę z 5.10.
 * Kategorie POI to wybór roboczy (zmiana w `config.yaml` → `poi.categories`, potem `prepare_poi.py`).
 * Release `lodz-realized-2026-10-05-phone` wymaga udanego buildu w `easy-GTFS-RT` (run z 5.10 został anulowany).
+
+## Drugi przebieg: hex 250 m → hex 250 m (2026-10-06)
+Pełna macierz 5665 × 5665 na tych samych modelach i parach (`pairs` w `config.yaml`; `alt` = 5.10 vs 21.09 jako drugi
+punkt odniesienia obok placebo). Pary hex-hex ważone ludnością początku × ludnością celu, bez pary hex-ten sam hex,
+tylko tam, gdzie transport bije pieszo w obu dniach (osobno wariant „od drzwi do drzwi”). Podział po odległości w linii
+prostej (`hexmatrix.distance_classes_km`; ostatnia klasa ≥ 10 km = przejazd przez miasto).
+
+1. Workflow `lodz-timetable-change.yml` z `dest=hex` (jeden job na przypadek i pasmo) → `poi_tt.py --dest hex`.
+   `gh run download <id>` do `<data_dir>/hex_tt/<przypadek>/<pasmo>.npz` + `walk.npz`.
+2. `py -I hex_delta.py` → `out/hex_delta/<para>/` (`sentences.txt`, `summary.csv`, `hex.csv`).
+3. W QGIS: `exec(open("hex_qgis.py").read(), {"BAND": "pm_peak"})` — mapa średniej zmiany z danego hexa
+   (wszystkie cele / cele ≥ 10 km).
