@@ -32,7 +32,11 @@ TIX = {k: [types.index(t) for t in v] for k, v in meta.items()}
 
 def load(day, name):
     p = HERE / "data/services" / day / (name + ".npz")
-    return np.load(p) if p.exists() else None
+    if not p.exists():
+        return None
+    z = np.load(p)
+    assert [str(t) for t in z["types"]] == types, str(p) + ": fine type order differs from config"
+    return z
 
 
 def write(name, arr, levels):
@@ -54,12 +58,15 @@ for name in names:
             continue
         arr = np.median(np.stack([p["arr"] for p in parts]), axis=0).astype(np.uint8)   # 5 days: an element, so an integer
         levels = parts[0]["levels"]
+        assert all(list(q["levels"]) == list(levels) for q in parts), name + ": levels differ between days"
+        assert len(parts) % 2 == 1, "median over an even number of days would truncate"
     else:
         p = load(days[-1], name)
         if p is None:
             missing.append(name)
             continue
         arr, levels = p["arr"], p["levels"]
+    assert list(levels) == list(cfg["modes"][kind]["levels"]), name + ": levels differ from config"
     write(name, arr, levels)
     done.append(name)
 index = {"services_version": cfg["services_version"], "criteria": crit, "composition": meta,

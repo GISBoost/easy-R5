@@ -130,3 +130,33 @@ placówki, także do 1,2 km za granicą miasta). Skrypty: `service_pois.py` (OSM
 przesiadki bez limitu), `export_services.py` (mediana po dniach → `gdzie-mieszkac-lodz-data/services/`). Frontend: sekcja „Usługi
 w zasięgu” (`app.js`, `score.js`: `serviceScore`, test w `score.test.js`), stan w hashu `sv`. **Po zmianie danych:** `export_services.py`,
 potem `publish_data.sh --push` (za zgodą). Szczegóły i uzasadnienie wyboru metody: [`apartment-finder-uslugi-plan.md`](apartment-finder-uslugi-plan.md).
+
+## STAN NA KONIEC DNIA 2026-10-05 i plan na jutro
+
+**Gdzie jesteśmy:** MVP działa na żywo (strona + dane na Pages). Dodane dziś: poprawiony hałas, informacja o efekcie ŁKA przy celu,
+**usługi w zasięgu** (4 metakategorie, „co najmniej X w ≤ Y min”, jeden tryb na kryterium). Usługi są **zaimplementowane lokalnie, jeszcze nie wdrożone**.
+
+**Stan repozytoriów:**
+- `easy-R5` (main, wypchnięte): commity `a8df59a` (usługi, hałas, CI) i `556fe4a` (zamrożone `inputs/service_pois.csv`). Nic niezacommitowanego związanego z apartment-finder poza tym plikiem.
+- `mapy-analizy`: **niezacommitowane** zmiany w `gdzie-mieszkac-lodz/` (app.js, i18n.js, index.html, score.js, score.test.js, styles.css, README.md: hałas, usługi, ŁKA). Live na Pages jest jeszcze wersja z `4275f55`.
+- `gdzie-mieszkac-lodz-data` (Pages, jednokomitowa gałąź): **stara wersja** (bez nowego `layers.json` z hałasem „poza modelem = brak danych” i bez `services/`).
+
+**GH Actions:** run `37360589700` (workflow `apartment-finder-services.yml`, 15 jobów dzień × pora, TP × rozkład/P50/P85 × ŁKA, 6 scenariuszy na job). Stan wieczorem: 10/16 gotowych, 0 błędów.
+Lokalnie gotowe: `data/services/2026-10-02/{walk,bike,car_morning,car_midday,car_afternoon}.npz` (nowe 21 typów) + `poi.gpkg`.
+
+**Jutro, po kolei:**
+1. `gh run view 37360589700 --repo GISBoost/easy-R5` → `completed/success`; jeśli joby padły: `gh run view --log-failed`, poprawić `scripts/ci_services.py`/workflow, push, ponownie `gh workflow run apartment-finder-services.yml`.
+2. `gh run download 37360589700 --repo GISBoost/easy-R5 --dir tools/apartment_finder/_dl_svc` (dopisać `_dl_svc/` do `.gitignore`), skopiować `data/services/<dzień>/*.npz` z artefaktów do `tools/apartment_finder/data/services/<dzień>/`.
+3. `py scripts/export_services.py` (oczekiwane: 23 scenariusze, 0 brakujących) → `gdzie-mieszkac-lodz-data/services/`.
+4. Test strony lokalnie (serwer z katalogu `easy/`, port 8766): scenariusze TP, hash `sv` z `m=transit`, pory, P50/P85, ŁKA; sprawdzić rozkład wartości i dostroić domyślne X/Y w `config/services.yaml` (`defaults`), ponownie wyeksportować.
+5. Uruchomić **milestone-reviewer** na całości (hałas, usługi, workflow), poprawić uwagi.
+6. Commit w `mapy-analizy` (lokalnie), po zgodzie push; `publish_data.sh --push` (nowe dane); sprawdzić stronę na żywo; `sitemap.xml`.
+
+**Znane ograniczenia/ryzyka usług:** TP bez limitu przesiadek; próg schodkowy (liczba skacze wokół Y); wartości obcinane do 255; kompletność OSM (convenience, przychodnie zmienne); parki poza metakategoriami (osobne kryterium zieleni).
+
+## 2026-10-06 — usługi: dane TP gotowe, test lokalny, review
+- CI run 37360589700 OK (15/15). Artefakty -> `data/services/<dzień>/`, `export_services.py`: 23 scenariusze, 0 braków (dodane asercje: kolejność typów, levels, nieparzysta liczba dni).
+- Domyślne X dostrojone (p75 walk-15 = 2/2/6/12): edukacja 2, zdrowie 2, handel 3, kultura 3.
+- Test lokalny: TP p85+ŁKA, południe, zdrowie ≥3 w 30 min = 2962 heksów, zgodne z danymi.
+- Review: poprawiono twarde „Wymagaj" bez danych (pomijane zamiast odrzucać wszystko); niski priorytet, nie zrobione: stałe N=5662 w `count_services.py`.
+- Zostaje: EN/telefon, publikacja (`publish_data.sh --push` + push mapy-analizy, tylko za zgodą), `sitemap.xml`.

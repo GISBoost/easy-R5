@@ -39,9 +39,9 @@ modes:
   bike:    {mode: 2, max_min: 30, levels: [5, 10, 15, 20, 30]}
   car:     {mode: 3, max_min: 20, levels: [5, 10, 15, 20]}      # one scenario per time of day (own OSM copy)
   transit: {mode: 0, max_min: 45, levels: [15, 30, 45]}         # window x ttype x ŁKA; transfers unlimited
-# UI defaults: mode, Y [min], X [count] (to be tuned after looking at the distributions)
+# UI defaults: mode, Y [min], X [count] (tuned 2026-10-06 on walk-15 quartiles (p75 = 2/2/6/12))
 defaults:
-  edukacja:          {mode: walk, y: 15, x: 3}
-  zdrowie:           {mode: walk, y: 15, x: 3}
-  handel_uslugi:     {mode: walk, y: 15, x: 5}
-  kultura_rekreacja: {mode: walk, y: 15, x: 5}
+  edukacja:          {mode: walk, y: 15, x: 2}
+  zdrowie:           {mode: walk, y: 15, x: 2}
+  handel_uslugi:     {mode: walk, y: 15, x: 3}
+  kultura_rekreacja: {mode: walk, y: 15, x: 3}
