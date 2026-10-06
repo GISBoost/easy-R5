@@ -115,6 +115,7 @@ Liczba przebiegów na dzień (do potwierdzenia): TP 4 pory × 3 typy czasu × 2 
 | Przystanek autobusowy | j.w. | malejąca |
 | Częstotliwość | odjazdy/godz. na przystankach w zasięgu pieszym, per pora dnia | rosnąca z nasyceniem |
 | Zieleń | odległość po sieci do najbliższego terenu zieleni od ok. 1 ha (O12) | malejąca |
+| Korony drzew (dodane 2026-10-06) | udział powierzchni heksa pod koronami drzew z LiDAR GUGiK 2021 (nDSM ≥ 3 m, bez budynków BDOT10k); kryterium miękkie i twarde „co najmniej X %” | rosnąca, nasycenie przy 40%; domyślna waga 2 (stare linki bez klucza zachowują wynik) |
 | Hałas drogowy, szynowy, przemysłowy | udział powierzchni heksa powyżej progu dB (Lden; Ln przy trybie „sypialnia") | malejąca |
 | Cena | zł/m² zagregowane do heksa, z liczbą transakcji | do ustalenia (O10) |
 
@@ -175,7 +176,7 @@ Zastrzeżenia: prędkość autobusu zawiera postoje (zaniża prędkość auta), 
 
 ### 7.4 Warstwy statyczne
 
-Per heks: odległości pieszo po sieci (przystanki tramwajowe, autobusowe, zieleń), częstotliwość per pora dnia, udziały powierzchni w klasach hałasu (Lden, Ln × drogowy/szynowy/przemysłowy), cena z liczbą transakcji.
+Per heks: odległości pieszo po sieci (przystanki tramwajowe, autobusowe, zieleń), udział koron drzew (LiDAR; `config/canopy.yaml`, metoda i walidacja w `docs/notes/apartment-finder-canopy-m0.md`), częstotliwość per pora dnia, udziały powierzchni w klasach hałasu (Lden, Ln × drogowy/szynowy/przemysłowy), cena z liczbą transakcji.
 
 ## 8. Format danych i budżet rozmiaru
 
@@ -261,7 +262,7 @@ Kolejność orientacyjna, do przeglądu po wdrożeniu MVP.
 7. **Gminy ościenne** jako cele i jako obszar kandydatów (Zgierz, Pabianice i in.).
 8. **Rower + TP** jako tryb łączony.
 9. **Porównanie 2–3 wybranych miejsc**, eksport (PDF/CSV).
-10. **Wielkość zieleni** (nie tylko odległość), nasłonecznienie, zabudowa.
+10. **Wielkość zieleni** (nie tylko odległość): **w części pokryta od 2026-10-06** modułem „Korony drzew” (udział koron w heksie, punktacja, wymaganie twarde, podgląd maski); zostają trawniki i niska zieleń (LiDAR ich nie rozróżnia od utwardzenia), nasłonecznienie, zabudowa.
 11. **Gotowe profile wag** („cisza", „dojazdy", „rodzina z dziećmi").
 12. **Inne miasta** (pipeline parametryzowany miastem; krajowe archiwum GTFS-RT obejmuje ok. 26 miast).
 13. **Więcej dni obserwacji** i pełne okno sezonowe zamiast 5 dni.

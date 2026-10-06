@@ -31,6 +31,13 @@ CODES = OUT / "codes"
 TMP = OUT / "_dl"
 for d in (CODES, TMP):
     d.mkdir(parents=True, exist_ok=True)
+PARAMS = {"year": cfg["source"]["year"], "height_codes_m": cfg["height_codes_m"], "max_height_m": cfg["max_height_m"],
+          "smooth_window_px": cfg["smooth"]["window_px"]}
+pf = CODES / "params.json"
+if pf.exists() and json.load(open(pf)) != PARAMS:
+    sys.exit("data/canopy/codes was made with other parameters (%s); remove it before re-running" % pf)
+if not pf.exists():
+    json.dump(PARAMS, open(pf, "w"))
 CRS2177 = osr.SpatialReference()
 CRS2177.ImportFromEPSG(2177)
 CRS2177.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
@@ -68,7 +75,9 @@ def read_index(path, keep=None):
 def tile_list():
     cache = OUT / "tiles_index.json"
     if cache.exists():
-        return json.load(open(cache, encoding="utf-8"))
+        old = json.load(open(cache, encoding="utf-8"))
+        if old.get("year") == cfg["source"]["year"]:
+            return old
     src = cfg["source"]
     lidar = OUT / src["lidar_index_gml"]
     if not lidar.exists():
@@ -85,8 +94,9 @@ def tile_list():
                 per.setdefault(r["godlo"], {})[key] = r["url"]
     res = [{"godlo": g, **per[g]} for g in sorted(tiles) if g in per and "nmpt" in per[g] and "nmt" in per[g]]
     missing = sorted(tiles - {r["godlo"] for r in res})
-    json.dump({"tiles": res, "missing": missing, "lidar_tiles": len(tiles)}, open(cache, "w"), indent=0)
-    return {"tiles": res, "missing": missing, "lidar_tiles": len(tiles)}
+    idx = {"year": cfg["source"]["year"], "tiles": res, "missing": missing, "lidar_tiles": len(tiles)}
+    json.dump(idx, open(cache, "w"), indent=0)
+    return idx
 
 
 def fetch(url, dst):

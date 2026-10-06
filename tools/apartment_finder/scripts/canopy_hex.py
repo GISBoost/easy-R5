@@ -1,6 +1,6 @@
 """Canopy stage 3: canopy mask tiles -> share of canopy per hex (QGIS interpreter).
 
-Reads `data/canopy/final/*.tif` (1 = canopy, 0 = other, 255 = no data; 0.5 m, EPSG:2177), builds a VRT, runs zonal
+Reads `data/canopy/<mask_dir>/*.tif` (config `mask_dir`, or the directory name given as argument) (1 = canopy, 0 = other, 255 = no data; 0.5 m, EPSG:2177), builds a VRT, runs zonal
 statistics on the hexes and writes `data/canopy/canopy_hex.csv`: hex_id, canopy_hex (share in [0, 1] of the whole hex area,
 buildings and roads included in the denominator), cover_hex (fraction covered by valid pixels; must be ~1); method version and
 data year go to canopy_hex.meta.json.
@@ -25,7 +25,8 @@ from qgis.core import QgsRasterLayer, QgsVectorLayer  # noqa: E402
 
 cfg = yaml.safe_load(open(HERE / "config/canopy.yaml", encoding="utf-8"))
 OUT = HERE / "data/canopy"
-fin = OUT / (sys.argv[1] if len(sys.argv) > 1 else "final")
+fin = OUT / (sys.argv[1] if len(sys.argv) > 1 else cfg["mask_dir"])
+mask = json.load(open(fin / "params.json"))   # version and height of the mask actually aggregated (run canopy_mask.py first)
 tiles = sorted(fin.glob("*.tif"))
 vrt = OUT / "canopy_final.vrt"
 gdal.BuildVRT(str(vrt), [str(p) for p in tiles], srcNodata=255, VRTNodata=255)
@@ -52,6 +53,7 @@ with open(OUT / "canopy_hex.csv", "w", newline="", encoding="utf-8") as fh:
     w = csv.DictWriter(fh, fieldnames=list(rows[0]))
     w.writeheader()
     w.writerows(rows)
-json.dump({"canopy_version": cfg["canopy_version"], "year": cfg["source"]["year"], "height_m": cfg["height_m"], "tiles": len(tiles)}, open(OUT / "canopy_hex.meta.json", "w"))
+json.dump({"canopy_version": mask["canopy_version"], "year": cfg["source"]["year"], "height_m": mask["height_m"], "tiles": len(tiles), "mask_dir": fin.name},
+          open(OUT / "canopy_hex.meta.json", "w"))
 low = [r["hex_id"] for r in rows if r["cover_hex"] < 0.99]
 print("hexes", len(rows), "tiles", len(tiles), "hexes with <99% coverage:", len(low), low[:10])

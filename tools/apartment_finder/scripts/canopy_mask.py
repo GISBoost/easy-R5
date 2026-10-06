@@ -15,7 +15,6 @@ Output `data/canopy/final/<godlo>.tif`: uint8, 1 = canopy, 0 = other, 255 = no d
 import argparse
 import glob
 import json
-import sys
 import time
 from pathlib import Path
 
@@ -36,7 +35,8 @@ for s in (S2177, S2180):
     s.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
 TO2177, TO2180 = osr.CoordinateTransformation(S2180, S2177), osr.CoordinateTransformation(S2177, S2180)
 PX = 0.5
-NEED = [i for i, t in enumerate(cfg["height_codes_m"]) if t == cfg["height_m"]][0] + 1   # code >= NEED means height >= height_m
+assert cfg["height_m"] in cfg["height_codes_m"], "height_m must be one of height_codes_m (the stored thresholds)"
+NEED = cfg["height_codes_m"].index(cfg["height_m"]) + 1   # code >= NEED means height >= height_m
 
 _layers = {}
 
@@ -62,6 +62,8 @@ def exclusion(gt, w, h):
             lyr = bdot_layer(name)
             lyr.SetSpatialFilterRect(xmin, ymin, xmax, ymax)
             for f in lyr:
+                if f.GetGeometryRef() is None:
+                    continue
                 g = f.GetGeometryRef().Clone()
                 if buf:
                     g = g.Buffer(buf)
@@ -136,8 +138,14 @@ if __name__ == "__main__":
     ap.add_argument("--only", nargs="*")
     ap.add_argument("--tag", default="")
     a = ap.parse_args()
-    fin = OUT / ("final_" + a.tag if a.tag else "final")
+    fin = OUT / ("final_" + a.tag if a.tag else cfg["mask_dir"])
     fin.mkdir(parents=True, exist_ok=True)
+    params = {"canopy_version": cfg["canopy_version"], "height_m": cfg["height_m"], "height_codes_m": cfg["height_codes_m"],
+              "exclude": cfg["exclude"], "open_radius_m": cfg["open_radius_m"], "smooth": cfg["smooth"], "min_patch_m2": cfg["min_patch_m2"]}
+    pf = fin / "params.json"
+    if pf.exists() and json.load(open(pf)) != params:
+        raise SystemExit("%s holds a mask made with other parameters; use a new --tag (or remove it) instead of mixing versions" % fin)
+    json.dump(params, open(pf, "w"), indent=1)   # a directory without params.json is adopted with the current parameters
     srcs = sorted((OUT / "codes").glob("*.tif"))
     if a.only:
         srcs = [p for p in srcs if p.stem in a.only]

@@ -81,6 +81,7 @@ def export_layers(out):
         cols.update(read_csv_cols(nz))
     cv = HERE / "data/canopy/canopy_hex.csv"
     if cv.exists():
+        assert (HERE / "data/canopy/canopy_hex.meta.json").exists(), "canopy_hex.csv without canopy_hex.meta.json: re-run canopy_hex.py"
         c = read_csv_cols(cv)
         assert all(v is not None and 0 <= v <= 1 for v in c["canopy_hex"]) and min(c["cover_hex"]) >= 0.99, "canopy layer incomplete"
         cols["canopy"] = [round(v, 3) for v in c["canopy_hex"]]   # share of the hex area under canopy (canopy-v2), 0..1
@@ -96,7 +97,7 @@ def canopy_manifest(out):
     c = json.load(open(mp))
     cc = yaml.safe_load(open(HERE / "config/canopy.yaml", encoding="utf-8"))
     ov = out / "canopy_overlay.json"
-    return {"version": c["canopy_version"], "year": c["year"], "height_m": c["height_m"], "scan_date": "2021-04",
+    return {"version": c["canopy_version"], "year": c["year"], "height_m": c["height_m"], "scan_date": cc["source"]["scan_date"],
             "overlay": json.load(open(ov)) if ov.exists() and (out / "canopy.webp").exists() else None}
 
 

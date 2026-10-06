@@ -5,7 +5,7 @@ Pipeline danych dla publicznego narzędzia wyboru lokalizacji mieszkania w Łodz
 dane, które ta strona wyświetla. Specyfikacja: `docs/prd/PR_easy-R5_apartment-finder.md`, notatki z rozpoznania:
 `docs/notes/apartment-finder-m0.md`.
 
-**Wersja metody:** `apt-v1` (siatka `hex250-v1`, warstwy `static-v1` / `noise-v1`, auto `car-v1`, krzywe `curves-v1`).
+**Wersja metody:** `apt-v1` (siatka `hex250-v1`, warstwy `static-v1` / `noise-v1`, korony drzew `canopy-v2`, auto `car-v1`, krzywe `curves-v1`).
 Każdy plik wynikowy niesie wersje w metadanych (`*.meta.json`, `data/matrices/<dzień>/*.json`, `manifest.json`).
 
 ## Co jest liczone
@@ -18,9 +18,13 @@ Każdy plik wynikowy niesie wersje w metadanych (`*.meta.json`, `data/matrices/<
 | Auto: współczynniki zwolnienia z autobusów → kopie OSM z `maxspeed` per pora | `scripts/car_speeds.py` | `data/car/lodz_car_<pora>.osm.pbf` |
 | Macierze czasów O–D (R5) | `scripts/run_matrices.py`, `scripts/run_all.sh` | `data/matrices/<dzień>/<scenariusz>.npz` |
 | Niezmienniki I1–I4 | `scripts/check_invariants.py` | `data/matrices/<dzień>/invariants_<pora>.json` |
-| Usługi: placówki OSM (5 kryteriów, z buforem 1,2 km) | `scripts/service_pois.py` (QGIS) | `data/services/poi.gpkg`, `inputs/service_pois.csv` |
+| Usługi: placówki OSM (21 typów w 4 metakategoriach, z buforem 1,2 km) | `scripts/service_pois.py` (QGIS) | `data/services/poi.gpkg`, `inputs/service_pois.csv` |
 | Usługi: liczba placówek w Y min, **dokładnie** (R5: środek heksa → współrzędne placówki) | `scripts/service_counts.py`, `scripts/count_services.py`, `scripts/run_services.sh` | `data/services/<dzień>/<scenariusz>.npz` |
 | Eksport usług (mediana po dniach dla TP) | `scripts/export_services.py` | `<easy>/gdzie-mieszkac-lodz-data/services/*.json` |
+| Korony drzew, etap 1: pobranie NMPT+NMT GUGiK 2021 per kafel (960 kafli, strumieniowo), nDSM i chropowatość | `scripts/canopy_tiles.py` (systemowy Python) | `data/canopy/codes/<godło>.tif` |
+| Korony drzew, etap 2: maska (≥ 3 m, minus BDOT10k, filtr gładkości i cienkości) | `scripts/canopy_mask.py` | `data/canopy/final_v2/<godło>.tif` |
+| Korony drzew, etap 3: udział koron w heksie | `scripts/canopy_hex.py` (QGIS) | `data/canopy/canopy_hex.csv` |
+| Korony drzew: obraz podglądu dla strony (WebP, 8 m) | `scripts/canopy_overlay.py` | `<easy>/gdzie-mieszkac-lodz-data/canopy.webp` |
 | Eksport dla strony | `scripts/export_web.py` | `<easy>/gdzie-mieszkac-lodz-data/` (osobne repo danych, patrz niżej) |
 
 Wszystkie parametry (okna czasowe, dni, progi, krzywe, promienie wygładzania) są w `config/*.yaml`.
@@ -42,6 +46,24 @@ Pozostałe: systemowy Python (`py`; numpy, pandas, shapely, pyproj, pyyaml).
    (nie zależą od dnia i GTFS): `bash scripts/run_nontransit.sh`.
 5. `py scripts/check_invariants.py <dzień> <pora>` (I1–I4), `py scripts/aggregate.py` (mediana po dniach, naprawa I1,
    raport I5) i `py scripts/export_web.py`.
+
+## Korony drzew (powtórzenie kroków)
+
+Wskaźnik: udział powierzchni heksa pod koronami drzew, 0–1 (mianownik = cała powierzchnia heksa, z budynkami i drogami).
+Parametry (próg wysokości, filtry, rozdzielczość podglądu, wersja metody) w `config/canopy.yaml`, krzywa punktacji
+w `config/curves.yaml` (`canopy`). Pełny raport z liczbami: `docs/notes/apartment-finder-canopy-m0.md`.
+
+1. Siatka heksów i skorowidze: wejście to `data/grid.gpkg`; lista kafli powstaje ze skorowidza LiDAR 2021
+   (WFS GUGiK, `DanePomiaroweLidarEVRF2007`), a adresy NMPT/NMT ze skorowidzów `SkorowidzNMPT2021` i `SkorowidzNMT2021`.
+2. BDOT10k powiatu 1061 (GPKG, `source.bdot10k_url` w configu) rozpakować do `data/canopy/bdot/`.
+3. `py scripts/canopy_tiles.py --workers 6` (ok. 35 min, ok. 22 GB transferu, wynik 90 MB; wznawialne, ASC kasowane po każdym kaflu).
+4. `py scripts/canopy_mask.py --tag v2` (ok. 4 min), potem `python-qgis-ltr.bat scripts/canopy_hex.py final_v2`.
+5. `py scripts/canopy_overlay.py` i `py scripts/export_web.py` (kolumna `canopy` w `layers.json` + blok `canopy` w manifeście).
+
+Metoda: nDSM = NMPT − NMT (siatka 0,5 m). Korona = nDSM ≥ 3 m (i ≤ 50 m). Odejmowane: obrysy BDOT10k (budynki, zbiorniki,
+wieże, urządzenia techniczne, obiekty sportowe z buforem 1 m; mosty/wiadukty 3 m; maszty 2–3 m), gładkie wysokie płaty
+> 30 m² (jezdnie wiaduktów, płaskie dachy spoza BDOT10k) poszerzone o 2,5 m oraz obiekty cieńsze niż ok. 2 m (słupy,
+latarnie, druty) i plamy < 10 m². Układy: dane LiDAR/NMPT są w EPSG:2177, siatka w 2180; agregacja po transformacji heksów do 2177.
 
 ## Publikacja danych (osobne repo, bez historii)
 
@@ -65,11 +87,12 @@ Release asset + workflow Actions z `upload-pages-artifact`/`deploy-pages`, wtedy
 - Odległości po sieci pieszej mają rozdzielczość 20 m (R5 raportuje pełne minuty; liczone przy 1,2 km/h), i są
   liczone od środka heksa. Powyżej 2 km: brak wartości (strona traktuje jako „daleko").
 - Czasy w macierzach są obcięte do 60 min i kwantyzowane co 2 min (błąd ≤ 1 min) — patrz `config/export.yaml`.
+- Korony drzew: stan z nalotu z kwietnia 2021 (drzewa po nalocie mogły zniknąć lub wyrosnąć; kwiecień = drzewa bez liści, więc mierzymy zasięg koron, nie gęstość ulistnienia). Maska ma pojedyncze fałszywe trafienia (według autora ok. 1–2% zbioru: pozostałości dachów i konstrukcji, krzewy powyżej 3 m); korona nad dachem w pasie 1 m od budynku jest wycięta, więc zabudowa jest lekko niedoszacowana. Korony nad jezdniami wliczają się, jeśli model powierzchni je widzi z góry. Dla jednego kafla (śródmieście) wynik porównano z klasyfikacją chmury punktów (99% pikseli korony ma punkty klasy wysokiej roślinności, 5,8% leży w komórkach klasy „budynek”). Poziom 150 m (bufor sąsiedztwa) sprawdzono i odrzucono: korelacja z heksem 0,93.
 - Cena: brak danych w tej wersji (pusty slot). Rejestr cen nie ma otwartego API.
 - Hałas: mapa akustyczna Łodzi (UMŁ, InterSIT, pomiary 2022). Licencja: informacja publiczna wg autora (2026-10-05).
   Progi dopuszczalne z rozporządzenia nie są założone w pipeline; strona stosuje próg wybrany przez użytkownika.
 
 ## Źródła danych
 
-OpenStreetMap (ODbL), GTFS ZDiT Łódź i zrekonstruowany GTFS-RT z `GISBoost/easy-GTFS-RT`, ŁKA (kolej-lka.pl,
+NMPT, NMT, chmura punktów i BDOT10k: Główny Urząd Geodezji i Kartografii (dane otwarte, udostępniane bezpłatnie na podstawie art. 40a ust. 2 Prawa geodezyjnego i kartograficznego; źródło: GUGiK, opendata.geoportal.gov.pl; treść licencji do potwierdzenia przed publikacją), OpenStreetMap (ODbL), GTFS ZDiT Łódź i zrekonstruowany GTFS-RT z `GISBoost/easy-GTFS-RT`, ŁKA (kolej-lka.pl,
 TripUpdates PKP PLK przez mkuran.pl), mapa akustyczna Łodzi (Urząd Miasta Łodzi).

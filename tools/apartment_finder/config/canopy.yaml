@@ -2,6 +2,7 @@
 # minus buildings and other structures (BDOT10k), morphological clean-up, aggregated to hexes. Bump canopy_version on any change.
 canopy_version: "canopy-v2"
 source:
+  scan_date: "2021-04"           # month of the flight (shown on the site as "state from ...")
   year: 2021                     # airborne laser scanning, April 2021 (leaf-off), 25 pts/m2, PL-2000 zone 6 (EPSG:2177), EVRF2007
   nmpt_wfs: "https://mapy.geoportal.gov.pl/wss/service/PZGIK/NumerycznyModelPokryciaTerenuEVRF2007/WFS/Skorowidze"
   nmpt_layer: "gugik:SkorowidzNMPT2021"
@@ -9,6 +10,7 @@ source:
   nmt_layer: "gugik:SkorowidzNMT2021"
   lidar_index_gml: "idx2021.gml"  # LAZ index (skorowidz) used only to list the tiles covering the city + buffer
   bdot10k_url: "https://opendata.geoportal.gov.pl/bdot10k/schemat2021/GPKG/10/1061_GPKG.zip"
+mask_dir: final_v2                # directory under data/canopy/ holding the canopy mask used by canopy_hex.py and canopy_overlay.py
 tiles_buffer_m: 400              # tiles within this distance of the city count (edge hexes + neighbourhood buffers)
 height_m: 3.0                    # canopy = nDSM >= this (2.0 includes more shrubs; stored codes allow re-thresholding)
 height_codes_m: [2.0, 3.0, 5.0]  # thresholds stored per pixel (code = number of thresholds reached)

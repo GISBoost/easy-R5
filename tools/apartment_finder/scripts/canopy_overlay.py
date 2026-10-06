@@ -2,7 +2,7 @@
 
 Warps the final canopy tiles (0.5 m, EPSG:2177) to Web Mercator with averaging (`overlay_res_m` per pixel, config/canopy.yaml),
 writes <out>/canopy.webp and <out>/canopy_overlay.json {url, bounds [[south, west], [north, east]], res_m}.
-System Python (osgeo, numpy, PIL):  py scripts/canopy_overlay.py [--final final_v2] [--out ../../../gdzie-mieszkac-lodz-data]
+System Python (osgeo, numpy, PIL):  py scripts/canopy_overlay.py [--final <mask dir>] [--out ../../../gdzie-mieszkac-lodz-data]
 """
 import argparse
 import json
@@ -17,7 +17,7 @@ gdal.UseExceptions()
 HERE = Path(__file__).resolve().parents[1]
 cfg = yaml.safe_load(open(HERE / "config/canopy.yaml", encoding="utf-8"))
 ap = argparse.ArgumentParser()
-ap.add_argument("--final", default="final_v2")
+ap.add_argument("--final", default=cfg["mask_dir"])
 ap.add_argument("--out", default=str((HERE / "../../../gdzie-mieszkac-lodz-data").resolve()))
 a = ap.parse_args()
 OUT = Path(a.out)
@@ -27,6 +27,7 @@ vrt = HERE / "data/canopy/_overlay_src.vrt"
 gdal.BuildVRT(str(vrt), [str(p) for p in tiles], srcNodata=255, VRTNodata=255)
 # bounds of the hex grid (+ margin) in Web Mercator: only what the app can show
 lay = gdal.OpenEx(str(HERE / "data/grid.gpkg"))
+assert lay.GetLayerByName("hex_grid").GetSpatialRef().GetAuthorityCode(None) == "2180", "hex grid must be EPSG:2180"
 ext = lay.GetLayerByName("hex_grid").GetExtent()      # EPSG:2180 (minx, maxx, miny, maxy)
 s80, s3857 = osr.SpatialReference(), osr.SpatialReference()
 s80.ImportFromEPSG(2180); s3857.ImportFromEPSG(3857)
@@ -40,7 +41,6 @@ w = gdal.Warp("", str(vrt), format="MEM", dstSRS="EPSG:3857", outputBounds=bb, x
 share = w.GetRasterBand(1).ReadAsArray()
 valid = share != 255
 levels = np.clip(np.round(np.where(valid, share, 0) * 8), 0, 8).astype(np.uint8)       # 8 alpha steps keep the PNG small
-pal = [(0, 0, 0)] + [(0, 150, 50)] * 8
 alpha = [0] + [int(255 * k / 8 * 0.9) for k in range(1, 9)]
 rgba = np.zeros(levels.shape + (4,), np.uint8)
 rgba[..., :3] = (0, 150, 50)
