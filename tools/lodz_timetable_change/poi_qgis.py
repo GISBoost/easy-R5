@@ -20,11 +20,11 @@ from qgis.PyQt.QtCore import QVariant
 HERE = Path(r"C:/Users/Michal/Desktop/easy/easy-R5/tools/lodz_timetable_change")
 SRC = globals().get("SRC_DIR", HERE / "out" / "poi_delta")
 GRID = HERE.parent / "tram_failure_lodz" / "grids" / "h250.gpkg"
-OUT_GPKG = HERE / "out" / "s3_poi.gpkg"
 CATS = ["pharmacy", "school", "clinic", "supermarket"]
 CAT_PL = {"all": "wszystkie", "pharmacy": "apteki", "school": "szkoły", "clinic": "przychodnie", "supermarket": "supermarkety"}
 PAIRS = {"main": "5.10 vs 28.09", "placebo": "28.09 vs 21.09 (placebo)"}
 BAND = globals().get("BAND", "am_peak")
+OUT_GPKG = HERE / "out" / f"s3_poi_{BAND}.gpkg"   # one GPKG per band
 EDGES = (3, 1, 0.25)   # minutes: strong / medium / weak change
 BLUES, REDS, GREY = ["#2166ac", "#4393c3", "#92c5de"], ["#f4a582", "#d6604d", "#b2182b"], "#f7f7f7"
 LABELS = ["≤ -3 min (krócej)", "-3 … -1", "-1 … -0,25", "≈ bez zmiany", "0,25 … 1", "1 … 3", "≥ 3 min (dłużej)"]
@@ -92,7 +92,7 @@ def style(layer, field):
 
 
 proj = QgsProject.instance()
-for old in [l for l in proj.mapLayers().values() if l.name().startswith("S3 POI")]:
+for old in [l for l in proj.mapLayers().values() if l.name().startswith("S3 POI") and l.name().endswith(BAND)]:
     proj.removeMapLayer(old.id())
 root = proj.layerTreeRoot()
 for pair, label in PAIRS.items():
