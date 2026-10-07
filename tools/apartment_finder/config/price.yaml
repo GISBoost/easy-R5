@@ -1,0 +1,10 @@
+# Price layer (RCN transactions): cleaning rules. Bump price_version when anything here changes.
+price_version: "price-v1"
+window:
+  from: "2025-07-01"   # the register has (almost) no Lodz deeds 2019-2024; this is the first usable stretch (docs/notes/apartment-finder-price-m0.md)
+teryt: "1061"          # Lodz city county
+function: mieszkalna
+area_m2: [25, 120]
+price_m2: [2500, 25000]
+transaction_types: [wolnyRynek]   # drops discounted, tender, non-tender and enforcement sales
+share: "1/1"           # NIER_UDZIAL; fractional shares of a flat are not whole-flat prices
