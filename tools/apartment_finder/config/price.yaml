@@ -8,3 +8,6 @@ area_m2: [25, 120]
 price_m2: [2500, 25000]
 transaction_types: [wolnyRynek]   # drops discounted, tender, non-tender and enforcement sales
 share: "1/1"           # NIER_UDZIAL; fractional shares of a flat are not whole-flat prices
+hex:
+  min_n: 5             # a hex shows a median only with at least this many deeds (below: no value, never 0)
+  ring_min_n: 5        # same threshold for the "hex + 6 neighbours" median (price_m2_ring), the fallback for sparse hexes
