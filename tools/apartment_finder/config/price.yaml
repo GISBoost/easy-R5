@@ -18,3 +18,14 @@ hex:                   # adaptive reach: smallest radius around the hex centre w
 inhabited:             # hex counts as residential with at least this much BDOT10k residential building footprint
   min_footprint_m2: 1000
   bdot_dir: "data/canopy/bdot"
+log:                   # Łódzki Ośrodek Geodezji (REST mapa.lodz.pl): price-class cells and transaction dates (permission from ŁOG, 2026-10-08)
+  from_year: 2022
+  snapshots:           # RynekMieszkaniowy layers: the "Średnia cena 1 m2" layer of the primary (rp) and secondary (rw) market per snapshot
+    - {label: "2022-Q2", rp: 22, rw: 24}
+    - {label: "2023-Q3", rp: 17, rw: 19}
+    - {label: "2024-Q3", rp: 12, rw: 14}
+    - {label: "2025-Q3", rp: 7, rw: 9}
+    - {label: "2026-Q3", rp: 2, rw: 4}
+log_hex:               # hex aggregation of the ŁOG class cells (same adaptive-reach idea as `hex`, counted in cells, not deeds)
+  min_cells: 5
+  open_class_add: 500  # value of the open top class "≥ X" = X + this (a lower bound, flagged as censored)
