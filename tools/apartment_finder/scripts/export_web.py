@@ -85,8 +85,31 @@ def export_layers(out):
         c = read_csv_cols(cv)
         assert all(v is not None and 0 <= v <= 1 for v in c["canopy_hex"]) and min(c["cover_hex"]) >= 0.99, "canopy layer incomplete"
         cols["canopy"] = [round(v, 3) for v in c["canopy_hex"]]   # share of the hex area under canopy (canopy-v2), 0..1
+    pv = HERE / "data/price/price_hex.csv"
+    if pv.exists():
+        assert (HERE / "data/price/price_hex.meta.json").exists(), "price_hex.csv without price_hex.meta.json: re-run price_hex.py"
+        p = read_csv_cols(pv)
+        ok = [v for v in p["price_m2"] if v is not None]
+        assert len(p["price_m2"]) == len(cols["canopy"] if "canopy" in cols else p["price_m2"]) and ok and min(ok) > 0, "price layer invalid"
+        assert all((a is None) == (b is None) == (c is None) for a, b, c in zip(p["price_m2"], p["radius_m"], p["n"])), "price/radius/n out of step"
+        cols["price_m2"] = [None if v is None else int(v) for v in p["price_m2"]]   # median PLN/m2, empty = no value
+        cols["price_r"] = [None if v is None else int(v) for v in p["radius_m"]]    # radius (m) the value was taken from
+        cols["price_n"] = [None if v is None else int(v) for v in p["n"]]           # deeds behind it
     json.dump(cols, open(out / "layers.json", "w"), separators=(",", ":"))
     return sorted(cols)
+
+
+def price_manifest():
+    """Price block of the manifest: method version, deed period, rules and coverage (price_clean.py / price_hex.py meta)."""
+    hp, cp = HERE / "data/price/price_hex.meta.json", HERE / "data/price/price_clean.meta.json"
+    if not (hp.exists() and cp.exists()):
+        return None
+    h, c = json.load(open(hp)), json.load(open(cp))
+    assert h["price_version"] == c["price_version"], "price_clean and price_hex made with different price versions"
+    return {"version": h["price_version"], "deeds": c["kept"], "date_min": c["date_min"], "date_max": c["date_max"],
+            "window_from": c["window_from"], "min_n": h["config"]["min_n"], "min_points": h["config"]["min_points"],
+            "max_radius_m": h["config"]["max_radius_m"], "hexes_with_price": h["hexes_with_price"],
+            "coverage_inhabited_pct": h["coverage_inhabited_pct"], "price_m2_pct": h["price_m2_pct"]}
 
 
 def canopy_manifest(out):
@@ -235,10 +258,12 @@ def main():
     present = sorted(f.name[:-6] for f in (out / "m").glob("*.r.bin"))
     bases = {n: base_of(n) for n in present if base_of(n) and base_of(n) != n}
     manifest = {
-        "method_version": "apt-v1 (grid %s, layers %s, noise %s, canopy %s, car %s, curves %s)" % (
+        "method_version": "apt-v1 (grid %s, layers %s, noise %s, canopy %s, price %s, car %s, curves %s)" % (
             grid_meta["grid_version"], "static-v1", noise_cfg["layers_version"], (canopy_manifest(out) or {}).get("version", "none"),
+            (price_manifest() or {}).get("version", "none"),
             "car-v1", curves["curves_version"]),
         "canopy": canopy_manifest(out),
+        "price": price_manifest(),
         "n": n, "bounds": bounds,
         "windows": {k: {"start": v["start"], "end": v["end"]} for k, v in tw["windows"].items()},
         "default_dir": {k: ("to" if v == "to_target" else "from") for k, v in tw["default_direction"].items()},

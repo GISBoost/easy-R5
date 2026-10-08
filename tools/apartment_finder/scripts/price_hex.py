@@ -3,8 +3,8 @@
 For every hex the smallest circle around its centre (start_radius_m .. max_radius_m) holding at least `hex.min_n` deeds
 (and `hex.min_points` distinct locations) gives the value: a distance-weighted median of price per m2. No such circle
 -> empty (never 0). Also marks "inhabited" hexes (BDOT10k residential building footprint, config `inhabited`) to report
-coverage where people live. Writes data/price/price_hex.csv (hex_id, price_m2, radius_m, n, n_pts, res_footprint_m2)
-+ price_hex.meta.json. System Python (osgeo, numpy).
+coverage where people live. A price is kept only for inhabited hexes (the others get it in price_m2_outside, for QGIS checks).
+Writes data/price/price_hex.csv (hex_id, price_m2, radius_m, n, n_pts, res_footprint_m2, price_m2_outside) + price_hex.meta.json. System Python (osgeo, numpy).
 
   py scripts/price_hex.py
 """
@@ -66,13 +66,15 @@ def main():
     radii = list(range(H["start_radius_m"], H["max_radius_m"] + 1, H["radius_step_m"]))
     rows = []
     for k, hid in enumerate(ids):
-        row = {"hex_id": int(hid), "price_m2": "", "radius_m": "", "n": "", "n_pts": "", "res_footprint_m2": round(res_fp[k])}
+        row = {"hex_id": int(hid), "price_m2": "", "radius_m": "", "n": "", "n_pts": "", "res_footprint_m2": round(res_fp[k]), "price_m2_outside": ""}
         for r in radii:
             m = D[k] <= r
             if m.sum() >= H["min_n"] and len(set(loc[m])) >= H["min_points"]:
                 w = 1 - (1 - H["weight_edge"]) * D[k][m] / r
                 row.update(price_m2=round(wmedian(V[m], w)), radius_m=r, n=int(m.sum()), n_pts=len(set(loc[m])))
                 break
+        if row["price_m2"] != "" and res_fp[k] < cfg["inhabited"]["min_footprint_m2"]:
+            row.update(price_m2_outside=row["price_m2"], price_m2="", radius_m="", n="", n_pts="")
         rows.append(row)
     with open(OUT / "price_hex.csv", "w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=list(rows[0]))
@@ -80,12 +82,13 @@ def main():
         w.writerows(rows)
 
     has = np.array([r["price_m2"] != "" for r in rows])
+    outside = sum(1 for r in rows if r["price_m2_outside"] != "")
     inh = res_fp >= cfg["inhabited"]["min_footprint_m2"]
     pr = np.array([r["price_m2"] for r in rows if r["price_m2"] != ""], float)
     rad = np.array([r["radius_m"] for r in rows if r["radius_m"] != ""], float)
     meta = {"price_version": cfg["price_version"], "hexes": len(ids), "inhabited_hexes": int(inh.sum()),
-            "coverage_all_pct": round(100 * has.mean(), 1), "coverage_inhabited_pct": round(100 * (has & inh).sum() / inh.sum(), 1),
-            "hexes_with_price": int(has.sum()), "with_price_not_inhabited": int((has & ~inh).sum()),
+            "coverage_all_pct": round(100 * has.mean(), 1), "coverage_inhabited_pct": round(100 * has.sum() / inh.sum(), 1),
+            "hexes_with_price": int(has.sum()), "price_hidden_not_inhabited": outside,
             "radius_m_pct": {p: float(np.percentile(rad, p)) for p in (10, 50, 90)},
             "price_m2_pct": {p: float(np.percentile(pr, p)) for p in (10, 25, 50, 75, 90)}, "config": H}
     json.dump(meta, open(OUT / "price_hex.meta.json", "w"), indent=1)
