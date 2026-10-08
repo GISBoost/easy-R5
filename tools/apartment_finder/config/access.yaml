@@ -1,0 +1,7 @@
+# Routing access points (bug: a hex centre can snap onto a disconnected piece of the street network -- courtyard driveways, a
+# one-way carriageway fragment -- so R5 finds no route from or to the hex for that mode). See docs/notes/apartment-finder-access-points.md.
+island_max_reached: 1        # a hex that reaches at most this many other hexes (as origin or as destination) in the once-only matrix is an island
+probe_step: 14               # every n-th hex is a probe destination when testing a candidate point
+ok_share_of_median: 0.5      # a candidate point is good when its reach on the probes is at least this share of the typical hex's reach
+radii_m: [25, 50, 75, 100, 125, 150, 200, 250, 300]
+bearings: 12                 # candidate points per radius

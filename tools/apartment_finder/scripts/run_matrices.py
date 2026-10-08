@@ -7,6 +7,7 @@ Output: data/matrices/<day>/<name>.npz  (p50 / p85 uint8 [origin, dest], 255 = n
 capped at 254) + <name>.json (parameters, network hash, R5 meta, timing). Idempotent: skips a scenario
 whose json exists. The raw CSV is deleted after packing (it is ~250 MB).
 """
+import csv
 import glob
 import json
 import os
@@ -24,7 +25,7 @@ import _qgis_env  # noqa: E402
 app = _qgis_env.start()
 import processing  # noqa: E402
 import yaml  # noqa: E402
-from qgis.core import QgsVectorLayer  # noqa: E402
+from qgis.core import QgsFeature, QgsGeometry, QgsPointXY, QgsVectorLayer  # noqa: E402
 
 scn = yaml.safe_load(open(HERE + "/config/scenarios.yaml", encoding="utf-8"))
 tw = yaml.safe_load(open(HERE + "/config/time_windows.yaml", encoding="utf-8"))["windows"]
@@ -49,6 +50,18 @@ if meta_path.exists():
 
 net = glob.glob(HERE + "/data/networks/%s/%s/*/network.dat" % (day, net_name))[0]
 cent = QgsVectorLayer(HERE + "/data/grid.gpkg|layername=hex_centroids", "c", "ogr")
+n_access = 0
+ap_path = HERE + "/data/access_points.csv"   # hexes whose centre snaps onto a disconnected piece of the network (scripts/access_points.py)
+if not transit and os.path.exists(ap_path):
+    ov = {int(r["hex_id"]): (float(r["x"]), float(r["y"])) for r in csv.DictReader(open(ap_path, encoding="utf-8")) if r["mode"] == kind}
+    if ov:
+        moved = QgsVectorLayer("Point?crs=%s&field=hex_id:integer" % cent.crs().authid(), "c_" + kind, "memory")
+        feats = []
+        for f in cent.getFeatures():
+            h = int(f["hex_id"]); nf = QgsFeature(moved.fields()); nf["hex_id"] = h
+            nf.setGeometry(QgsGeometry.fromPointXY(QgsPointXY(*ov[h])) if h in ov else f.geometry()); feats.append(nf)
+        moved.dataProvider().addFeatures(feats)
+        cent, n_access = moved, len(ov)
 w = tw[window]
 h1, m1 = map(int, w["start"].split(":"))
 h2, m2 = map(int, w["end"].split(":"))
@@ -69,7 +82,7 @@ env = {k: v for k, v in os.environ.items() if not k.upper().startswith(("PYTHON"
 subprocess.run([SYSTEM_PY, HERE + "/scripts/pack_matrix.py", csv_path, str(out_dir / (name + ".npz"))], check=True, env=env)
 r5meta = json.load(open(csv_path + ".meta.json", encoding="utf-8"))
 json.dump({"scenario": name, "day": day, "window": window, "network": net_name, "r5_seconds": round(secs, 1),
-           "scenarios_version": scn["scenarios_version"], "car_version": car, "r5": r5meta},
+           "scenarios_version": scn["scenarios_version"], "car_version": car, "access_points": n_access, "r5": r5meta},
           open(meta_path, "w", encoding="utf-8"), indent=1)
 os.remove(csv_path)
 os.remove(csv_path + ".meta.json")

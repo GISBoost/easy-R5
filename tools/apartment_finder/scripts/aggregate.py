@@ -55,15 +55,30 @@ def load(day, name):
     return best[key]
 
 
+def islands(m, max_reached=1):
+    """Hexes that reach at most `max_reached` other hexes as origin or as destination (255 = not reached)."""
+    reached = m < 255
+    return sorted(int(h) for h in np.where(((reached.sum(1) - 1) <= max_reached) | ((reached.sum(0) - 1) <= max_reached))[0])
+
+
 def main():
-    names = sorted(p.stem for p in (HERE / "data/matrices" / days[-1]).glob("*.npz"))
+    only = [a for a in sys.argv[1:] if not a.startswith("-")]   # optional scenario names (e.g. after re-running walk/bike/car)
+    names = [n for n in sorted(p.stem for p in (HERE / "data/matrices" / days[-1]).glob("*.npz")) if not only or n in only]
     report = {}
+    islands_report = {}
     missing = []
     for name in names:
         have = [d for d in days if (HERE / "data/matrices" / d / (name + ".npz")).exists()]
         if len(have) < len(days):
             if len(have) == 1 and have[0] == days[-1]:  # once-only scenario (walk, bike, car)
-                np.save(OUT / (name + ".npy"), load(days[-1], name))
+                mat = load(days[-1], name)
+                np.save(OUT / (name + ".npy"), mat)
+                isl = islands(mat)   # I6: hexes whose centre snapped onto a disconnected piece of the network (see scripts/access_points.py)
+                islands_report[name] = isl
+                if isl:
+                    print("I6 %s: island hexes %s" % (name, isl), file=sys.stderr)
+                    if name.endswith("_car"):
+                        raise SystemExit("I6 violated: car matrix %s has island hexes %s; run scripts/access_points.py car and re-run the car matrices" % (name, isl))
                 continue
             missing.append(name)
             print("MISSING DAYS", name, file=sys.stderr)
@@ -81,6 +96,7 @@ def main():
                         "mean_abs_dev_per_day_min": {d: round(v, 2) for d, v in zip(days, dev)},
                         "outlier_day": days[int(np.argmax(dev))]}
         print(name, report[name]["share_pairs_spread_gt_10min"], report[name]["outlier_day"], file=sys.stderr)
+    report["_i6_island_hexes"] = islands_report
     report["_i1_repaired_pairs_total"] = int(sum(repaired_pairs.values()))
     report["_i1_repaired_pairs_by_scenario_day"] = {"%s|%s" % k: v for k, v in repaired_pairs.items() if v}
     json.dump(report, open(OUT / "i5_report.json", "w", encoding="utf-8"), indent=1)
