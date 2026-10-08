@@ -25,6 +25,9 @@ Każdy plik wynikowy niesie wersje w metadanych (`*.meta.json`, `data/matrices/<
 | Korony drzew, etap 2: maska (≥ 3 m, minus BDOT10k, filtr gładkości i cienkości) | `scripts/canopy_mask.py` | `data/canopy/final_v2/<godło>.tif` |
 | Korony drzew, etap 3: udział koron w heksie | `scripts/canopy_hex.py` (QGIS) | `data/canopy/canopy_hex.csv` |
 | Korony drzew: obraz podglądu dla strony (WebP, 8 m) | `scripts/canopy_overlay.py` | `<easy>/gdzie-mieszkac-lodz-data/canopy.webp` |
+| Ceny, etap 1: transakcje mieszkań z RCN (WFS GUGiK, 345 stron, sortowane po `gid`) | `scripts/price_fetch.py` (systemowy Python) | `data/price/rcn_lokale.csv` |
+| Ceny, etap 2: filtr i zł/m² (okno od 2025-07, wolny rynek, 25–120 m²) | `scripts/price_clean.py` | `data/price/price_clean.gpkg` |
+| Ceny, etap 3: mediana zasięgu adaptywnego per heks (tylko heksy zamieszkałe) | `scripts/price_hex.py` | `data/price/price_hex.csv` |
 | Eksport dla strony | `scripts/export_web.py` | `<easy>/gdzie-mieszkac-lodz-data/` (osobne repo danych, patrz niżej) |
 
 Wszystkie parametry (okna czasowe, dni, progi, krzywe, promienie wygładzania) są w `config/*.yaml`.
@@ -65,6 +68,19 @@ wieże, urządzenia techniczne, obiekty sportowe z buforem 1 m; mosty/wiadukty 3
 > 30 m² (jezdnie wiaduktów, płaskie dachy spoza BDOT10k) poszerzone o 2,5 m oraz obiekty cieńsze niż ok. 2 m (słupy,
 latarnie, druty) i plamy < 10 m². Układy: dane LiDAR/NMPT są w EPSG:2177, siatka w 2180; agregacja po transformacji heksów do 2177.
 
+## Ceny mieszkań (powtórzenie kroków)
+
+Warstwa: mediana ceny transakcyjnej zł/m² z aktów notarialnych (Rejestr Cen Nieruchomości, GUGiK) w okolicy heksa. Parametry
+(okno dat, filtr, zasięg, progi) w `config/price.yaml` (`price-v1`), krzywa punktacji w `config/curves.yaml` (`price`).
+Raport z liczbami: `docs/notes/apartment-finder-price-m0.md`.
+
+1. `py scripts/price_fetch.py` (ok. 5 min): WFS `mapy.geoportal.gov.pl/wss/service/rcn`, warstwa `ms:lokale`, bbox miasta (oś: północ, wschód),
+   strony po 250, **koniecznie `sortBy=gid`** (bez sortowania serwer stronicuje niestabilnie: gubi i powtarza rekordy; skrypt przerywa przy duplikacie `gid`).
+2. `py scripts/price_clean.py`: filtr z `price.yaml`; wynik + liczniki odrzuceń w `price_clean.meta.json`.
+3. `py scripts/price_hex.py`: dla każdego heksa najmniejszy okrąg (250–1000 m wokół środka) z co najmniej 10 transakcjami z co najmniej 5 różnych
+   lokalizacji, mediana ważona odległością; cena zostaje tylko w heksach z co najmniej 1000 m² obrysów budynków mieszkalnych BDOT10k.
+4. `py scripts/export_web.py`: kolumny `price_m2`, `price_r`, `price_n` w `layers.json` i blok `price` w manifeście.
+
 ## Publikacja danych (osobne repo, bez historii)
 
 Kod strony jest w `mapy-analizy`, dane (ok. 245 MB) w `GISBoost/gdzie-mieszkac-lodz-data` (Pages z gałęzi `gh-pages`,
@@ -88,11 +104,11 @@ Release asset + workflow Actions z `upload-pages-artifact`/`deploy-pages`, wtedy
   liczone od środka heksa. Powyżej 2 km: brak wartości (strona traktuje jako „daleko").
 - Czasy w macierzach są obcięte do 60 min i kwantyzowane co 2 min (błąd ≤ 1 min) — patrz `config/export.yaml`.
 - Korony drzew: stan z nalotu z kwietnia 2021 (drzewa po nalocie mogły zniknąć lub wyrosnąć; kwiecień = drzewa bez liści, więc mierzymy zasięg koron, nie gęstość ulistnienia). Maska ma pojedyncze fałszywe trafienia (według autora ok. 1–2% zbioru: pozostałości dachów i konstrukcji, krzewy powyżej 3 m); korona nad dachem w pasie 1 m od budynku jest wycięta, więc zabudowa jest lekko niedoszacowana. Korony nad jezdniami wliczają się, jeśli model powierzchni je widzi z góry. Dla jednego kafla (śródmieście) wynik porównano z klasyfikacją chmury punktów (99% pikseli korony ma punkty klasy wysokiej roślinności, 5,8% leży w komórkach klasy „budynek”). Poziom 150 m (bufor sąsiedztwa) sprawdzono i odrzucono: korelacja z heksem 0,93.
-- Cena: brak danych w tej wersji (pusty slot). Rejestr cen nie ma otwartego API.
+- Cena: tylko transakcje z RCN od 2025-07 (ok. 7,7 tys. aktów). **Rejestr dla Łodzi jest prawie pusty dla lat 2019–2024** (po stronie źródła, ten sam obraz w pliku GeoPackage z Geoportalu), więc nie ma trendu ani dłuższej historii; początek okna (VII–IX 2025) jest cienki, a najnowsze akty trafiają do rejestru z opóźnieniem. Cena to mediana okolicy (do 1000 m), nie konkretnego budynku; ma ją 69% heksów zamieszkałych (29% wszystkich), reszta to brak danych (nie 0). Transakcje skupiają się w nowych inwestycjach. Ceny ofertowe deweloperów (dane.gov.pl) nie są jeszcze użyte. Warunki ponownego wykorzystania RCN do potwierdzenia przed publikacją.
 - Hałas: mapa akustyczna Łodzi (UMŁ, InterSIT, pomiary 2022). Licencja: informacja publiczna wg autora (2026-10-05).
   Progi dopuszczalne z rozporządzenia nie są założone w pipeline; strona stosuje próg wybrany przez użytkownika.
 
 ## Źródła danych
 
-NMPT, NMT, chmura punktów i BDOT10k: Główny Urząd Geodezji i Kartografii (dane otwarte, udostępniane bezpłatnie na podstawie art. 40a ust. 2 Prawa geodezyjnego i kartograficznego; źródło: GUGiK, opendata.geoportal.gov.pl; treść licencji do potwierdzenia przed publikacją), OpenStreetMap (ODbL), GTFS ZDiT Łódź i zrekonstruowany GTFS-RT z `GISBoost/easy-GTFS-RT`, ŁKA (kolej-lka.pl,
+Ceny transakcyjne: Rejestr Cen Nieruchomości (GUGiK, usługa WFS `mapy.geoportal.gov.pl/wss/service/rcn`; od 13.02.2026 bezpłatny, strony transakcji zanonimizowane; warunki ponownego wykorzystania do potwierdzenia przed publikacją). NMPT, NMT, chmura punktów i BDOT10k: Główny Urząd Geodezji i Kartografii (dane otwarte, udostępniane bezpłatnie na podstawie art. 40a ust. 2 Prawa geodezyjnego i kartograficznego; źródło: GUGiK, opendata.geoportal.gov.pl; treść licencji do potwierdzenia przed publikacją), OpenStreetMap (ODbL), GTFS ZDiT Łódź i zrekonstruowany GTFS-RT z `GISBoost/easy-GTFS-RT`, ŁKA (kolej-lka.pl,
 TripUpdates PKP PLK przez mkuran.pl), mapa akustyczna Łodzi (Urząd Miasta Łodzi).

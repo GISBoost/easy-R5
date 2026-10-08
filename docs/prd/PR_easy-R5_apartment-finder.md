@@ -117,7 +117,7 @@ Liczba przebiegów na dzień (do potwierdzenia): TP 4 pory × 3 typy czasu × 2 
 | Zieleń | odległość po sieci do najbliższego terenu zieleni od ok. 1 ha (O12) | malejąca |
 | Korony drzew (dodane 2026-10-06) | udział powierzchni heksa pod koronami drzew z LiDAR GUGiK 2021 (nDSM ≥ 3 m, bez budynków BDOT10k); kryterium miękkie i twarde „co najmniej X %” | rosnąca, nasycenie przy 40%; domyślna waga 2 (stare linki bez klucza zachowują wynik) |
 | Hałas drogowy, szynowy, przemysłowy | udział powierzchni heksa powyżej progu dB (Lden; Ln przy trybie „sypialnia") | malejąca |
-| Cena | zł/m² zagregowane do heksa, z liczbą transakcji | do ustalenia (O10) |
+| Cena (dodana 2026-10-08) | mediana zł/m² transakcji z RCN w okolicy heksa (zasięg adaptywny do 1000 m, min. 10 aktów z 5 lokalizacji), tylko heksy zamieszkałe | malejąca, pełna ocena ≤ 6900, zero ≥ 10700 zł/m²; domyślna waga 0; wymaganie twarde „najwyżej X zł/m²” (brak ceny nie odrzuca) |
 
 Parametry krzywych (progi, przedziały idealne) trafiają do `config/`, nie do kodu. Wartości domyślne proponuje Claude Code, Michał zatwierdza.
 
