@@ -1,6 +1,6 @@
 # „Gdzie mieszkać w Łodzi?" — postęp i kontekst dla kolejnego agenta
 
-Ostatnia aktualizacja: 2026-10-05, ok. 12:00. **Czytaj najpierw ten plik**, potem PRD i prompt.
+Ostatnia aktualizacja: 2026-10-08. **Czytaj najpierw ten plik** (sekcja „STAN NA 2026-10-08" niżej jest aktualna; starsze sekcje to dziennik, część z nich jest już nieaktualna), potem PRD i prompt.
 
 | Dokument | Rola |
 |---|---|
@@ -15,6 +15,25 @@ Reguły repo (CLAUDE.md, oba poziomy): **nie commituj/nie pushuj bez prośby**, 
 angielsku, dane nie są wersjonowane, `py` zamiast `python`, `gh` tylko pełną ścieżką
 `C:\Program Files\GitHub CLI\gh.exe`. Michał poprosił o pracę **na obu repo** (`easy-R5` i `mapy-analizy`) i o krótkie
 raporty „do jakiego etapu przechodzisz" zamiast zatrzymań po każdym kamieniu.
+
+## STAN NA 2026-10-08 (aktualny przegląd; starsze sekcje poniżej to dziennik)
+
+**Zrobione lokalnie (nic z tego nie jest na żywo):**
+- M0–M6: siatka hex 250 m (5662), warstwy statyczne, hałas (3 źródła, Lden/Ln), auto (przybliżenie), macierze R5 5 dni × 3 pory (GH Actions), frontend z punktacją trójwarstwową, hash `#s=`, PL/EN.
+- Usługi w zasięgu (4 metakategorie, 23 scenariusze, domyślne X dostrojone).
+- Poprawki UI: „Jak to działa", klik w heks po dodaniu celu, układ telefonu (sprawdzony w iframe 390 px).
+- Moduł „Korony drzew" M-C0…M-C5 (`canopy-v2`): kryterium miękkie (domyślna waga 2) + twarde „min. %" + podgląd maski; dokumentacja, test maski, review.
+- Moduł „Ceny mieszkań" M-P0…M-P6 (`price-v1`): RCN z WFS GUGiK, 7 660 transakcji VII 2025–IX 2026, cena per heks (zasięg adaptywny do 1000 m, ≥ 10 aktów z ≥ 5 lokalizacji, tylko heksy zamieszkałe: 69% zamieszkałych, 29% wszystkich), kryterium miękkie (domyślna waga 0), twarde „najwyżej X zł/m²", podgląd barwny, karta, PL/EN, testy i niezależna walidacja 12 heksów.
+- Dane ŁOG od 2022 pobrane i przeliczone w pipeline (`price_log_fetch.py`, `price_log_hex.py`, `data/price/log/`), **nie włączone do aplikacji** (klasy cen 200 m, za grube i obcięte od góry; raport `apartment-finder-log-resources.md`). Zgoda ŁOG na użycie danych: Michał, 2026-10-08.
+
+**Niezrobione / otwarte:**
+- **Publikacja czegokolwiek:** `easy-R5` main jest 7 commitów przed origin, `mapy-analizy` 8; strona na Pages i repo danych (`publish_data.sh --push`) to wciąż stara wersja (bez hałasu v2, usług, koron, cen, `canopy.webp`). Wymaga zgody Michała. Do tego `sitemap.xml`.
+- **Licencje do potwierdzenia przed publikacją:** GUGiK (NMPT/NMT/BDOT10k), RCN (warunki ponownego użycia danych WFS), UMŁ (hałas, uznane za informację publiczną). ŁOG: zgoda ustna/od Michała, dla raportów wystarczy wskazanie źródła.
+- **Ceny:** (1) decyzja, czy okno zaczyna się od X 2025 (WFS miał w VII–IX 2025 tylko 8–33% transakcji ŁOG); (2) eksport cen aktów od 2022 od ŁOG (u nich są, w krajowym WFS lat 2019–2024 brak); (3) czy cena RP w RCN jest brutto z VAT (ŁOG podaje netto; nasze ceny RP są ok. 5% wyższe po VAT); (4) ceny ofertowe deweloperów (dane.gov.pl) jako osobna warstwa; (5) wizualna kontrola w QGIS.
+- **Korony:** wizualna kontrola na ortofotomapie, porównanie z KMKD (licencja niezweryfikowana); ok. 1–2% fałszywych koron (świadomie nie poprawiane); zatwierdzenie domyślnej wagi 2.
+- **M4:** pilotaż 150 m nadal nie zrobiony. **M2:** kontrola hałasu w QGIS przez Michała. Ujednolicenie wersji OSM (CI vs lokalnie). Hosting macierzy, jeśli repo danych urośnie.
+- Niski priorytet: sprawdzić EN/telefon dla sekcji koron i usług; czyszczenie kolumn `freq_*_allday`; stałe N=5662 w `count_services.py`; „najlepszy z wybranych trybów", dalsze strojenie usług.
+- Znane problemy (dziura RCN 2019–2024, korony) nie mają jeszcze wpisów w `KNOWN_ISSUES.md`/GitHub Issues (polityka CLAUDE.md wymaga issue przed wpisem).
 
 ## Decyzje Michała z czatu (2026-10-05), poza PRD §4
 
@@ -161,13 +180,18 @@ Lokalnie gotowe: `data/services/2026-10-02/{walk,bike,car_morning,car_midday,car
 - Review: poprawiono twarde „Wymagaj" bez danych (pomijane zamiast odrzucać wszystko); niski priorytet, nie zrobione: stałe N=5662 w `count_services.py`.
 - Zostaje: EN/telefon, publikacja (`publish_data.sh --push` + push mapy-analizy, tylko za zgodą), `sitemap.xml`.
 
-## 2026-10-06 — moduł „Korony drzew" (M-C0..M-C4 zrobione, M-C5 zostaje)
+## 2026-10-06 — moduł „Korony drzew" (M-C0..M-C5 zrobione lokalnie 2026-10-07)
 - Pipeline (`tools/apartment_finder/scripts/canopy_tiles.py` → `canopy_mask.py` → `canopy_hex.py`, `canopy_overlay.py`; config `config/canopy.yaml`, `canopy-v2`): NMPT−NMT 2021 ≥ 3 m, minus BDOT10k, filtr gładkości (wiadukty/dachy) i cienkości (słupy). Szczegóły i liczby: [`apartment-finder-canopy-m0.md`](apartment-finder-canopy-m0.md). Dane robocze w `tools/apartment_finder/data/canopy/` (poza gitem; `final_v2/`, `canopy_hex.csv`).
 - Aplikacja: kolumna `canopy` w `layers.json`, krzywa `canopy` w `curves.yaml` (`full_share` 0,40, domyślne „wymagaj" 15%, waga domyślna 2), kryterium miękkie + wymaganie twarde + podgląd maski (`canopy.webp`, 2,7 MB, ładowany dopiero po włączeniu) + wpis w karcie + PL/EN + „Jak to działa". Lokalnie przetestowane (twarde 15% = 3833 heksów zgodnie z danymi).
 - Znane: pojedyncze fałszywe korony (Michał: ok. 1–2% zbioru, nie poprawiane), korona nad dachem w buforze 1 m od budynku przepada, stan z kwietnia 2021. Do zrobienia M-C5: README (opis kroków), aktualizacja PRD (pozycja „wielkość zieleni" częściowo pokryta), licencja GUGiK do potwierdzenia, ewentualna kontrola ortofotomapą, publikacja `canopy.webp` w repo danych (za zgodą).
 
 ## 2026-10-08 — moduł „Ceny mieszkań" (M-P0..M-P6 zrobione lokalnie, bez publikacji)
 - Pipeline: `price_fetch.py` → `price_clean.py` → `price_hex.py`, config `config/price.yaml` (`price-v1`), krzywa `curves.yaml: price`. Raport: `docs/notes/apartment-finder-price-m0.md`.
-- Dane: RCN przez WFS (z `sortBy=gid`, inaczej niestabilne stronicowanie), 7660 transakcji VII 2025 – IX 2026; lata 2019–2024 puste u źródła. Cena: zasięg adaptywny 250–1000 m (min. 10 aktów z 5 lokalizacji), tylko heksy zamieszkałe: 1667 heksów = 69% zamieszkałych, 29% wszystkich.
+- Dane: RCN przez WFS (z `sortBy=gid`, inaczej niestabilne stronicowanie), 7660 transakcji VII 2025 – IX 2026; lata 2019–2024 puste w krajowym WFS (ŁOG ma je u siebie, patrz niżej). Cena: zasięg adaptywny 250–1000 m (min. 10 aktów z 5 lokalizacji), tylko heksy zamieszkałe: 1667 heksów = 69% zamieszkałych, 29% wszystkich.
 - Aplikacja: kolumny `price_m2/price_r/price_n`, blok `price` w manifeście, kryterium miękkie (domyślna waga 0), wymaganie twarde „najwyżej X zł/m²" (brak ceny nie odrzuca), podgląd barwny heksów, wiersz na karcie, PL/EN.
 - Do zrobienia: potwierdzić warunki ponownego użycia RCN, publikacja, ceny ofertowe deweloperów (osobna warstwa), wizualna kontrola w QGIS.
+
+## 2026-10-08 — dane ŁOG (Łódzki Ośrodek Geodezji)
+- Rozpoznanie: [`apartment-finder-log-resources.md`](apartment-finder-log-resources.md) (zasoby, serwer REST `mapa.lodz.pl/3/rest/services`, walidacja modelu cen względem raportu ŁOG 2025). Nasze ceny są ok. 12% wyższe od średnich ŁOG (RP po VAT ok. 5%, RW ok. 6%), układ dzielnic zbliżony.
+- Pobrane od 2022 (`scripts/price_log_fetch.py`): komórki 200 m z klasą ceny (5 migawek × RP/RW), 20 078 transakcji bez ceny; przeliczone na heksy (`price_log_hex.py`). Zgodność przestrzenna z naszą ceną słaba (rho 0,24–0,33), bo klasy po 1 000 zł i od 2025 obcięte od góry; do aplikacji nie weszło.
+- Następny krok zależy od Michała: eksport cen aktów od ŁOG (trend 2022–2026, gęstsza mapa) albo warstwa podglądu klas ŁOG.
