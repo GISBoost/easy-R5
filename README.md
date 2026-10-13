@@ -1,4 +1,7 @@
-# Easy-R5
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/logo-lockup-horizontal-dark.svg">
+  <img src="docs/img/logo-lockup-horizontal.svg" alt="Easy-R5" height="64">
+</picture>
 
 A QGIS processing plugin for transit accessibility analysis on the
 [**Conveyal R5**](https://github.com/conveyal/r5) routing engine — travel-time matrices,
