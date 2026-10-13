@@ -108,3 +108,23 @@ hs_err_pid*.log
 # --- Claude Code: local settings stay out; shared subagent definitions are versioned ---
 .claude/*
 !.claude/agents/
+
+# --- Local only: kept on this machine on purpose, never published (the repo is public) ---
+# Business/strategy reports (the root CLAUDE.md points at one of them as context).
+/raport_*
+/GISBoost_raport_*
+/ss-*.png
+# Markers left where data was deleted or moved to the G: archive (paths on one machine).
+PLIKI_USUNIETE.md
+PRZENIESIONE_NA_G.md
+*.PRZENIESIONE_NA_G.md
+# Unpublished social-media drafts and their raw images.
+tools/realtime_delay_lodz/social-drafts.md
+tools/realtime_delay_lodz/output_*.jpg
+
+# --- Generated study outputs (rebuildable; per each tool's README) ---
+tools/demo_v03_lodz/out/
+tools/demo_v03_lodz/scenariusz_tramwaj.json
+tools/f1_smoke_test_lodz/
+tools/lodz_timetable_change/out/
+tools/lodzkie_na_mapach_2026/out/geojson_staging/
