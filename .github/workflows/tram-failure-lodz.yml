@@ -146,7 +146,10 @@ jobs:
       - name: Get the static GTFS for the analysis date
         run: |
           set -euo pipefail
-          gh release download "lodz-realized-${GTFS_DATE}-phone" --repo GISBoost/easy-GTFS-RT \
+          TAG="lodz-realized-${GTFS_DATE}-phone"
+          # monthly-release layout (easy-GTFS-RT `monthly_release`): one release per month
+          gh release view "$TAG" --repo GISBoost/easy-GTFS-RT >/dev/null 2>&1 || TAG="lodz-realized-${GTFS_DATE:0:7}"
+          gh release download "$TAG" --repo GISBoost/easy-GTFS-RT \
             --pattern "lodz_static_gtfs_${GTFS_DATE}.zip" --dir . --clobber
           ls -la "lodz_static_gtfs_${GTFS_DATE}.zip"
 

@@ -21,6 +21,13 @@ GH = r"C:\Program Files\GitHub CLI\gh.exe" if sys.platform == "win32" else "gh" 
 REPO = "GISBoost/easy-GTFS-RT"
 
 
+def lodz_tag(day):
+    """Per-day release if it exists, else the monthly release (easy-GTFS-RT `monthly_release`)."""
+    tag = "lodz-realized-%s-phone" % day
+    ok = subprocess.run([GH, "release", "view", tag, "--repo", REPO], capture_output=True).returncode == 0
+    return tag if ok else "lodz-realized-%s" % day[:7]
+
+
 def download(day):
     """Lodz (static/p50/p85) and LKA release assets for a day, if not present yet."""
     for v in ("static", "p50", "p85"):
@@ -29,7 +36,7 @@ def download(day):
             "p85": "lodz_realized_%s_p85.zip" % day}
     for v, name in lodz.items():
         if not (HERE / "data/gtfs" / day / v / name).exists():
-            subprocess.run([GH, "release", "download", "lodz-realized-%s-phone" % day, "--repo", REPO,
+            subprocess.run([GH, "release", "download", lodz_tag(day), "--repo", REPO,
                             "-p", name, "-D", str(HERE / "data/gtfs" / day / v)], check=True)
     d = HERE / "data/lka" / day
     d.mkdir(parents=True, exist_ok=True)

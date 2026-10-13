@@ -137,7 +137,10 @@ jobs:
           set -euo pipefail
           D="${{ matrix.day }}"
           mkdir -p gtfs
-          gh release download "lodz-realized-${D}-phone" --repo GISBoost/easy-GTFS-RT \
+          TAG="lodz-realized-${D}-phone"
+          # monthly-release layout (easy-GTFS-RT `monthly_release`): one release per month
+          gh release view "$TAG" --repo GISBoost/easy-GTFS-RT >/dev/null 2>&1 || TAG="lodz-realized-${D:0:7}"
+          gh release download "$TAG" --repo GISBoost/easy-GTFS-RT \
             --pattern "lodz_realized_${D}_p50.zip" --dir gtfs --clobber
           ls -la gtfs
 

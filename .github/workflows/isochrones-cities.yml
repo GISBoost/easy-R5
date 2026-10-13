@@ -183,6 +183,8 @@ jobs:
               asset="${CITY}_realized_${GTFS_DATE}_p50.zip"
             fi
             tag="${CITY}-realized-${GTFS_DATE}-phone"
+            # monthly-release layout (easy-GTFS-RT `monthly_release`): one release per month
+            gh release view "$tag" --repo GISBoost/easy-GTFS-RT >/dev/null 2>&1 || tag="${CITY}-realized-${GTFS_DATE:0:7}"
             gh release download "$tag" --repo GISBoost/easy-GTFS-RT \
               --pattern "$asset" --dir "$net_dir" --clobber
 
