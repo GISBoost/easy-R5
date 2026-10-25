@@ -8,7 +8,7 @@ A QGIS processing plugin for transit accessibility analysis on the
 cumulative-opportunity accessibility and isochrones over a departure-time window, computed inside
 QGIS with no R, no conda and no Docker.
 
-> **Status: 0.3.0, experimental.** All fifteen algorithms work; the travel-time matrix and
+> **Status: 0.3.1, experimental.** All fifteen algorithms work; the travel-time matrix and
 > accessibility are verified end-to-end (accessibility reproduces r5r's Gdańsk output
 > *exactly* — [`docs/notes/validation-gdansk.md`](docs/notes/validation-gdansk.md)).
 > New in 0.3.0, each verified on a real Łódź network: **network scenarios** (draw a new line,
