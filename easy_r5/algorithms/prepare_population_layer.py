@@ -102,7 +102,7 @@ class PreparePopulationLayer(QgsProcessingAlgorithm):
             QgsProcessingParameterString(
                 self.POPULATION_COLUMN,
                 self.tr("Population column name in Excel header"),
-                defaultValue="pop20-29",
+                defaultValue="20-29",
             )
         )
         self.addParameter(
@@ -124,7 +124,8 @@ class PreparePopulationLayer(QgsProcessingAlgorithm):
             QgsProcessingParameterString(
                 self.OUTPUT_FIELD_NAME,
                 self.tr("Output field name"),
-                defaultValue="pop20_29",
+                defaultValue="",
+                optional=True,
             )
         )
         self.addParameter(
@@ -142,6 +143,7 @@ class PreparePopulationLayer(QgsProcessingAlgorithm):
         feedback: "QgsProcessingFeedback",
     ) -> dict:
         import json        # noqa: PLC0415
+        import re          # noqa: PLC0415
         import subprocess  # noqa: PLC0415  # nosec B404 — needed for the nosec-annotated subprocess.run call below
         from pathlib import Path
 
@@ -159,9 +161,11 @@ class PreparePopulationLayer(QgsProcessingAlgorithm):
         pop_col = self.parameterAsString(parameters, self.POPULATION_COLUMN, context).strip()
         geom_layer = self.parameterAsVectorLayer(parameters, self.GEOMETRY_LAYER, context)
         key_field = self.parameterAsString(parameters, self.KEY_FIELD, context)
+        # Empty = derived from the column ("20-29" -> "pop20_29"), so a changed
+        # column never lands in a field named after the default age band.
         out_field_name = (
             self.parameterAsString(parameters, self.OUTPUT_FIELD_NAME, context).strip() or
-            "pop20_29"
+            "pop" + re.sub(r"\W", "_", pop_col)
         )
 
         feedback.setProgress(0)

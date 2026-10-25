@@ -33,6 +33,26 @@ def ensure_openpyxl() -> bool:
         return False
 
 
+def _get_python_executable() -> str:
+    """The real interpreter, not the QGIS launcher (``qgis-bin.exe`` on Windows).
+
+    Used to run ``core/xlsx_reader.py`` in a subprocess (never pip). Copied from
+    easy-OTP's ``core/dependencies.py``.
+    """
+    exe = sys.executable
+    if "python" in os.path.basename(exe).lower():
+        return exe
+    for name in ("python.exe", "python3.exe"):
+        candidate = os.path.join(sys.exec_prefix, name)
+        if os.path.isfile(candidate):
+            return candidate
+    for name in ("python3", "python"):
+        candidate = os.path.join(sys.exec_prefix, "bin", name)
+        if os.path.isfile(candidate):
+            return candidate
+    return exe
+
+
 def _safe_zipextract(zf: zipfile.ZipFile, dest_path: str) -> None:
     """Extract, skipping any member that would escape ``dest_path`` (zip slip)."""
     dest_root = os.path.realpath(dest_path)
