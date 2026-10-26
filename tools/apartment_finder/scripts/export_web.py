@@ -95,6 +95,15 @@ def export_layers(out):
         cols["price_m2"] = [None if v is None else int(v) for v in p["price_m2"]]   # median PLN/m2, empty = no value
         cols["price_r"] = [None if v is None else int(v) for v in p["radius_m"]]    # radius (m) the value was taken from
         cols["price_n"] = [None if v is None else int(v) for v in p["n"]]           # deeds behind it
+    ov = HERE / "data/offer/offer_hex.csv"
+    if ov.exists():
+        assert (HERE / "data/offer/offer_hex.meta.json").exists(), "offer_hex.csv without offer_hex.meta.json: re-run offer_hex.py"
+        p = read_csv_cols(ov)
+        assert len(p["offer_m2"]) == len(cols["d_tram_m"]) and any(p["offer_m2"]), "offer layer invalid"
+        assert all((a is None) == (b is None) == (c is None) for a, b, c in zip(p["offer_m2"], p["radius_m"], p["n"])), "offer/radius/n out of step"
+        cols["offer_m2"] = [None if v is None else int(v) for v in p["offer_m2"]]   # median asking PLN/m2 of nearby investments, empty = no value
+        cols["offer_r"] = [None if v is None else int(v) for v in p["radius_m"]]    # radius (m) the value was taken from
+        cols["offer_n"] = [None if v is None else int(v) for v in p["n"]]           # investments behind it
     json.dump(cols, open(out / "layers.json", "w"), separators=(",", ":"))
     return sorted(cols)
 
@@ -110,6 +119,20 @@ def price_manifest():
             "window_from": c["window_from"], "min_n": h["config"]["min_n"], "min_points": h["config"]["min_points"],
             "max_radius_m": h["config"]["max_radius_m"], "hexes_with_price": h["hexes_with_price"],
             "coverage_inhabited_pct": h["coverage_inhabited_pct"], "price_m2_pct": h["price_m2_pct"]}
+
+
+def offer_manifest(out):
+    """Offer block of the manifest (offer_hex.py meta); also copies the investment points to out/investments.json."""
+    mp = HERE / "data/offer/offer_hex.meta.json"
+    if not mp.exists():
+        return None
+    h = json.load(open(mp))
+    (out / "investments.json").write_bytes((HERE / "data/offer/investments.json").read_bytes())
+    return {"version": h["offer_version"], "fetched": h["fetched"], "investments": h["investments_kept"], "developers": h["developers"],
+            "offers_active": h["offers_active"], "min_n": h["config"]["min_n"], "min_developers": h["config"]["min_developers"],
+            "max_radius_m": h["config"]["max_radius_m"], "hexes_with_offer": h["hexes_with_offer"],
+            "coverage_inhabited_pct": h["coverage_inhabited_pct"], "offer_m2_pct": h["offer_m2_pct"],
+            "source_url": "https://deweloperuch.pl/ceny-ofertowe/lodz"}
 
 
 def canopy_manifest(out):
@@ -258,12 +281,13 @@ def main():
     present = sorted(f.name[:-6] for f in (out / "m").glob("*.r.bin"))
     bases = {n: base_of(n) for n in present if base_of(n) and base_of(n) != n}
     manifest = {
-        "method_version": "apt-v1 (grid %s, layers %s, noise %s, canopy %s, price %s, car %s, curves %s)" % (
+        "method_version": "apt-v1 (grid %s, layers %s, noise %s, canopy %s, price %s, offer %s, car %s, curves %s)" % (
             grid_meta["grid_version"], "static-v1", noise_cfg["layers_version"], (canopy_manifest(out) or {}).get("version", "none"),
-            (price_manifest() or {}).get("version", "none"),
+            (price_manifest() or {}).get("version", "none"), (offer_manifest(out) or {}).get("version", "none"),
             "car-v1", curves["curves_version"]),
         "canopy": canopy_manifest(out),
         "price": price_manifest(),
+        "offer": offer_manifest(out),
         "n": n, "bounds": bounds,
         "windows": {k: {"start": v["start"], "end": v["end"]} for k, v in tw["windows"].items()},
         "default_dir": {k: ("to" if v == "to_target" else "from") for k, v in tw["default_direction"].items()},

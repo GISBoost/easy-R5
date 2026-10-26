@@ -28,6 +28,8 @@ Każdy plik wynikowy niesie wersje w metadanych (`*.meta.json`, `data/matrices/<
 | Ceny, etap 1: transakcje mieszkań z RCN (WFS GUGiK, 345 stron, sortowane po `gid`) | `scripts/price_fetch.py` (systemowy Python) | `data/price/rcn_lokale.csv` |
 | Ceny, etap 2: filtr i zł/m² (okno od 2025-07, wolny rynek, 25–120 m²) | `scripts/price_clean.py` | `data/price/price_clean.gpkg` |
 | Ceny, etap 3: mediana zasięgu adaptywnego per heks (tylko heksy zamieszkałe) | `scripts/price_hex.py` | `data/price/price_hex.csv` |
+| Ceny ofertowe, etap 1: inwestycje miasta z deweloperuch.pl (CLI `deweloperuch-mcp`, jedno zapytanie) | `scripts/offer_fetch.py` | `data/offer/investments_raw.json` |
+| Ceny ofertowe, etap 2: mediana zasięgu adaptywnego per heks + punkty inwestycji | `scripts/offer_hex.py` (po `price_hex.py`) | `data/offer/offer_hex.csv`, `data/offer/investments.json` |
 | Eksport dla strony | `scripts/export_web.py` | `<easy>/gdzie-mieszkac-lodz-data/` (osobne repo danych, patrz niżej) |
 
 Wszystkie parametry (okna czasowe, dni, progi, krzywe, promienie wygładzania) są w `config/*.yaml`.
@@ -80,6 +82,28 @@ Raport z liczbami: `docs/notes/apartment-finder-price-m0.md`.
 3. `py scripts/price_hex.py`: dla każdego heksa najmniejszy okrąg (250–1000 m wokół środka) z co najmniej 10 transakcjami z co najmniej 5 różnych
    lokalizacji, mediana ważona odległością; cena zostaje tylko w heksach z co najmniej 1000 m² obrysów budynków mieszkalnych BDOT10k.
 4. `py scripts/export_web.py`: kolumny `price_m2`, `price_r`, `price_n` w `layers.json` i blok `price` w manifeście.
+
+## Ceny ofertowe deweloperów (powtórzenie kroków)
+
+Warstwa: mediana średnich cen ofertowych zł/m² inwestycji deweloperskich w okolicy heksa, z [deweloperuch.pl](https://deweloperuch.pl/)
+(ceny z raportów deweloperów na dane.gov.pl). To ceny, za które deweloper chce sprzedać, nie transakcje: na stronie
+stoją osobno od warstwy RCN, z własną wagą i budżetem. Parametry w `config/offer.yaml` (`offer-v1`), krzywa w
+`config/curves.yaml` (`offer`).
+
+1. `py scripts/offer_fetch.py`: `deweloperuch investments search lodz --limit 500 --json` z pakietu
+   [deweloperuch-mcp](https://github.com/MBratkowski/deweloperuch-mcp) (wersja przypięta w `offer.yaml`). To **jedno
+   zapytanie** do serwisu, przez limiter i blokadę STOP pakietu; istniejący plik zostaje, nowe pobranie tylko z `--refresh`.
+   Serwis jest projektem społecznym: nie pobierać częściej, niż publikujemy dane. Wynik 2026-10-26: 119 inwestycji,
+   61 deweloperów, 5950 aktywnych ofert, lista pełna (`truncated: false`).
+   Na tej maszynie `uvx` nie instaluje zależności `pywin32` (błąd blokady pliku), więc CLI idzie z osobnego venv:
+   `uv venv <dir> --python 3.12`, `UV_LINK_MODE=copy uv pip install --python <dir>/Scripts/python.exe deweloperuch-mcp==0.1.3`,
+   potem `py scripts/offer_fetch.py --cli <dir>/Scripts/deweloperuch.exe`.
+2. `py scripts/offer_hex.py`: inwestycje z aktywnymi ofertami i średnim metrażem 25–120 m² (serwis nie podaje typu,
+   a ten sam zakres co przy RCN odcina osiedla domów). Dla każdego zamieszkałego heksa (BDOT10k, z `price_hex.csv`)
+   najmniejszy okrąg 500–2000 m z co najmniej 3 inwestycjami od co najmniej 2 deweloperów, mediana ważona odległością.
+   Pokrycie 2026-10-26: 70,8% heksów zamieszkałych (RCN: ok. 69%).
+3. `py scripts/export_web.py --only none` dopisuje kolumny `offer_m2`, `offer_r`, `offer_n` do `layers.json`, blok `offer`
+   w manifeście i `investments.json` bez przeliczania macierzy (pełny eksport robi to samo przy okazji).
 
 ## Publikacja danych (osobne repo, bez historii)
 
