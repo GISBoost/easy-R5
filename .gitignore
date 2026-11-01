@@ -128,3 +128,4 @@ tools/demo_v03_lodz/scenariusz_tramwaj.json
 tools/f1_smoke_test_lodz/
 tools/lodz_timetable_change/out/
 tools/lodzkie_na_mapach_2026/out/geojson_staging/
+tools/lodzkie_na_mapach_2026/old/out/
