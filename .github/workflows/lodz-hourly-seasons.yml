@@ -1,0 +1,105 @@
+name: lodz-hourly-seasons — hourly 30-min facility counts (Aug/Sep/Oct 2026)
+
+# On-demand. One job per day in tools/lodz_hourly_seasons/config.yaml (9 days): the realized-P50 network is built once, then
+# 16 R5 runs (one per clock hour 06-22). All jobs share ONE OSM extract (osm job), so differences between months come from
+# transit only. Results: `gh run download <id>` into tools/lodz_hourly_seasons/data/, then scripts/aggregate.py.
+on:
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'Comma-separated days (blank = all days in config.yaml)'
+        required: false
+        default: ''
+      hours:
+        description: 'Comma-separated hours (blank = all; for tests, e.g. 8)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.gen.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: gen
+        shell: bash
+        run: |
+          pip install pyyaml
+          python - <<'PY'
+          import json, os, yaml
+          cfg = yaml.safe_load(open("tools/lodz_hourly_seasons/config.yaml", encoding="utf-8"))
+          days = [d for ds in cfg["months"].values() for d in ds]
+          want = [d for d in os.environ.get("DAYS", "").replace(" ", "").split(",") if d]
+          days = [d for d in days if not want or d in want]
+          assert days, "no days selected"
+          open(os.environ["GITHUB_OUTPUT"], "a").write("matrix=" + json.dumps({"day": days}) + "\n")
+          print(days)
+          PY
+        env:
+          DAYS: ${{ github.event.inputs.days }}
+
+  osm:
+    runs-on: ubuntu-latest
+    steps:
+      - run: sudo apt-get update -y && sudo apt-get install -y osmosis
+      - name: Clip the city extract once (bbox + margin; completeWays is required, dangling node refs crash R5)
+        run: |
+          set -euo pipefail
+          curl -fL -o region.osm.pbf https://download.geofabrik.de/europe/poland/lodzkie-latest.osm.pbf
+          osmosis --read-pbf file=region.osm.pbf \
+            --bounding-box left=19.1672 bottom=51.6035 right=19.7404 top=51.9155 completeWays=yes \
+            --write-pbf file=lodz.osm.pbf
+          ls -la lodz.osm.pbf
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lodz-osm
+          path: lodz.osm.pbf
+          retention-days: 30
+
+  compute:
+    needs: [plan, osm]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        working-directory: tools/lodz_hourly_seasons
+        shell: bash
+    env:
+      GH_TOKEN: ${{ github.token }}
+      HEAP_GB: '11'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'      # ADR-0002
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install numpy pandas pyyaml
+      - name: Cache the pinned R5 jar
+        uses: actions/cache@v4
+        with:
+          path: tools/apartment_finder/_ci_work/r5-v7.6-all.jar
+          key: r5-jar-v7.6
+      - uses: actions/download-artifact@v4
+        with:
+          name: lodz-osm
+          path: tools/lodz_hourly_seasons
+      - name: Count facilities for every hour of ${{ matrix.day }}
+        env:
+          DAY: ${{ matrix.day }}
+          HOURS: ${{ github.event.inputs.hours }}
+        run: python scripts/ci_hourly.py --day "$DAY" --osm lodz.osm.pbf --heap-gb "$HEAP_GB" --hours "$HOURS"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hourly-${{ matrix.day }}
+          path: tools/lodz_hourly_seasons/data/${{ matrix.day }}.npz
+          retention-days: 30

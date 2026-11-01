@@ -1,0 +1,15 @@
+# Lodz hourly accessibility, August vs September vs October 2026 (competition entry "Lodzkie na mapach 2026").
+# Metric: number of OSM facilities (21 fine types, summed to 4 meta-categories) reachable from each 250 m hex centre in <= 30 min
+# by public transport, departure window = one clock hour (06-07 ... 21-22), R5 percentile 50 over the departure minutes.
+# Timetable: Lodz REALIZED P50 GTFS of the day (easy-GTFS-RT) only. No LKA (its realized feed is unusable, a static one would blur
+# the delay effect), no static baseline: the figure measures the effect of delays on accessibility.
+cutoff_min: 30
+hours: [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]      # window = [h:00, h+1:00)
+# 3 Tue-Thu working days per month, chosen 2026-11-01 from the gtfs-dashboard manifest (status ok, full 06-22 coverage):
+#  * same static service_id inside a month (Aug schedule changed on ~17.08: 9363 -> 9892 trips; Sep and Oct are stable),
+#  * mean delay and share of changed trips close to the month's typical values (no 12.08, 25-26.08, 17-18.09, 14.10 = school-free day).
+# The month layer = per hex and hour the MEDIAN over its 3 days (odd count, so the median is a real value).
+months:
+  "2026-08": ["2026-08-04", "2026-08-05", "2026-08-13"]
+  "2026-09": ["2026-09-08", "2026-09-09", "2026-09-10"]
+  "2026-10": ["2026-10-06", "2026-10-07", "2026-10-08"]
