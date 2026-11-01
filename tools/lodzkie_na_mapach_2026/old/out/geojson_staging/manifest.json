@@ -1,0 +1,122 @@
+{
+  "region": "wojewodztwo lodzkie",
+  "date_woj": "2026-09-10",
+  "date_lodz_vacation_days": [
+    "2026-08-13",
+    "2026-08-14",
+    "2026-08-17",
+    "2026-08-18"
+  ],
+  "bounds_woj": [
+    [
+      50.83617419501578,
+      18.074480779966528
+    ],
+    [
+      52.39413382984599,
+      20.667207179790438
+    ]
+  ],
+  "bounds_lodz": [
+    [
+      51.684840429811295,
+      19.320828502671
+    ],
+    [
+      51.860006153007255,
+      19.64158091074134
+    ]
+  ],
+  "woj_categories": [
+    "przedszkole",
+    "szkola",
+    "przychodnia",
+    "apteka",
+    "park",
+    "plac_zabaw",
+    "boisko_sport",
+    "supermarket",
+    "poczta",
+    "urzad_gminy"
+  ],
+  "lodz_categories": [
+    "przedszkole",
+    "szkola",
+    "uczelnia",
+    "przychodnia",
+    "szpital",
+    "apteka",
+    "biblioteka",
+    "dom_kultury",
+    "kino",
+    "teatr",
+    "muzeum",
+    "park",
+    "plac_zabaw",
+    "silownia",
+    "basen",
+    "boisko_sport",
+    "supermarket",
+    "centrum_handlowe",
+    "targowisko",
+    "poczta",
+    "urzad_gminy"
+  ],
+  "files": [
+    {
+      "source_layer": "hex_woj_level",
+      "file": "level_woj.geojson",
+      "features": 16864,
+      "size_kb": 10327.5
+    },
+    {
+      "source_layer": "hex_woj_thresholds",
+      "file": "growth_woj.geojson",
+      "features": 16864,
+      "size_kb": 6844.0
+    },
+    {
+      "source_layer": "hex_lodz_delta",
+      "file": "delta_lodz_wrzesien.geojson",
+      "features": 4260,
+      "size_kb": 8735.3
+    },
+    {
+      "source_layer": "hex_lodz_delta_multiday",
+      "file": "delta_lodz_3dni.geojson",
+      "features": 4260,
+      "size_kb": 9240.7
+    },
+    {
+      "source_layer": "hex_lodz_delta_vacation",
+      "file": "delta_lodz_wakacje.geojson",
+      "features": 4260,
+      "size_kb": 9234.9
+    },
+    {
+      "source_layer": "hex_woj_all",
+      "file": "siatka_woj.geojson",
+      "features": 21585,
+      "size_kb": 6427.9
+    },
+    {
+      "source_layer": "hex_lodz_all",
+      "file": "siatka_lodz.geojson",
+      "features": 5662,
+      "size_kb": 1682.4
+    },
+    {
+      "source_layer": "boundary_woj",
+      "file": "boundary_woj.geojson",
+      "features": 1,
+      "size_kb": 152.1
+    },
+    {
+      "source_layer": "boundary_lodz",
+      "file": "boundary_lodz.geojson",
+      "features": 1,
+      "size_kb": 72.1
+    }
+  ],
+  "total_size_kb": 52717.0
+}
