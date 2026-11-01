@@ -45,6 +45,10 @@ jobs:
   osm:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'      # the runner default (17) cannot load osmosis' PBF reader (class file 65)
       - run: sudo apt-get update -y && sudo apt-get install -y osmosis
       - name: Clip the city extract once (bbox + margin; completeWays is required, dangling node refs crash R5)
         run: |
