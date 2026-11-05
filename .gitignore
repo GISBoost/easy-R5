@@ -129,3 +129,21 @@ tools/f1_smoke_test_lodz/
 tools/lodz_timetable_change/out/
 tools/lodzkie_na_mapach_2026/out/geojson_staging/
 tools/lodzkie_na_mapach_2026/old/out/
+
+# lodz_hourly_seasons: generated competition deliverable (shapefiles, qgz, zip)
+tools/lodz_hourly_seasons/submission/
+tools/lodz_hourly_seasons/HANDOFF_plansza.md
+tools/lodz_hourly_seasons/AUDYT_planszy.md
+tools/lodz_hourly_seasons/PROMPT_audyt_planszy.md
+tools/lodz_hourly_seasons/RESEARCH_plansze.md
+tools/lodz_hourly_seasons/CHECKLISTA_wysylka.md
+tools/lodz_hourly_seasons/scripts/add_pdf_links.py
+tools/lodz_hourly_seasons/scripts/build_plansza.py
+tools/lodz_hourly_seasons/scripts/build_podklad.py
+tools/lodz_hourly_seasons/scripts/build_qgz.py
+tools/lodz_hourly_seasons/scripts/build_qr.py
+tools/lodz_hourly_seasons/scripts/build_siec.py
+tools/lodz_hourly_seasons/scripts/export_plansza.py
+tools/lodz_hourly_seasons/scripts/export_submission.py
+tools/lodz_hourly_seasons/scripts/make_zip.py
+tools/lodz_hourly_seasons/scripts/osiedla_stats.py
