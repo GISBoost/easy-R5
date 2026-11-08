@@ -11,6 +11,8 @@ import csv
 import datetime
 import json
 import math
+import re
+import statistics
 import sys
 import zipfile
 from collections import defaultdict
@@ -110,11 +112,147 @@ def project(coords, dist, stop_ll):
     return out
 
 
+def shape_median(coords):
+    if len(coords) < 2:
+        return None
+    return statistics.median(hav_m(coords[i - 1], coords[i]) for i in range(1, len(coords)))
+
+
+def split_spikes(piece, med):
+    """Drop one edge that jumps across a hole in an otherwise dense shape.
+
+    ponytail: threshold is max(250m, 8x that shape's median edge). A uniformly
+    coarse shape stays intact. The hole is deleted, not rebuilt from other shapes.
+    """
+    if med is None or len(piece) < 2:
+        return [piece] if len(piece) >= 2 else []
+    thr = max(250.0, 8.0 * med)
+    parts = []
+    cur = [piece[0]]
+    for p in piece[1:]:
+        if hav_m(cur[-1], p) > thr:
+            if len(cur) >= 2:
+                parts.append(cur)
+            cur = [p]
+        else:
+            cur.append(p)
+    if len(cur) >= 2:
+        parts.append(cur)
+    return parts
+
+
+SNAP_M = 80.0
+
+
+def other_tags(raw):
+    out = {}
+    if not raw:
+        return out
+    for key, val in re.findall(r'"((?:\\.|[^"\\])*)"=>"((?:\\.|[^"\\])*)"', raw):
+        out[key.replace('\\"', '"')] = val.replace('\\"', '"').replace("\\\\", "\\")
+    return out
+
+
+def closest_measure(coords, dist, pt, max_m):
+    best_d, best_m = max_m, None
+    cos = math.cos(math.radians(pt[1]))
+    for i in range(1, len(coords)):
+        ax, ay = coords[i - 1]
+        bx, by = coords[i]
+        dx = math.radians(bx - ax) * 6371000 * cos
+        dy = math.radians(by - ay) * 6371000
+        px = math.radians(pt[0] - ax) * 6371000 * cos
+        py = math.radians(pt[1] - ay) * 6371000
+        l2 = dx * dx + dy * dy
+        t = 0.0 if l2 <= 0 else max(0.0, min(1.0, (px * dx + py * dy) / l2))
+        d = math.hypot(px - dx * t, py - dy * t)
+        if d < best_d:
+            best_d = d
+            best_m = dist[i - 1] + (dist[i] - dist[i - 1]) * t
+    return best_m
+
+
+def osm_lines(pbf):
+    from osgeo import gdal, ogr
+    gdal.SetConfigOption("OGR_INTERLEAVED_READING", "YES")
+    ds = ogr.Open(str(pbf))
+    if ds is None:
+        raise SystemExit("cannot open %s" % pbf)
+    layers = [ds.GetLayerByIndex(i) for i in range(ds.GetLayerCount())]
+    found = defaultdict(list)
+
+    def take(feat):
+        tags = other_tags(feat.GetField("other_tags"))
+        kind = tags.get("route")
+        ref = (tags.get("ref") or "").strip()
+        if kind not in ("tram", "bus") or not ref or ";" in ref:
+            return
+        geom = feat.GetGeometryRef()
+        if geom is None:
+            return
+        n = geom.GetGeometryCount()
+        geoms = [geom.GetGeometryRef(i) for i in range(n)] if n else [geom]
+        for g in geoms:
+            coords = [(g.GetPoint(i)[0], g.GetPoint(i)[1]) for i in range(g.GetPointCount())]
+            if len(coords) >= 2:
+                found[(kind, ref)].append((coords, cum_m(coords)))
+
+    # ponytail: GDAL stops a single-layer scan once the points layer overflows. Read every layer in turn.
+    while True:
+        progressed = False
+        for layer in layers:
+            feat = layer.GetNextFeature()
+            while feat is not None:
+                progressed = True
+                if layer.GetName() == "multilinestrings":
+                    take(feat)
+                feat = layer.GetNextFeature()
+        if not progressed:
+            break
+    return found
+
+
+def osm_piece(lines, a_ll, b_ll):
+    straight = hav_m(a_ll, b_ll)
+    best = None
+    for coords, dist in lines:
+        ma = closest_measure(coords, dist, a_ll, SNAP_M)
+        mb = closest_measure(coords, dist, b_ll, SNAP_M)
+        if ma is None or mb is None or abs(mb - ma) < 1:
+            continue
+        along = abs(mb - ma)
+        if along > max(straight * 4, straight + 800):
+            continue
+        rank = abs(along - straight)
+        if best is None or rank < best[0]:
+            best = (rank, coords, dist, ma, mb)
+    if best is None:
+        return None
+    _rank, coords, dist, ma, mb = best
+    return slice_dist(coords, dist, ma, mb)
+
+
+def _self_check():
+    lat = 51.76
+    dense = [(19.40 + i * 0.0003, lat) for i in range(8)]
+    jump = dense + [(dense[-1][0] + 0.03, lat)]
+    parts = split_spikes(jump, 20.0)
+    assert parts == [dense], parts
+    coarse = [(19.40 + i * 0.008, lat) for i in range(5)]
+    assert split_spikes(coarse, 550.0) == [coarse]
+    assert split_spikes([coarse[0], coarse[-1]], None) == [[coarse[0], coarse[-1]]]
+    assert other_tags('"ref"=>"10","route"=>"tram"')["route"] == "tram"
+    line = [(19.40, 51.76), (19.42, 51.76)]
+    got = closest_measure(line, cum_m(line), (19.41, 51.7603), 80)
+    assert got is not None and 600 < got < 900, got
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--day", required=True)
     ap.add_argument("--gtfs", required=True)
     ap.add_argument("--out", required=True, help="directory for stops, destinations, segments.geojson")
+    ap.add_argument("--osm", help="OSM PBF; route ref fills a stop pair, GTFS shape stays where it does not")
     a = ap.parse_args()
     day = datetime.date.fromisoformat(a.day)
     gtfs = Path(a.gtfs)
@@ -137,7 +275,7 @@ def main():
                 rt = int(row.get("route_type") or 3)
             except ValueError:
                 rt = 3
-            routes[row["route_id"].strip()] = rt
+            routes[row["route_id"].strip()] = (rt, row.get("route_short_name", "").strip())
         trips = {}
         n_trips = 0
         for row in rows(zf, "trips.txt"):
@@ -181,18 +319,22 @@ def main():
         if len(seq) < 2:
             continue
         key = (shape_id, tuple(s[1] for s in seq))
-        rt = routes.get(route_id, 3)
+        rt, short = routes.get(route_id, (3, ""))
         dists = tuple(s[2] for s in seq)
         prev = patterns.get(key)
         if prev is None:
-            patterns[key] = [rt, dists]
-        elif rt == TRAM:
-            prev[0] = TRAM
+            patterns[key] = [rt, dists, {short} if short else set()]
+        else:
+            if rt == TRAM:
+                prev[0] = TRAM
+            if short:
+                prev[2].add(short)
 
+    osm = osm_lines(a.osm) if a.osm else {}
     used = []
     seg = {}  # (a, b) -> (coords, mode, npts)
-    n_shape = n_proj = n_straight = 0
-    for (shape_id, stop_ids), (rt, dists) in patterns.items():
+    n_shape = n_proj = n_straight = n_osm = 0
+    for (shape_id, stop_ids), (rt, dists, refs) in patterns.items():
         for s in stop_ids:
             if s not in stops:
                 break
@@ -213,24 +355,40 @@ def main():
             else:
                 along = None
                 kind = "straight"
+            med = None if kind == "straight" else shape_median(coords)
             for i in range(len(stop_ids) - 1):
                 a, b = stop_ids[i], stop_ids[i + 1]
                 if a == b:
                     continue
-                if kind == "straight":
-                    piece = [stops[a][:2], stops[b][:2]]
+                want = "tram" if mode == "tram" else "bus"
+                lines = []
+                for ref in refs:
+                    lines.extend(osm.get((want, ref), ()))
+                osm_part = osm_piece(lines, stops[a][:2], stops[b][:2]) if lines else None
+                if osm_part and len(osm_part) >= 2:
+                    parts = [osm_part]
+                    n_osm += 1
                 else:
-                    piece = slice_dist(coords, along, stop_d[i], stop_d[i + 1])
-                if len(piece) < 2:
-                    piece = [stops[a][:2], stops[b][:2]]
-                # A two-point chord of several kilometres is a missing shape, not a road.
-                if len(piece) <= 2 and hav_m(piece[0], piece[-1]) > 2000:
+                    if kind == "straight":
+                        piece = [stops[a][:2], stops[b][:2]]
+                    else:
+                        piece = slice_dist(coords, along, stop_d[i], stop_d[i + 1])
+                    if len(piece) < 2:
+                        piece = [stops[a][:2], stops[b][:2]]
+                    parts = []
+                    for part in split_spikes(piece, med):
+                        # A two-point chord of several kilometres is a missing shape, not a road.
+                        if len(part) <= 2 and hav_m(part[0], part[-1]) > 2000:
+                            continue
+                        parts.append(part)
+                if not parts:
                     continue
+                npts = sum(len(part) for part in parts)
                 key = (a, b)
                 prev = seg.get(key)
-                if prev is None or len(piece) > prev[2] or (mode == "tram" and prev[1] != "tram"):
+                if prev is None or npts > prev[2] or (mode == "tram" and prev[1] != "tram"):
                     keep_mode = "tram" if (prev and prev[1] == "tram") or mode == "tram" else mode
-                    seg[key] = (piece, keep_mode, len(piece))
+                    seg[key] = (parts, keep_mode, npts)
             if kind == "shape":
                 n_shape += 1
             elif kind == "proj":
@@ -255,21 +413,25 @@ def main():
             w.writerow([index[sid], "%.6f" % lon, "%.6f" % lat])
 
     features = []
-    for n, ((stop_a, stop_b), (piece, mode, _npts)) in enumerate(sorted(seg.items())):
-        features.append({
-            "type": "Feature",
-            "id": n,
-            "properties": {"to": index[stop_b], "mode": mode},
-            "geometry": {"type": "LineString", "coordinates": [[round(x, 6), round(y, 6)] for x, y in piece]},
-        })
+    fid = 0
+    for (stop_a, stop_b), (parts, mode, _npts) in sorted(seg.items()):
+        for part in parts:
+            features.append({
+                "type": "Feature",
+                "id": fid,
+                "properties": {"to": index[stop_b], "mode": mode},
+                "geometry": {"type": "LineString", "coordinates": [[round(x, 6), round(y, 6)] for x, y in part]},
+            })
+            fid += 1
     geo = {"type": "FeatureCollection", "features": features}
     with open(out / "segments.geojson", "w", encoding="utf-8") as fh:
         json.dump(geo, fh, separators=(",", ":"))
 
     print("day %s active_services %d trips %d / %d patterns %d" % (day.isoformat(), len(active), len(trips), n_trips, len(patterns)))
-    print("stops %d segments %d shape %d projected %d straight %d" % (len(order), len(features), n_shape, n_proj, n_straight))
+    print("stops %d segments %d shape %d projected %d straight %d osm %d" % (len(order), len(features), n_shape, n_proj, n_straight, n_osm))
     print("wrote %s" % out)
 
 
 if __name__ == "__main__":
+    _self_check()
     main()
