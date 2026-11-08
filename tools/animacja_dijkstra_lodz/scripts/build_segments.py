@@ -25,6 +25,22 @@ from easy_r5.core.gtfs_calendar import _active_on, _exceptions, _services  # noq
 TRAM = 0
 MIN_M = 12.0
 
+# R* = zjazdy do zajezdni (R11, R16, …). P* / oP* = przewóz pracowników.
+# F/G/H/W = linie zakładowe / zajezdniowe (F1, G1, G2, H, W). T gdy wróci w feedzie.
+# Z* zostaje: to bieżąca komunikacja zastępcza.
+def keep_line(name):
+    if not name:
+        return False
+    if name in ("T", "H", "W"):
+        return False
+    if re.fullmatch(r"R\d+", name):
+        return False
+    if re.fullmatch(r"o?P\d+", name, re.I):
+        return False
+    if re.fullmatch(r"[FG]\d+", name):
+        return False
+    return True
+
 
 def rows(zf, name):
     with zf.open(name) as fh:
@@ -141,7 +157,7 @@ def split_spikes(piece, med):
     return parts
 
 
-SNAP_M = 80.0
+SNAP_M = 100.0
 
 
 def other_tags(raw):
@@ -172,6 +188,37 @@ def closest_measure(coords, dist, pt, max_m):
     return best_m
 
 
+def chain_lines(parts, tol_m=40.0):
+    """Join a route's pieces where the ways almost meet.
+
+    ponytail: greedy endpoint join. A branch that does not meet within tol_m stays a separate line.
+    """
+    unused = [list(p) for p in parts if len(p) >= 2]
+    out = []
+    while unused:
+        cur = unused.pop(0)
+        grew = True
+        while grew:
+            grew = False
+            for i, other in enumerate(unused):
+                if hav_m(cur[-1], other[0]) <= tol_m:
+                    cur.extend(other[1:])
+                elif hav_m(cur[-1], other[-1]) <= tol_m:
+                    cur.extend(reversed(other[:-1] if len(other) > 1 else other))
+                elif hav_m(cur[0], other[-1]) <= tol_m:
+                    cur = other[:-1] + cur
+                elif hav_m(cur[0], other[0]) <= tol_m:
+                    cur = list(reversed(other[1:])) + cur
+                else:
+                    continue
+                unused.pop(i)
+                grew = True
+                break
+        if len(cur) >= 2:
+            out.append(cur)
+    return out
+
+
 def osm_lines(pbf):
     from osgeo import gdal, ogr
     gdal.SetConfigOption("OGR_INTERLEAVED_READING", "YES")
@@ -192,10 +239,13 @@ def osm_lines(pbf):
             return
         n = geom.GetGeometryCount()
         geoms = [geom.GetGeometryRef(i) for i in range(n)] if n else [geom]
+        parts = []
         for g in geoms:
             coords = [(g.GetPoint(i)[0], g.GetPoint(i)[1]) for i in range(g.GetPointCount())]
             if len(coords) >= 2:
-                found[(kind, ref)].append((coords, cum_m(coords)))
+                parts.append(coords)
+        for coords in chain_lines(parts):
+            found[(kind, ref)].append((coords, cum_m(coords)))
 
     # ponytail: GDAL stops a single-layer scan once the points layer overflows. Read every layer in turn.
     while True:
@@ -245,6 +295,13 @@ def _self_check():
     line = [(19.40, 51.76), (19.42, 51.76)]
     got = closest_measure(line, cum_m(line), (19.41, 51.7603), 80)
     assert got is not None and 600 < got < 900, got
+    joined = chain_lines([[(19.40, 51.76), (19.41, 51.76)], [(19.41005, 51.76), (19.42, 51.76)]])
+    assert len(joined) == 1 and joined[0][-1][0] == 19.42, joined
+    assert keep_line("10A") and keep_line("6") and keep_line("Z13") and keep_line("N2")
+    assert not keep_line("T") and not keep_line("R11") and not keep_line("R16")
+    assert not keep_line("P1") and not keep_line("oP6")
+    assert not keep_line("F1") and not keep_line("G1") and not keep_line("G2")
+    assert not keep_line("H") and not keep_line("W")
 
 
 def main():
@@ -321,18 +378,18 @@ def main():
         key = (shape_id, tuple(s[1] for s in seq))
         rt, short = routes.get(route_id, (3, ""))
         dists = tuple(s[2] for s in seq)
+        names = {short} if keep_line(short) else set()
         prev = patterns.get(key)
         if prev is None:
-            patterns[key] = [rt, dists, {short} if short else set()]
+            patterns[key] = [rt, dists, names]
         else:
             if rt == TRAM:
                 prev[0] = TRAM
-            if short:
-                prev[2].add(short)
+            prev[2] |= names
 
     osm = osm_lines(a.osm) if a.osm else {}
     used = []
-    seg = {}  # (a, b) -> (coords, mode, npts)
+    seg = {}  # (a, b) -> (parts, mode, npts, refs)
     n_shape = n_proj = n_straight = n_osm = 0
     for (shape_id, stop_ids), (rt, dists, refs) in patterns.items():
         for s in stop_ids:
@@ -340,6 +397,10 @@ def main():
                 break
         else:
             mode = "tram" if rt == TRAM else "bus"
+            refs = {n for n in refs if keep_line(n)}
+            if not refs:
+                used.extend(stop_ids)
+                continue
             raw = shapes.get(shape_id) or []
             coords = [(p[1], p[2]) for p in raw]
             shape_dist = [p[3] for p in raw]
@@ -386,9 +447,14 @@ def main():
                 npts = sum(len(part) for part in parts)
                 key = (a, b)
                 prev = seg.get(key)
+                names = set(refs)
+                if prev is not None:
+                    names |= prev[3]
                 if prev is None or npts > prev[2] or (mode == "tram" and prev[1] != "tram"):
                     keep_mode = "tram" if (prev and prev[1] == "tram") or mode == "tram" else mode
-                    seg[key] = (parts, keep_mode, npts)
+                    seg[key] = (parts, keep_mode, npts, names)
+                else:
+                    seg[key] = (prev[0], prev[1], prev[2], names)
             if kind == "shape":
                 n_shape += 1
             elif kind == "proj":
@@ -414,12 +480,13 @@ def main():
 
     features = []
     fid = 0
-    for (stop_a, stop_b), (parts, mode, _npts) in sorted(seg.items()):
+    for (stop_a, stop_b), (parts, mode, _npts, names) in sorted(seg.items()):
+        line = ", ".join(sorted(n for n in names if n))
         for part in parts:
             features.append({
                 "type": "Feature",
                 "id": fid,
-                "properties": {"to": index[stop_b], "mode": mode},
+                "properties": {"to": index[stop_b], "mode": mode, "line": line},
                 "geometry": {"type": "LineString", "coordinates": [[round(x, 6), round(y, 6)] for x, y in part]},
             })
             fid += 1
