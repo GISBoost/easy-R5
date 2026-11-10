@@ -89,7 +89,13 @@ yet, this file plus the scripts' own comments are the record for now.
    newer `pbf` releases, which is what the Node conversion script itself
    needs to work around via `new Pbf.PbfWriter()`); `app.js` fetches `.pbf`
    as an `arrayBuffer()` and decodes with `geobuf.decode(new Pbf(bytes))`.
-6. Copy `data/<city>/` into `mapy-analizy/izochrony-transport/data/<city>/`
+5b. **`node geobuf_pack/pack_hours.js <city> <variant>`** — zbija per-origin
+   `.pbf` w `data/<city>/<variant>/hours/<hour>.pbf` (jedna paczka na godzinę,
+   wszystkie origins × 3 cutoffs). Mapa ładuje tę paczkę, nie 16 tys. originów.
+   Per-origin `.pbf` zostają lokalnie do przebudowy; do `mapy-analizy` idzie
+   `hours/`, `manifest.json` i `boundary.geojson`.
+6. Copy `data/<city>/manifest.json`, `boundary.geojson` and
+   `data/<city>/{rt,static}/hours/` into `mapy-analizy/izochrony-transport/data/<city>/`
    (manual, matches the other two analyses' "refresh = rerun here, re-export
    there" convention), and add `{ "id": "<city>", "label": "<Display Name>" }`
    to the top-level `mapy-analizy/izochrony-transport/data/manifest.json` — that's
